@@ -52,14 +52,14 @@ old Plans list is gone; it became task lists.
 ## Data model (SQLite)
 
 ```
-projects(id, name, status, next, repo, fav, task_list, wiki_note, updated_at)
+projects(id, name, status, next, repo, fav, archived, task_list, wiki_note, updated_at)
   status: next | active | blocked | paused | shipped
   task_list: CalDAV collection for this project's tasks (default: its name)
   wiki_note: e.g. "wiki/1-projects/Pondering Orb.md"
 logs(id, project_id, text, by, created_at)     -- text <= settings.log_max
 upkeep(id, name, every_days, last_done)
 layouts(user, page, items_json)                -- per page: [{panel, w, h, hidden}]
-settings(key, value)                           -- log_max, golem, main_lists
+settings(key, value)                           -- log_max, golem, main_lists, links, theme, connections
 cache(source, key, body, fetched_at)           -- last good reply per integration
 outbox(id, target, request_json, tries, error) -- writes waiting for a service
 ```
@@ -138,6 +138,14 @@ plugin commits every 10 minutes.
   mirrored; an optional daily digest bullet ("Orb: 4 log entries on
   [[Pondering Orb]]") can be turned on in Settings.
 - **Never** anything under `raw/`, and never secrets in a note.
+- **Reading the whole vault:** mount the vault folder into Orb **read only**
+  (for example `/mnt/user/appdata/llmwiki/vault:/vault:ro`). Orb indexes every
+  `.md` file there, including `raw/`, `schema/` and `logs/`, for the Wiki tab:
+  folder tree, full-text search, tags, backlinks and front-matter. Obsidian's
+  own data (`.obsidian/`) is skipped. The mount is only for reading; every
+  write still goes through the REST API, so file ownership and the vault rules
+  stay intact. A file watcher refreshes the index when other agents change
+  notes.
 - **Wiki down:** reads come from `cache` with a "stale since" note; writes go
   to `outbox` and show as pending until they succeed. Nothing is dropped
   silently.
@@ -160,8 +168,53 @@ upkeep, uptime, log, calendar) plus one per app and one per app group from
 `orb.yaml`. System has three panels per host: CPU (per-core meters), memory
 and disks, and containers.
 
+How editing works:
+
+- **Move:** drag a panel by its title.
+- **Resize:** drag the corner.
+- **Right-click a panel** (long-press on touch): hide or show, fit height to
+  content, full or half width, remove.
+- **Right-click empty space:** add any panel that isn't on the page, or reset
+  the page.
+- **Linked pages:** drag one tab onto another to show both side by side under
+  one tab ("Projects / To-do"). The link is saved; right-click the joined tab
+  to unlink or swap sides. Each half keeps its own panel layout. On narrow
+  screens the halves stack.
+
 In the React build this is `react-grid-layout`; the demo has its own small
 version with the same behaviour.
+
+## Projects
+
+- **New project** opens a small form: name, next step, column, and "Create a
+  note in the wiki" with a required area.
+- **Quick log:** type an entry and press Log it; a popup asks which project
+  (most recent first), with "+ New project" to create one on the spot. The
+  dropdown above the log is only a filter.
+- **Archive** hides a project from the board, Main and pickers; "Show
+  archived" brings it back into view. The wiki note is not touched.
+- **Delete** removes the project from Orb after a confirm. Its log entries
+  and wiki note stay; Orb never deletes wiki notes.
+
+## Appearance
+
+Themes are token sets: Follow device (Night tower in dark mode, Parchment in
+light), Night tower, Parchment, Arcane library, Ember forge and Frost spire.
+"Customize colours" edits nine tokens on top of any preset. Saved in
+`settings.theme`.
+
+## Connections
+
+Settings has one form per service (Uptime Kuma, LLMWIKI, CalDAV,
+UpstreamManager) with its address, the names of the environment variables
+that hold its secrets, and a **Test** button. Test runs from the server:
+
+| Service | Test |
+| --- | --- |
+| Uptime Kuma | `GET /api/status-page/<slug>` and `/heartbeat/<slug>`, lists monitors |
+| LLMWIKI | `GET /` with the key, and checks the vault mount has `.md` files |
+| CalDAV | `PROPFIND`, lists collections that hold VTODOs |
+| UpstreamManager | `GET /api/repos` and `/api/requests` |
 
 **Live app panels** come from small adapters in the Go server. Each adapter
 polls its app, keeps the last result in `cache`, and serves the browser a
