@@ -238,6 +238,39 @@ a.app:hover{border-color:var(--gold)}
 .icard .foot{display:flex;justify-content:space-between;gap:6px;padding:6px 10px;border-top:1px solid var(--line)}
 .icard[data-stage="thought"]{--c:var(--arcane)} .icard[data-stage="design"]{--c:var(--gold)} .icard[data-stage="code"]{--c:var(--ok)}
 
+/* wiki */
+.fm{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.md{display:flex;flex-direction:column;gap:6px;max-width:72ch}
+.md p,.md ul{margin:0}
+.md ul{padding-left:1.2em}
+.md .mdh{margin:8px 0 0;font-family:var(--f-display);color:var(--gold);letter-spacing:.04em}
+.md code{font-family:var(--f-mono);font-size:.86em;background:var(--inset);padding:0 4px;border-radius:3px}
+.wl{color:var(--arcane);border-bottom:1px dotted var(--arcane)}
+/* live widgets */
+.lv{display:flex;flex-direction:column;gap:3px;padding:4px 0}
+/* uptime */
+.mons{display:flex;flex-direction:column;gap:4px}
+.mon{display:flex;align-items:center;gap:10px;background:var(--inset);border-radius:5px;padding:6px 10px;min-width:0}
+.mon .dot{width:9px;height:9px;border-radius:50%;flex:none;background:var(--warn)}
+.mon.up .dot{background:var(--ok)} .mon.down .dot{background:var(--bad)}
+.beats{display:flex;gap:2px;flex:none}
+.beats i{width:5px;height:16px;border-radius:2px;background:var(--ok);display:block}
+.beats i.d{background:var(--bad)}
+@media (max-width:700px){.beats{display:none}}
+/* btop */
+.btop{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:18px 14px;margin-bottom:18px;font-family:var(--f-mono);font-size:.82rem}
+@media (max-width:760px){.btop{grid-template-columns:minmax(0,1fr)}}
+.bt{position:relative;border:1px solid var(--line-hi);border-radius:8px;padding:16px 12px 10px;background:var(--panel);display:flex;flex-direction:column;gap:4px;min-width:0}
+.bt-wide{grid-column:1/-1}
+.bt-t{position:absolute;top:-.75em;left:12px;background:var(--panel);padding:0 6px;color:var(--gold);font-size:.78rem}
+.cores{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:2px 12px}
+.core{display:grid;grid-template-columns:3.2em minmax(0,1fr) 3.4em;gap:6px;align-items:center}
+.cells{display:flex;gap:1px;min-width:0}
+.cells i{flex:1;height:9px;border-radius:1px;display:block}
+.ctab{width:100%;border-collapse:collapse}
+.ctab th{text-align:left;color:var(--muted);font-weight:500;padding:2px 8px 4px 0}
+.ctab td{padding:2px 8px 2px 0;border-top:1px solid var(--line)}
+
 /* golem */
 .golem{display:flex;flex-direction:column;gap:10px}
 .golem-head{display:flex;align-items:center;gap:10px}
@@ -298,38 +331,46 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
   $("today").textContent = new Date().toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric",year:"numeric"});
 
   // ---------- state ----------
-  const S = { tasks:[], ideas:[], projects:[], logs:[], plans:[], upkeep:[], notes:[], events:[], stats:null, yaml:null, layout:null, settings:null, loaded:false };
+  const S = { wiki:[], live:[], uptime:null, tasks:[], ideas:[], projects:[], logs:[], plans:[], upkeep:[], notes:[], events:[], stats:null, yaml:null, layout:null, settings:null, loaded:false };
   let db = null;
   let savedChat = [];
   try { savedChat = JSON.parse(localStorage.getItem("orb.golem") || "[]"); if (!Array.isArray(savedChat)) savedChat = []; } catch { savedChat = []; }
-  const UI = { tab:"main", noteId:null, noteDraft:null, calMonth:new Date(new Date().getFullYear(), new Date().getMonth(), 1), logLimit:15, logFilter:"", configuring:false, yamlDraft:null, yamlMsg:"", confirmDel:null, dragId:null, projectId:null, moving:null,
+  const UI = { tab:"main", noteId:null, noteDraft:null, calMonth:new Date(new Date().getFullYear(), new Date().getMonth(), 1), logLimit:15, logFilter:"", configuring:false, yamlDraft:null, yamlMsg:"", confirmDel:null, dragId:null, projectId:null, moving:null, todoLists:[], wikiPath:null, wikiEdit:null,
     golem:{busy:false, text:"", status:"", msgs:savedChat.slice(-30)} };
 
   const TABS = [
     {id:"main", label:"Main", title:"Scrying Table", flavor:"Everything you chose to keep in view."},
     {id:"projects", label:"Projects", title:"Workshop", flavor:"What is on the bench, and the log of how it got there."},
-    {id:"ideas", label:"Ideas", title:"Alchemy Bench", flavor:"Ideas still in thought, design or first code. Promote one when it earns a place on the board."},
-    {id:"notes", label:"Notes & Plans", title:"Library", flavor:"Notes worth keeping and plans for later."},
-    {id:"calendar", label:"Calendar", title:"Star Chart", flavor:"Events and upkeep due dates by day."},
+    {id:"ideas", label:"Ideas", title:"Alchemy Bench", flavor:"Ideas by stage. The full board moves to Miladash."},
+    {id:"todo", label:"To-do", title:"Task Ledger", flavor:"CalDAV task lists. Pick the lists you want to see."},
+    {id:"wiki", label:"Wiki", title:"Library", flavor:"Your LLMWIKI vault, sorted by PARA."},
+    {id:"calendar", label:"Calendar", title:"Star Chart", flavor:"Events, task due dates and upkeep by day."},
     {id:"mail", label:"Mail", title:"Raven Post", flavor:"Your inbox, once the ravens are allowed in."},
     {id:"upkeep", label:"Upkeep", title:"Wards", flavor:"Recurring checks that keep the tower standing."},
-    {id:"system", label:"System", title:"Engine Room", flavor:"How the machines are holding up."},
-    {id:"config", label:"Settings", title:"Sanctum", flavor:"Golem, logs, the Main table and the apps YAML."}
+    {id:"uptime", label:"Uptime", title:"Watchtower", flavor:"Every service, as Uptime Kuma sees it."},
+    {id:"system", label:"System", title:"Engine Room", flavor:"Cores, memory, disks and containers, btop style."},
+    {id:"config", label:"Settings", title:"Sanctum", flavor:"Golem, task lists, logs, the Main table and the apps YAML."}
   ];
 
   const WIDGETS = {
-    golem:{label:"Golem", wide:true}, favorites:{label:"Favorites"}, apps:{label:"Apps"}, week:{label:"Next 7 days"}, upkeep:{label:"Upkeep due"},
-    projects:{label:"Active projects"}, tasks:{label:"Open tasks"}, ideas:{label:"Ideas brewing"}, system:{label:"System"}, log:{label:"Recent log"}, plans:{label:"Next plans"}, mail:{label:"Mail"}
+    golem:{label:"Golem", wide:true}, favorites:{label:"Favorite projects"}, tasks:{label:"Open tasks"}, apps:{label:"All apps"}, uptime:{label:"Uptime"},
+    week:{label:"Next 7 days"}, upkeep:{label:"Upkeep due"}, projects:{label:"Active projects"}, ideas:{label:"Ideas brewing"},
+    system:{label:"System"}, log:{label:"Recent log"}, mail:{label:"Mail"}
   };
-  const DEFAULT_MAIN = ["golem","favorites","tasks","apps","log","week"];
-  const mainLayout = () => (S.layout && Array.isArray(S.layout.main) ? S.layout.main.filter(w=>WIDGETS[w]) : DEFAULT_MAIN);
+  const DEFAULT_MAIN = ["golem","favorites","tasks","app:Plex","app:SABnzbd","uptime","log","group:The Tower"];
+  const widgetKeys = () => [...Object.keys(WIDGETS), ...CFG.groups.map(g=>"group:"+g.name), ...allApps().map(a=>"app:"+a.name)];
+  const widgetExists = k => WIDGETS[k] || (k.startsWith("group:") && CFG.groups.some(g=>"group:"+g.name===k)) || (k.startsWith("app:") && !!findApp(k.slice(4)));
+  const labelOf = k => WIDGETS[k] ? WIDGETS[k].label : k.startsWith("group:") ? k.slice(6)+" (group)" : k.slice(4);
+  const mainLayout = () => (S.layout && Array.isArray(S.layout.main) ? S.layout.main : DEFAULT_MAIN).filter(widgetExists);
 
   const STATUSES = ["next","active","blocked","paused","shipped"];
   const STATUS_LABEL = {next:"Up next", active:"Active", blocked:"Blocked", paused:"Paused", shipped:"Shipped"};
+  const WIKI_STATUS = {next:"active", active:"active", blocked:"active", paused:"paused", shipped:"done"};
   const STAGES = ["thought","design","code"];
   const STAGE_LABEL = {thought:"Thought", design:"Design", code:"Code"};
   const STAGE_HINT = {thought:"Just a spark. Why would it matter?", design:"Sketching how it works.", code:"First code, no promises."};
-  const settings = () => ({ logMax:50, golemWrites:true, golemBrain:"claude", argosConnector:"Argos", ...(S.settings||{}) });
+  const GOLEM_DEFAULT = { provider:"local", local:{baseUrl:"http://argos:8080/v1", model:""}, frontier:{service:"openrouter", baseUrl:"https://openrouter.ai/api/v1", model:"", keyEnv:"OPENROUTER_API_KEY"} };
+  const settings = () => { const s = {logMax:50, golemWrites:true, mainLists:[], ...(S.settings||{})}; s.golem = {...GOLEM_DEFAULT, ...(s.golem||{})}; s.golem.local = {...GOLEM_DEFAULT.local, ...(s.golem.local||{})}; s.golem.frontier = {...GOLEM_DEFAULT.frontier, ...(s.golem.frontier||{})}; return s; };
   const logMax = () => Math.max(20, Math.min(200, Number(settings().logMax)||50));
 
   // ---------- yaml config ----------
@@ -339,7 +380,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     try {
       const c = window.jsyaml.load(text || "") || {};
       if (typeof c !== "object") return { cfg:null, error:"The config must be a mapping with groups: and favorites:." };
-      const groups = (Array.isArray(c.groups) ? c.groups : []).map(g => ({ name:String(g?.name||"Apps"), apps:(Array.isArray(g?.apps)?g.apps:[]).filter(a=>a&&a.name).map(a=>({ name:String(a.name), url:String(a.url||""), description:String(a.description||""), rune:String(a.rune||a.name[0]||"?").slice(0,2), live:a.live||null, links:Array.isArray(a.links)?a.links:[] })) }));
+      const groups = (Array.isArray(c.groups) ? c.groups : []).map(g => ({ name:String(g?.name||"Apps"), apps:(Array.isArray(g?.apps)?g.apps:[]).filter(a=>a&&a.name).map(a=>({ name:String(a.name), url:String(a.url||""), description:String(a.description||""), rune:String(a.rune||a.name[0]||"?").slice(0,2), live:a.live||null, widget:(a.widget&&typeof a.widget==="object")?a.widget:null, links:Array.isArray(a.links)?a.links:[] })) }));
       const favorites = Array.isArray(c.favorites) ? c.favorites : [];
       return { cfg:{groups,favorites}, error:"" };
     } catch(e){ return { cfg:null, error: e.message || String(e) }; }
@@ -361,6 +402,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
   const upkeepSorted = () => S.upkeep.map(u=>({u,s:upkeepState(u)})).sort((a,b)=>a.s.due-b.s.due);
   function agendaBetween(fromISO, toISO){
     const items = S.events.filter(e=>e.date>=fromISO && e.date<=toISO).map(e=>({date:e.date, time:e.time||"", title:e.title, kind:"ev", id:e._id}));
+    for (const t of S.tasks) if (!t.done && t.due && t.due>=fromISO && t.due<=toISO) items.push({date:t.due, time:"", title:"☐ "+t.title, kind:"ev"});
     for (const {u,s} of upkeepSorted()){
       const d = isoOf(new Date(Math.max(s.due, Date.now())));
       if (d>=fromISO && d<=toISO) items.push({date:d, time:"", title:u.name, kind:"uk", over:s.left<0});
@@ -474,22 +516,137 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
         <div class="small muted">${last?esc(fmtDate(last.date))+" · "+esc(last.text):"No log yet"}${n?` · ${n} open task${n>1?"s":""}`:""}</div></div>${star("projects",p)}</li>`;
     }).join("")}</ul>`;
   }
-  function tasksHTML(project, limit){
-    let list = S.tasks.filter(t=>!project || t.project===project);
-    list.sort((a,b)=>(a.done?1:0)-(b.done?1:0) || String(a.due||"9999").localeCompare(String(b.due||"9999")));
-    if (!project) list = list.filter(t=>!t.done);
-    if (limit) list = list.slice(0, limit);
-    const demo = S.tasks.some(t=>t.example) ? `<div class="banner">Demo tasks. In the container these come from ALLGlance (vikunja, synced over CalDAV).</div>` : "";
-    if (!list.length) return demo + `<div class="empty">${project?"No tasks assigned to this project.":"No open tasks."}</div>`;
+  // ---------- tasks (CalDAV lists) ----------
+  const listOf = t => t.list || t.project || "Inbox";
+  const taskLists = () => [...new Set(S.tasks.map(listOf))].sort();
+  const projectList = p => p.taskList || p.name;
+  function taskRows(list, showList){
     const today = todayISO();
-    return demo + `<div>${list.map(t=>`<div class="task ${t.done?"done":""}"><input type="checkbox" data-act="task-toggle" data-id="${esc(t._id)}" ${t.done?"checked":""} aria-label="Done: ${esc(t.title)}">
-      <div class="grow"><span class="t">${esc(t.title)}</span>${!project&&t.project?` <span class="tag">${esc(t.project)}</span>`:""}
-      <div class="row small" style="gap:6px"><span class="src">${esc(t.source||"orb")}</span>${t.done&&t.doneBy?`<span class="hint">done by ${esc(t.doneBy)}</span>`:""}</div></div>
+    return `<div>${list.map(t=>`<div class="task ${t.done?"done":""}"><input type="checkbox" data-act="task-toggle" data-id="${esc(t._id)}" ${t.done?"checked":""} aria-label="Done: ${esc(t.title)}">
+      <div class="grow"><span class="t">${esc(t.title)}</span>${showList?` <span class="tag">${esc(listOf(t))}</span>`:""}
+      ${t.done&&t.doneBy?`<div class="hint">done by ${esc(t.doneBy)}</div>`:""}</div>
       ${t.due?`<span class="due ${!t.done&&t.due<today?"late":""}">${esc(fmtDate(t.due))}</span>`:""}</div>`).join("")}</div>`;
   }
-  function appsHTML(compact){
-    if (!CFG.groups.length) return `<div class="empty">No apps yet. Add a group in the YAML below.</div>`;
-    return CFG.groups.map(g=>`${compact?"":`<h4 class="group-name">${esc(g.name)}</h4>`}<div class="apps">${g.apps.map(a=>{
+  const sortTasks = l => l.sort((a,b)=>(a.done?1:0)-(b.done?1:0) || String(a.due||"9999").localeCompare(String(b.due||"9999")));
+  const demoTasks = () => S.tasks.some(t=>t.example) ? `<div class="banner">Demo tasks. In the container these are VTODOs read and updated over CalDAV (your GLANCE stack).</div>` : "";
+  function tasksHTML(project, limit){
+    let list;
+    if (project){ const p = S.projects.find(x=>x.name===project); const ln = p ? projectList(p) : project; list = sortTasks(S.tasks.filter(t=>listOf(t)===ln)); }
+    else { const lists = settings().mainLists; list = sortTasks(S.tasks.filter(t=>!t.done && (!lists.length || lists.includes(listOf(t))))); }
+    if (limit) list = list.slice(0, limit);
+    if (!list.length) return demoTasks() + `<div class="empty">${project?"No tasks in this project's list.":"No open tasks in the chosen lists."}</div>`;
+    return (project?demoTasks():"") + taskRows(list, !project);
+  }
+
+  // ---------- wiki (LLMWIKI preview) ----------
+  const PARA = [["wiki/1-projects/","Projects"],["wiki/2-areas/","Areas"],["wiki/3-resources/","Resources"],["wiki/4-archive/","Archive"],["wiki/logs/","Logs"]];
+  const wikiByPath = path => S.wiki.find(w=>w.path===path);
+  function md(body){
+    const inline = s => esc(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/\[\[([^\]]+)\]\]/g,`<span class="wl">$1</span>`).replace(/`([^`]+)`/g,"<code>$1</code>");
+    let html = "", inList = false;
+    for (const line of String(body||"").split("\n")){
+      const m = line.match(/^(#{1,3})\s+(.*)/), li = line.match(/^\s*[-*]\s+(.*)/);
+      if (!li && inList){ html += "</ul>"; inList = false; }
+      if (m) html += `<h${m[1].length+2} class="mdh">${inline(m[2])}</h${m[1].length+2}>`;
+      else if (li){ if (!inList){ html += "<ul>"; inList = true; } html += `<li>${inline(li[1])}</li>`; }
+      else if (line.trim()) html += `<p>${inline(line)}</p>`;
+    }
+    return html + (inList ? "</ul>" : "");
+  }
+  function section(body, heading){
+    const lines = String(body||"").split("\n"); const i = lines.findIndex(l=>l.replace(/^#+\s*/,"").trim().toLowerCase()===heading.toLowerCase() && /^#{2}\s/.test(l));
+    if (i<0) return null; let j = i+1; while (j<lines.length && !/^#{1,2}\s/.test(lines[j])) j++;
+    return {start:i, end:j, text:lines.slice(i+1,j).join("\n").trim()};
+  }
+  function replaceSection(body, heading, text){
+    const lines = String(body||"").split("\n"), s = section(body, heading);
+    if (!s) return body.trimEnd() + `\n\n## ${heading}\n${text}\n`;
+    return [...lines.slice(0,s.start+1), text, "", ...lines.slice(s.end)].join("\n").replace(/\n{3,}/g,"\n\n");
+  }
+  async function wikiLog(line){
+    const path = `wiki/logs/Log - ${todayISO()}.md`, id = "log-"+todayISO(), cur = wikiByPath(path);
+    const entry = `- ${new Date().toTimeString().slice(0,5)} Pondering Orb: ${line}`;
+    if (cur) await db.doc("wiki/"+cur._id).update({body:(cur.body||"").trimEnd()+"\n"+entry, updated:todayISO()});
+    else await db.doc("wiki/"+id).set({path, title:`Log - ${todayISO()}`, type:"log", updated:todayISO(), body:`# Log - ${todayISO()}\n\n${entry}`, example:true});
+  }
+  function wikiCard(p){
+    const n = p.wikiNote && wikiByPath(p.wikiNote);
+    if (!n) return `<div class="empty">No wiki note linked. In the container this is the project's <span class="mono">wiki_note</span> path.</div>`;
+    const cs = section(n.body,"Current state"), ns = section(n.body,"Next steps");
+    return `<div class="fm"><span class="src">${esc(n.path)}</span><span class="pill info"><i></i>project_status: ${esc(n.project_status)}</span><span class="pill"><i></i>status: ${esc(n.status)}</span></div>
+      <div class="md"><h4 class="mdh">Current state</h4>${md(cs?cs.text:"")}<h4 class="mdh">Next steps</h4>${md(ns?ns.text:"")}</div>
+      <div class="row"><button class="btn" data-act="wiki-open" data-path="${esc(n.path)}">Open in Wiki</button></div>`;
+  }
+
+  // ---------- live app widgets ----------
+  const slug = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g,"-");
+  function liveHTML(a){
+    const w = a.widget, d = S.live.find(x=>x._id===slug(a.name));
+    if (!w || !w.type) return "";
+    if (!d) return `<div class="empty small">Live ${esc(w.type)} data appears here in the container.</div>`;
+    const demo = d.example ? `<span class="hint">example data</span>` : "";
+    if (w.type==="plex"){
+      const ss = d.sessions||[];
+      return (ss.length ? ss.map(x=>`<div class="lv"><div class="row" style="justify-content:space-between"><b>${esc(x.title)}</b><span class="hint">${esc(x.user)} · ${esc(x.player)}</span></div><div class="bar"><span style="width:${Math.min(100,+x.progress||0)}%"></span></div></div>`).join("") : `<div class="empty small">Nothing playing.</div>`) + demo;
+    }
+    if (w.type==="sabnzbd"){
+      const q = d.queue||[];
+      return `<div class="row small mono" style="justify-content:space-between"><span>${esc(d.speed||"0 B/s")}</span><span>${esc(d.timeleft||"")} left</span></div>` +
+        (q.length ? q.map(x=>`<div class="lv"><div class="row" style="justify-content:space-between"><span class="grow" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.name)}</span><span class="mono small">${esc(x.pct)}%</span></div><div class="bar"><span style="width:${Math.min(100,+x.pct||0)}%"></span></div></div>`).join("") : `<div class="empty small">Queue empty.</div>`) + demo;
+    }
+    if (w.type==="upstreammanager"){
+      const r = d.repos||[];
+      return `<div class="row small"><span class="pill ${d.pending?"warn":"ok"}"><i></i>${d.pending||0} request${d.pending===1?"":"s"} waiting</span></div>` +
+        `<ul class="list">${r.map(x=>`<li><div class="grow">${esc(x.name)}</div><span class="mono small ${x.behind?"st-paused":"muted"}">${x.behind?x.behind+" behind":"up to date"}</span></li>`).join("")}</ul>` + demo;
+    }
+    return `<div class="empty small">No view for ${esc(w.type)} yet.</div>`;
+  }
+  function appPanel(a){
+    const head = `<div class="app" style="border:0;padding:0;background:none"><span class="rune">${esc(a.rune)}</span><span class="grow"><div class="ad">${esc(a.description)}</div>
+      <div class="row small" style="margin-top:2px">${isUrl(a.url)?`<a href="${esc(a.url)}" target="_blank" rel="noopener">Open</a>`:""}${a.links.filter(l=>isUrl(l.url)).map(l=>`<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label||l.url)}</a>`).join("")}</div></span></div>`;
+    return head + liveHTML(a);
+  }
+  function groupPanel(name){ const g = CFG.groups.find(x=>x.name===name); return g ? appsHTML(true, [g]) : ""; }
+  function widgetBody(k){ if (k.startsWith("app:")) return appPanel(findApp(k.slice(4))); if (k.startsWith("group:")) return groupPanel(k.slice(6)); return W[k](); }
+
+  // ---------- uptime ----------
+  function uptimeHTML(compact){
+    const u = S.uptime, ms = (u && u.monitors) || [];
+    if (!ms.length) return `<div class="empty">No monitors yet. In the container they come from Uptime Kuma.</div>`;
+    const down = ms.filter(m=>m.status==="down").length, up = ms.filter(m=>m.status==="up").length;
+    const sum = `<div class="row"><span class="pill ok"><i></i>${up} up</span>${down?`<span class="pill bad"><i></i>${down} down</span>`:""}${ms.length-up-down?`<span class="pill warn"><i></i>${ms.length-up-down} pending</span>`:""}${u.example?`<span class="hint">example data</span>`:""}</div>`;
+    const list = compact ? ms.filter(m=>m.status!=="up").concat(ms.filter(m=>m.status==="up")).slice(0,6) : ms;
+    const groups = compact ? [["",list]] : [...new Set(list.map(m=>m.group||"Services"))].map(g=>[g, list.filter(m=>(m.group||"Services")===g)]);
+    return sum + groups.map(([g,items])=>`${g?`<h4 class="group-name">${esc(g)}</h4>`:""}<div class="mons">${items.map(m=>`<div class="mon ${esc(m.status)}">
+      <span class="dot"></span><span class="grow">${esc(m.name)}</span>
+      ${compact?"":`<span class="beats">${(m.beats||[]).slice(-40).map(b=>`<i class="${b?"u":"d"}"></i>`).join("")}</span>`}
+      <span class="mono small">${m.uptime24!=null?esc(m.uptime24)+"%":""}</span>${compact?"":`<span class="mono small muted">${m.ping!=null?esc(m.ping)+" ms":""}</span>`}</div>`).join("")}</div>`).join("");
+  }
+
+  // ---------- btop-style system ----------
+  const heat = v => v>=90?"var(--bad)":v>=70?"var(--warn)":"var(--ok)";
+  const cells = (v, n=20) => { const f = Math.round(Math.min(100,+v||0)/100*n); return `<span class="cells">${Array.from({length:n},(_,i)=>`<i style="background:${i<f?heat((i+1)/n*100):"var(--line)"}"></i>`).join("")}</span>`; };
+  function btopHTML(){
+    const st = S.stats, hosts = (st && st.hosts) || [];
+    if (!hosts.length) return `<div class="empty">No host has reported yet.</div>`;
+    return (st.example ? `<div class="banner">Example numbers. In the container Orb reads /proc and the Docker API itself.</div>` : "") + hosts.map(h=>`
+      <div class="btop">
+        <div class="bt"><span class="bt-t">${esc(h.name)} · cpu ${esc(h.cpu)}%${h.tempC!=null?" · "+esc(h.tempC)+"°C":""} · up ${esc(h.uptimeDays)}d</span>
+          ${spark(h.cpuHistory)}
+          <div class="cores">${(h.cores||[]).map((c,i)=>`<div class="core"><span class="mono">C${i}</span>${cells(c,12)}<span class="mono">${esc(c)}%</span></div>`).join("")}</div></div>
+        <div class="bt"><span class="bt-t">mem</span>
+          <div class="core"><span class="mono">ram</span>${cells(h.mem)}<span class="mono">${esc(h.mem)}%</span></div>
+          ${h.gpu!=null?`<div class="core"><span class="mono">vram</span>${cells(h.gpu)}<span class="mono">${esc(h.gpu)}%</span></div>`:""}
+          ${(h.disks||[{mount:"/",pct:h.disk}]).map(d=>`<div class="core"><span class="mono">${esc(d.mount)}</span>${cells(d.pct)}<span class="mono">${esc(d.pct)}%</span></div>`).join("")}
+          ${h.net?`<div class="core"><span class="mono">net</span><span class="mono small">↓ ${esc(h.net.rx)} ↑ ${esc(h.net.tx)}</span></div>`:""}</div>
+        ${(h.containers||[]).length?`<div class="bt bt-wide"><span class="bt-t">containers</span><div style="overflow-x:auto"><table class="ctab"><thead><tr><th>name</th><th>state</th><th>cpu</th><th>mem</th></tr></thead><tbody>
+          ${h.containers.map(c=>`<tr><td>${esc(c.name)}</td><td class="${c.state==="running"?"st-active":"st-blocked"}">${esc(c.state)}</td><td class="mono">${esc(c.cpu)}%</td><td class="mono">${esc(c.mem)}</td></tr>`).join("")}</tbody></table></div></div>`:""}
+      </div>`).join("");
+  }
+  function appsHTML(compact, groups){
+    groups = groups || CFG.groups;
+    if (!groups.length) return `<div class="empty">No apps yet. Add a group in the YAML in Settings.</div>`;
+    return groups.map(g=>`${compact?"":`<h4 class="group-name">${esc(g.name)}</h4>`}<div class="apps">${g.apps.map(a=>{
       const inner = `<span class="rune">${esc(a.rune)}</span><span class="grow"><div class="an">${esc(a.name)}</div>${a.description&&!compact?`<div class="ad">${esc(a.description)}</div>`:""}${compact?"":`<div class="au">${esc(a.url)}</div>`}
         ${a.live&&!compact?`<div class="live"><span class="pill warn"><i></i>Live: waiting for ${esc(a.live.source||"a connector")}</span></div>`:""}
         ${!compact&&a.links.length?`<div class="row small" style="margin-top:4px">${a.links.filter(l=>isUrl(l.url)).map(l=>`<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label||l.url)}</a>`).join("")}</div>`:""}</span>`;
@@ -513,8 +670,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
       : `<div class="msg golem">Golem stands ready. Ask what to work on, or tell me what you did and I will log it.</div>`;
     return `<div class="golem">
       <div class="golem-head"><span class="golem-face ${g.busy?"busy":""}" aria-hidden="true"></span>
-        <div class="grow"><div class="small">Brain: ${st.golemBrain==="argos"?"Argos (not connected, using Claude)":"Claude"} · ${st.golemWrites?"can write logs, plans and ideas":"read only"}</div>
-        <div class="hint" id="golem-status">${esc(g.status)}</div></div>
+        <div class="grow"><div class="hint" id="golem-status">${esc(g.status)}</div></div>
         ${g.msgs.length?`<button class="btn" data-act="golem-clear">Clear</button>`:""}<a class="btn" href="#config">Settings</a></div>
       <div class="chat" id="chat" aria-live="polite">${msgs}<div class="msg golem" id="golem-live" ${g.busy?"":"hidden"}>${esc(g.live||"…")}</div></div>
       ${g.msgs.length?"":`<div class="chips">${["What should I work on next?","Log: fixed the Argos watcher tests","What upkeep is overdue?","Summarize this week's logs"].map(q=>`<button data-act="golem-chip" data-q="${esc(q)}">${esc(q)}</button>`).join("")}</div>`}
@@ -532,7 +688,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     ideas:()=>ideasCompact(),
     system:()=>hostsHTML(true),
     log:()=>logForm() + logHTML(6, false),
-    plans:()=>plansHTML("next"),
+    uptime:()=>uptimeHTML(true),
     mail:()=>`<div class="empty">Gmail is not connected yet. <a href="#mail">See the Mail room</a>.</div>`,
     apps:()=>appsHTML(true)
   };
@@ -541,10 +697,10 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
   function roomHead(t, extra=""){ return `<div class="room-head"><div class="titles"><h2>${esc(t.title)}</h2><span class="flavor">${esc(t.flavor)}</span></div>${extra}</div>`; }
   function arrangeHTML(){
     const layout = mainLayout();
-    return `<ul class="cfg">${[...layout, ...Object.keys(WIDGETS).filter(k=>!layout.includes(k))].map(k=>{
+    return `<ul class="cfg">${[...layout, ...widgetKeys().filter(k=>!layout.includes(k))].map(k=>{
       const on = layout.includes(k);
-      return `<li><label><input type="checkbox" data-act="cfg-toggle" data-w="${k}" ${on?"checked":""}> ${esc(WIDGETS[k].label)}</label>
-        ${on?`<button class="btn" data-act="cfg-move" data-w="${k}" data-d="-1" aria-label="Move ${esc(WIDGETS[k].label)} up">↑</button><button class="btn" data-act="cfg-move" data-w="${k}" data-d="1" aria-label="Move ${esc(WIDGETS[k].label)} down">↓</button>`:""}</li>`;
+      return `<li><label><input type="checkbox" data-act="cfg-toggle" data-w="${esc(k)}" ${on?"checked":""}> ${esc(labelOf(k))}</label>
+        ${on?`<button class="btn" data-act="cfg-move" data-w="${esc(k)}" data-d="-1" aria-label="Move ${esc(labelOf(k))} up">↑</button><button class="btn" data-act="cfg-move" data-w="${esc(k)}" data-d="1" aria-label="Move ${esc(labelOf(k))} down">↓</button>`:""}</li>`;
     }).join("")}</ul><div class="row"><button class="btn" data-act="cfg-reset">Reset to default</button></div>`;
   }
 
@@ -553,7 +709,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
       const layout = mainLayout();
       const cfg = UI.configuring ? `<section class="panel"><h3>Arrange the table</h3><p class="hint" style="margin:0">Tick what to show and move it up or down. Also in Settings.</p>${arrangeHTML()}</section>` : "";
       return roomHead(t, `<button class="btn" data-act="cfg-open">${UI.configuring?"Done arranging":"Arrange"}</button>`) + cfg +
-        (layout.length ? `<div class="grid">${layout.map(k=>`<section class="panel" ${WIDGETS[k].wide?'style="grid-column:1/-1"':""}><h3>${esc(WIDGETS[k].label)}</h3>${W[k]()}</section>`).join("")}</div>`
+        (layout.length ? `<div class="grid">${layout.map(k=>`<section class="panel" ${WIDGETS[k]&&WIDGETS[k].wide?'style="grid-column:1/-1"':""}><h3>${esc(labelOf(k))}</h3>${widgetBody(k)}</section>`).join("")}</div>`
           : `<div class="empty">The table is empty. Use Arrange to choose what to show.</div>`);
     },
     projects(t){
@@ -578,49 +734,12 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
             ${logs.length?`<ul class="list">${logs.slice(0,40).map(l=>`<li><span class="date">${esc(l.date)}</span><div class="grow">${esc(l.text)}${l.by?` <span class="hint">· ${esc(l.by==="golem"?"Golem":l.by)}</span>`:""}</div></li>`).join("")}</ul>`:`<div class="empty">No log entries yet.</div>`}
           </section>
           <section class="panel"><h3>Tasks</h3>${tasksHTML(p.name)}
-            <form class="row" data-form="task"><input type="hidden" name="project" value="${esc(p.name)}">
+            <form class="row" data-form="task"><input type="hidden" name="list" value="${esc(projectList(p))}">
               <input type="text" name="title" placeholder="New task" aria-label="New task for ${esc(p.name)}" required><input type="date" name="due" aria-label="Due date">
               <button class="btn primary" type="submit">Add task</button></form>
             <form class="row" data-form="next"><input type="hidden" name="id" value="${esc(p._id)}"><input type="text" name="next" value="${esc(p.next||"")}" placeholder="Next step" aria-label="Next step"><button class="btn" type="submit">Save next step</button></form>
-          </section></div>`;
-    },
-    ideas(t){
-      const live = S.ideas.filter(i=>!i.promoted), done = S.ideas.filter(i=>i.promoted);
-      const ZW = 520, BW = ZW*3, BH = Math.max(760, ...live.map(i=>(Number(i.y)||0)+220));
-      const stacked = {thought:0, design:0, code:0};
-      const pos = i => { if (i.x!=null && i.y!=null) return [Number(i.x), Number(i.y)]; const st = STAGES.includes(i.stage)?i.stage:"thought"; const n = stacked[st]++; return [STAGES.indexOf(st)*ZW + 30 + (n%2)*240, 60 + Math.floor(n/2)*170]; };
-      return roomHead(t, `<span class="pill info"><i></i>Preview of Miladash</span>`) + `<section class="panel"><h3>Board</h3>
-        <p class="hint" style="margin:0">Drag a card by its title. Where it lands sets its stage. In the container this board is Miladash, the dashboard branch of Milaclone.</p>
-        <div class="board-wrap"><div class="board" id="board" style="width:${BW}px;height:${BH}px" data-zw="${ZW}">
-          ${STAGES.map((st,k)=>`<div class="zone" style="left:${k*ZW}px;width:${ZW}px"><span>${STAGE_LABEL[st]} · ${esc(STAGE_HINT[st])}</span></div>`).join("")}
-          ${live.map(i=>{ const [x,y] = pos(i); return `<article class="icard" data-idea="${esc(i._id)}" data-stage="${esc(i.stage||"thought")}" style="left:${x}px;top:${y}px">
-            <header class="grip" data-grip>${esc(i.title)}</header>${i.pitch?`<div class="body">${esc(i.pitch)}</div>`:""}
-            <div class="foot"><span class="small muted">${esc(STAGE_LABEL[i.stage]||"Thought")}</span><button class="btn" data-act="idea-promote" data-id="${esc(i._id)}">${UI.confirmDel===i._id?"Confirm":"Promote"}</button></div></article>`; }).join("")}
-        </div></div>
-        <form class="row" data-form="idea"><input type="text" name="title" placeholder="Idea" aria-label="Idea" required><input type="text" name="pitch" placeholder="One line on why" aria-label="Why it matters"><button class="btn primary" type="submit">Add idea</button></form></section>
-        ${done.length?`<section class="panel"><h3>Promoted to projects</h3><ul class="list">${done.map(i=>`<li><span class="date">${esc(fmtDate(i.promoted))}</span><div class="grow">${esc(i.title)}</div></li>`).join("")}</ul></section>`:""}`;
-    },
-    notes(t){
-      const notes = [...S.notes].sort((a,b)=>(b.fav?1:0)-(a.fav?1:0) || String(b.updated||"").localeCompare(String(a.updated||"")));
-      const cur = UI.noteId === "new" ? {title:"",body:"",_id:"new"} : notes.find(n=>n._id===UI.noteId) || notes[0];
-      if (cur && UI.noteId !== "new") UI.noteId = cur._id;
-      const draft = UI.noteDraft && UI.noteDraft.id === (cur&&cur._id) ? UI.noteDraft : null;
-      return roomHead(t) + `<div class="two">
-        <section class="panel"><h3>Notes <span class="act"><button class="btn" data-act="note-new">New note</button></span></h3>
-          ${notes.length || UI.noteId==="new" ? `<div class="notes">
-            <ul class="note-list">${notes.map(n=>`<li><button data-act="open-note" data-id="${esc(n._id)}" aria-current="${cur&&cur._id===n._id?"true":"false"}"><span class="grow">${esc(n.title||"Untitled")}</span>${n.fav?`<span style="color:var(--gold)">★</span>`:""}</button></li>`).join("")}</ul>
-            ${cur ? `<form class="editor" data-form="note">
-              <input type="text" id="note-title" name="title" value="${esc(draft?draft.title:cur.title)}" placeholder="Title" aria-label="Note title">
-              <textarea id="note-body" name="body" aria-label="Note text" placeholder="Write it down before it slips away.">${esc(draft?draft.body:cur.body)}</textarea>
-              <div class="row"><button class="btn primary" type="submit">Save note</button>
-              ${cur._id!=="new" ? `<span class="grow"></span><button class="btn" type="button" data-act="note-del" data-id="${esc(cur._id)}">${UI.confirmDel===cur._id?"Click again to delete":"Delete"}</button>` : ""}
-              <span class="hint">${cur.updated?"Saved "+esc(fmtDate(cur.updated)):""}</span></div></form>` : ""}
-          </div>` : `<div class="empty">No notes yet. Start one with New note.</div>`}
-        </section>
-        <section class="panel"><h3>Plans</h3>${plansHTML()}
-          <form class="row" data-form="plan"><input type="text" name="text" placeholder="An idea or plan" aria-label="Plan" required>
-          <select name="horizon" aria-label="When"><option value="next">Next</option><option value="later">Later</option><option value="someday">Someday</option></select>
-          <button class="btn primary" type="submit">Add plan</button></form></section></div>`;
+          </section></div>
+        <section class="panel"><h3>Wiki note</h3>${wikiCard(p)}</section>`;
     },
     calendar(t){
       const m = UI.calMonth, y = m.getFullYear(), mo = m.getMonth();
@@ -659,36 +778,79 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
         <button class="btn primary" type="submit">Add check</button></form></section>
         <section class="panel"><h3>How the wards work</h3><p class="small" style="margin:0">Each check has a period. It turns amber a day before it is due and red once it is overdue. Done stamps today's date. The overdue count shows in the header on every tab.</p></section></div>`;
     },
-    system(t){
-      return roomHead(t) + `<div class="two"><section class="panel"><h3>Hosts</h3>${hostsHTML(false)}</section>
-        <div class="sealed"><h4>Making the numbers live</h4><ol class="small">
-        <li>The page cannot read your hosts directly; something has to report.</li>
-        <li>Simplest path: an n8n workflow that collects stats (Glances, node_exporter or Proxmox API) and connects through the n8n connector.</li>
-        <li>Until then, Claude can update the numbers on request.</li></ol></div></div>`;
+    ideas(t){
+      const live = S.ideas.filter(i=>!i.promoted), done = S.ideas.filter(i=>i.promoted);
+      return roomHead(t, `<span class="pill info"><i></i>Board redesign: docs/miladash.md</span>`) + `<section class="panel"><h3>By stage</h3>
+        <p class="hint" style="margin:0">A plain pipeline for now. Sketching with boxes and arrows happens in Miladash; this list stays as the summary.</p>
+        <div class="kanban" style="grid-template-columns:repeat(3,minmax(220px,1fr))">${STAGES.map(st=>{
+          const cards = live.filter(i=>(STAGES.includes(i.stage)?i.stage:"thought")===st);
+          return `<div class="kcol"><h4><span>${STAGE_LABEL[st]}</span><span class="n">${cards.length}</span></h4><div class="hint">${STAGE_HINT[st]}</div>
+            ${cards.map(i=>`<article class="kcard"><div class="name">${esc(i.title)}</div>${i.pitch?`<div class="next">${esc(i.pitch)}</div>`:""}
+              <div class="foot"><select data-act="idea-stage" data-id="${esc(i._id)}" aria-label="Stage of ${esc(i.title)}">${STAGES.map(s=>`<option value="${s}" ${s===i.stage?"selected":""}>${STAGE_LABEL[s]}</option>`).join("")}</select>
+              <button class="btn" data-act="idea-promote" data-id="${esc(i._id)}">${UI.confirmDel===i._id?"Confirm":"Promote"}</button></div></article>`).join("") || `<div class="empty small">Nothing here.</div>`}</div>`;
+        }).join("")}</div>
+        <form class="row" data-form="idea"><input type="text" name="title" placeholder="Idea" aria-label="Idea" required><input type="text" name="pitch" placeholder="One line on why" aria-label="Why it matters"><button class="btn primary" type="submit">Add idea</button></form></section>
+        ${done.length?`<section class="panel"><h3>Promoted to projects</h3><ul class="list">${done.map(i=>`<li><span class="date">${esc(fmtDate(i.promoted))}</span><div class="grow">${esc(i.title)}</div></li>`).join("")}</ul></section>`:""}`;
     },
+    todo(t){
+      const lists = taskLists(), sel = UI.todoLists.filter(l=>lists.includes(l));
+      const shown = sel.length ? sel : lists;
+      const count = l => S.tasks.filter(x=>listOf(x)===l && !x.done).length;
+      return roomHead(t) + `<div class="two" style="grid-template-columns:minmax(0,220px) minmax(0,1fr)">
+        <section class="panel"><h3>Lists</h3>
+          <div class="cfg" role="group" aria-label="Lists to show">${lists.map(l=>`<li><label><input type="checkbox" data-act="todo-list" data-l="${esc(l)}" ${sel.includes(l)?"checked":""}> ${esc(l)}</label><span class="mono small muted">${count(l)}</span></li>`).join("")}</div>
+          <div class="hint">${sel.length?`Showing ${sel.length} of ${lists.length}.`:"Showing all lists. Tick lists to narrow."}</div>
+          <p class="hint" style="margin:0">Each list is a CalDAV task collection. Projects use the list with their name.</p></section>
+        <section class="panel"><h3>Tasks</h3>${demoTasks()}
+          ${shown.map(l=>{ const items = sortTasks(S.tasks.filter(x=>listOf(x)===l)); return `<h4 class="group-name">${esc(l)}</h4>${items.length?taskRows(items,false):`<div class="empty small">Empty list.</div>`}`; }).join("")}
+          <form class="row" data-form="task"><input type="text" name="title" placeholder="New task" aria-label="New task" required>
+            <input type="text" name="list" list="list-names" placeholder="List" aria-label="List" value="${esc(sel[0]||lists[0]||"Inbox")}"><datalist id="list-names">${lists.map(l=>`<option value="${esc(l)}">`).join("")}</datalist>
+            <input type="date" name="due" aria-label="Due date"><button class="btn primary" type="submit">Add task</button></form></section></div>`;
+    },
+    wiki(t){
+      const cur = wikiByPath(UI.wikiPath) || S.wiki.find(w=>w.path.startsWith("wiki/1-projects/"));
+      if (cur) UI.wikiPath = cur.path;
+      const ed = UI.wikiEdit;
+      const view = cur ? `<div class="fm"><span class="src">${esc(cur.path)}</span>${cur.type?`<span class="pill"><i></i>${esc(cur.type)}</span>`:""}${cur.area?`<span class="pill"><i></i>area: ${esc(cur.area)}</span>`:""}
+          ${cur.project_status?`<span class="pill info"><i></i>project_status: ${esc(cur.project_status)}</span>`:""}${cur.status?`<span class="pill"><i></i>status: ${esc(cur.status)}</span>`:""}<span class="hint">updated ${esc(cur.updated||"")}</span></div>
+        ${cur.type==="project"?`<div class="row">${["Current state","Next steps"].map(h=>`<button class="btn" data-act="wiki-edit" data-h="${h}">Edit ${h}</button>`).join("")}</div>`:""}
+        ${ed && ed.path===cur.path ? `<form class="editor" data-form="wiki-sec"><label class="hint" for="wiki-sec">${esc(ed.heading)} (sent as a PATCH on that heading only)</label>
+          <textarea id="wiki-sec" name="text" rows="6">${esc(ed.text)}</textarea><div class="row"><button class="btn primary" type="submit">Save section</button><button class="btn" type="button" data-act="wiki-cancel">Cancel</button></div></form>` : ""}
+        <div class="md">${md(cur.body)}</div>` : `<div class="empty">No notes yet.</div>`;
+      return roomHead(t, `<span class="pill warn"><i></i>Preview: LLMWIKI is not reachable from claude.ai</span>`) + `<div class="two" style="grid-template-columns:minmax(0,260px) minmax(0,1fr)">
+        <section class="panel"><h3>Vault</h3>${S.wiki.some(w=>w.example)?`<div class="banner">Example notes standing in for your vault.</div>`:""}
+          ${PARA.map(([pre,label])=>{ const notes = S.wiki.filter(w=>w.path.startsWith(pre)).sort((a,b)=>a.title.localeCompare(b.title)); return `<h4 class="group-name">${label}</h4>
+            <ul class="note-list">${notes.map(n=>`<li><button data-act="wiki-open" data-path="${esc(n.path)}" aria-current="${cur&&cur.path===n.path?"true":"false"}"><span class="grow">${esc(n.title)}</span></button></li>`).join("") || `<li class="empty small">Empty</li>`}</ul>`; }).join("")}
+        </section>
+        <section class="panel"><h3>${esc(cur?cur.title:"Note")}</h3>${view}</section></div>`;
+    },
+    uptime(t){ return roomHead(t) + `<section class="panel"><h3>Monitors</h3>${uptimeHTML(false)}</section>`; },
+    system(t){ return roomHead(t) + btopHTML(); },
     config(t){
-      const st = settings(), draft = UI.yamlDraft ?? S.yaml ?? "";
+      const st = settings(), g = st.golem, draft = UI.yamlDraft ?? S.yaml ?? "", lists = taskLists();
       return roomHead(t) + `<div class="two"><div class="room" style="gap:16px">
         <section class="panel"><h3>Golem</h3>
-          <div class="setting"><div><div>Brain</div><div class="d">Which model Golem thinks with.</div></div><span></span></div>
+          <form data-form="golem-cfg" class="editor">
           <div class="radio">
-            <label><input type="radio" name="brain" data-act="set-brain" value="claude" ${st.golemBrain!=="argos"?"checked":""}> <span><b>Claude</b> <span class="d">Works now, uses your claude.ai account.</span></span></label>
-            <label><input type="radio" name="brain" data-act="set-brain" value="argos" ${st.golemBrain==="argos"?"checked":""}> <span><b>Argos</b> <span class="d">Your local models. Needs the Argos connector (below); until then Golem falls back to Claude.</span></span></label>
+            <label><input type="radio" name="provider" value="local" ${g.provider!=="frontier"?"checked":""}> <span><b>Local, OpenAI-compatible</b> <span class="d">Argos, llama-server, Ollama or anything serving /v1.</span></span></label>
+            <div class="row" style="padding-left:24px"><input type="url" name="localUrl" value="${esc(g.local.baseUrl)}" aria-label="Local base URL" style="flex:1 1 220px"><input type="text" name="localModel" value="${esc(g.local.model)}" placeholder="model name" aria-label="Local model"></div>
+            <label><input type="radio" name="provider" value="frontier" ${g.provider==="frontier"?"checked":""}> <span><b>Frontier API</b> <span class="d">OpenRouter or the Claude API.</span></span></label>
+            <div class="row" style="padding-left:24px"><select name="service" aria-label="Frontier service"><option value="openrouter" ${g.frontier.service==="openrouter"?"selected":""}>OpenRouter</option><option value="anthropic" ${g.frontier.service==="anthropic"?"selected":""}>Claude API</option></select>
+              <input type="url" name="frontierUrl" value="${esc(g.frontier.baseUrl)}" aria-label="Frontier base URL" style="flex:1 1 200px"><input type="text" name="frontierModel" value="${esc(g.frontier.model)}" placeholder="model name" aria-label="Frontier model">
+              <input type="text" name="keyEnv" value="${esc(g.frontier.keyEnv)}" aria-label="Environment variable holding the API key" title="Name of the env var with the key. The key itself never goes in the page or orb.yaml."></div>
           </div>
-          <div class="setting"><div><div>Golem may write</div><div class="d">Add logs, plans and ideas, and move project cards, when you ask.</div></div><input type="checkbox" data-act="set-writes" ${st.golemWrites?"checked":""} aria-label="Golem may write"></div>
-          <div class="sealed"><h4>Connecting Argos</h4><ol class="small">
-            <li>Argos serves MCP at <span class="mono">/api/mcp</span> (pool_status, requests_in_flight, recent_requests, docs search).</li>
-            <li>Publish it through your Cloudflare tunnel behind auth, for example <span class="mono">https://argos.example.com/api/mcp</span>.</li>
-            <li>In claude.ai Settings, Connectors, add it as a custom connector named Argos.</li>
-            <li>Ask Claude to wire Golem to it. Golem can then read GPU and request status. Chatting with Argos models needs a chat tool added to that MCP server.</li></ol></div>
+          <div class="setting"><div><div>Golem may write</div><div class="d">Add logs, tasks and ideas, and move project cards, when you ask.</div></div><input type="checkbox" name="writes" ${st.golemWrites?"checked":""} aria-label="Golem may write"></div>
+          <div class="row"><button class="btn primary" type="submit">Save Golem settings</button></div></form>
+          <p class="hint" style="margin:0">In this demo Golem always thinks with Claude through claude.ai. The container uses the endpoint chosen here. Keys are read from the named environment variable, never stored.</p>
         </section>
+        <section class="panel"><h3>Task lists on Main</h3><div class="cfg">${lists.map(l=>`<li><label><input type="checkbox" data-act="main-list" data-l="${esc(l)}" ${st.mainLists.includes(l)?"checked":""}> ${esc(l)}</label></li>`).join("")}</div>
+          <div class="hint">${st.mainLists.length?"":"None ticked: Open tasks shows every list."}</div></section>
         <section class="panel"><h3>Logs</h3>
           <form class="setting" data-form="logmax"><div><label for="logmax">Log entry length</label><div class="d">Most characters in one entry, for you and Golem. 20 to 200.</div></div>
-          <div class="row"><input type="number" id="logmax" name="logmax" min="20" max="200" value="${logMax()}"><button class="btn" type="submit">Save</button></div></form>
-        </section>
-        <section class="panel"><h3>Main table</h3>${arrangeHTML()}</section></div>
+          <div class="row"><input type="number" id="logmax" name="logmax" min="20" max="200" value="${logMax()}"><button class="btn" type="submit">Save</button></div></form></section>
+        <section class="panel"><h3>Main table</h3><p class="hint" style="margin:0">Every app and every group can be its own panel.</p>${arrangeHTML()}</section></div>
         <section class="panel"><h3>Apps (orb.yaml)</h3>
-          <p class="hint" style="margin:0">Groups hold apps. Each app takes name, url, description, rune (one or two letters), optional links, and an optional live: block for data a connector will feed later.</p>
+          <p class="hint" style="margin:0">Groups hold apps. An app takes name, url, description, rune, optional links, and an optional widget: {type: plex | sabnzbd | upstreammanager} for a live panel.</p>
           <textarea class="yaml" id="yaml" spellcheck="false" aria-label="Apps configuration in YAML">${esc(draft)}</textarea>
           <div class="row"><button class="btn primary" data-act="yaml-save">Save YAML</button><button class="btn" data-act="yaml-revert">Discard changes</button>
           ${UI.yamlMsg?`<span class="okmsg">${esc(UI.yamlMsg)}</span>`:""}</div>
@@ -720,6 +882,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     if (ti && bo && UI.noteId) UI.noteDraft = {id:UI.noteId, title:ti.value, body:bo.value};
     const y = $("yaml"); if (y) UI.yamlDraft = y.value === (S.yaml ?? "") ? null : y.value;
     const a = $("golem-in"); if (a) UI.golem.text = a.value;
+    const ws = $("wiki-sec"); if (ws && UI.wikiEdit) UI.wikiEdit.text = ws.value;
   }
   function render(){
     captureDrafts();
@@ -727,7 +890,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     renderSummary(); renderTabs();
     const t = TABS.find(x=>x.id===UI.tab) || TABS[0];
     $("main").innerHTML = `<div class="room">${UI.projectId ? ROOMS.project() : ROOMS[t.id](t)}</div>`;
-    if (active && $(active) && /^(note-title|note-body|yaml|golem-in|logmax)$/.test(active)) $(active).focus();
+    if (active && $(active) && /^(note-title|note-body|yaml|golem-in|logmax|wiki-sec)$/.test(active)) $(active).focus();
   }
   function route(){
     const h = location.hash.replace(/^#/,"");
@@ -748,12 +911,13 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     try { db = await window.claude?.use?.("db"); } catch { db = null; }
     if (!db){ clearTimeout(timer); setStatus("Storage is not available in this view. Open the page signed in on claude.ai to save changes."); S.loaded = true; render(); return; }
     const err = e => setStatus("Lost connection to storage: " + (e.message||e.code));
-    for (const k of ["tasks","ideas","projects","logs","plans","upkeep","notes","events"]){
+    for (const k of ["wiki","live","tasks","ideas","projects","logs","upkeep","events"]){
       db.collection(k).onSnapshot(snap => { clearTimeout(timer); S[k] = snap.docs.map(d=>({...d.data(), _id:d.id})); S.loaded = true; setStatus("Changes save for everyone who opens this page."); schedule(); }, err);
     }
     db.doc("stats/current").onSnapshot(s => { S.stats = s.exists ? s.data() : null; schedule(); }, err);
     db.doc("config/orb").onSnapshot(s => { S.yaml = s.exists ? String(s.data().yaml||"") : ""; applyYaml(); schedule(); }, err);
     db.doc("config/layout").onSnapshot(s => { S.layout = s.exists ? s.data() : null; schedule(); }, err);
+    db.doc("uptime/current").onSnapshot(s => { S.uptime = s.exists ? s.data() : null; schedule(); }, err);
     db.doc("config/settings").onSnapshot(s => { S.settings = s.exists ? s.data() : null; schedule(); }, err);
   })();
   const need = () => { if (!db){ setStatus("Storage is not available, so this change was not saved."); return false; } return true; };
@@ -790,6 +954,9 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
       }
       case "yaml-revert": UI.yamlDraft = null; UI.yamlMsg = ""; applyYaml(); render(); break;
       case "log-filter": UI.logFilter = el.dataset.p || ""; if (UI.tab!=="projects") location.hash = "projects"; else render(); break;
+      case "wiki-open": UI.wikiPath = el.dataset.path; UI.wikiEdit = null; if (UI.tab!=="wiki") location.hash = "wiki"; else render(); break;
+      case "wiki-edit": { const n = wikiByPath(UI.wikiPath); if (!n) break; const sct = section(n.body, el.dataset.h); UI.wikiEdit = {path:n.path, heading:el.dataset.h, text:sct?sct.text:""}; render(); $("wiki-sec")?.focus(); break; }
+      case "wiki-cancel": UI.wikiEdit = null; render(); break;
       case "golem-chip": golemSend(el.dataset.q); break;
       case "golem-clear": UI.golem.msgs = []; persistChat(); render(); break;
       case "idea-promote": {
@@ -802,8 +969,10 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
   });
   document.addEventListener("change", e => {
     const el = e.target, act = el.dataset && el.dataset.act; if (!act) return;
-    if (act === "proj-status"){ if(!need())return; db.doc("projects/"+el.dataset.id).update({status:el.value, updated:todayISO()}).catch(fail); }
+    if (act === "proj-status"){ if(!need())return; const id = el.dataset.id, val = el.value; db.doc("projects/"+id).update({status:val, updated:todayISO()}).then(()=>syncWikiStatus(id, val)).catch(fail); }
     if (act === "plan-toggle"){ if(!need())return; db.doc("plans/"+el.dataset.id).update({done:el.checked}).catch(fail); }
+    if (act === "todo-list"){ const l = el.dataset.l; UI.todoLists = el.checked ? [...new Set([...UI.todoLists, l])] : UI.todoLists.filter(x=>x!==l); render(); }
+    if (act === "main-list"){ const cur = settings().mainLists, l = el.dataset.l; saveSettings({mainLists: el.checked ? [...new Set([...cur, l])] : cur.filter(x=>x!==l)}); }
     if (act === "task-toggle"){ if(!need())return; db.doc("tasks/"+el.dataset.id).update(el.checked?{done:true, doneAt:todayISO(), doneBy:"you"}:{done:false, doneAt:"", doneBy:""}).catch(fail); }
     if (act === "log-filter-select"){ UI.logFilter = el.value; render(); }
     if (act === "idea-stage"){ if(!need())return; db.doc("ideas/"+el.dataset.id).update({stage:el.value, updated:todayISO()}).catch(fail); }
@@ -822,7 +991,17 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
         case "idea": if(!v.title.trim()) return; await db.collection("ideas").add({title:v.title.trim(), pitch:(v.pitch||"").trim(), stage:"thought", updated:todayISO()}); break;
         case "logmax": await saveSettings({logMax:Math.max(20, Math.min(200, Number(v.logmax)||50))}); setStatus("Log length saved."); return;
         case "golem": golemSend(v.q); return;
-        case "task": if(!v.title.trim()) return; await db.collection("tasks").add({title:v.title.trim(), project:v.project||"", due:v.due||"", done:false, source:"orb"}); break;
+        case "task": if(!v.title.trim()) return; await db.collection("tasks").add({title:v.title.trim(), list:(v.list||"Inbox").trim()||"Inbox", due:v.due||"", done:false}); break;
+        case "wiki-sec": {
+          const ed = UI.wikiEdit, n = ed && wikiByPath(ed.path); if (!n) return;
+          await db.doc("wiki/"+n._id).update({body:replaceSection(n.body, ed.heading, (v.text||"").trim()), updated:todayISO()});
+          await wikiLog(`edited "${ed.heading}" in [[${n.title}]]`); UI.wikiEdit = null; setStatus("Section saved and logged."); render(); return;
+        }
+        case "golem-cfg": {
+          const g = settings().golem;
+          await saveSettings({golemWrites:!!v.writes, golem:{provider:v.provider==="frontier"?"frontier":"local", local:{baseUrl:(v.localUrl||"").trim(), model:(v.localModel||"").trim()}, frontier:{...g.frontier, service:v.service||"openrouter", baseUrl:(v.frontierUrl||"").trim(), model:(v.frontierModel||"").trim(), keyEnv:(v.keyEnv||"").trim()}}});
+          setStatus("Golem settings saved."); return;
+        }
         case "next": await db.doc("projects/"+v.id).update({next:(v.next||"").trim(), updated:todayISO()}); setStatus("Next step saved."); return;
         case "plan": if(!v.text.trim()) return; await db.collection("plans").add({text:v.text.trim(), horizon:v.horizon||"next", done:false, fav:false}); break;
         case "upkeep": if(!v.name.trim()) return; await db.collection("upkeep").add({name:v.name.trim(), everyDays:Number(v.every)||7, lastDone:""}); break;
@@ -838,6 +1017,17 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     } catch(err){ fail(err); }
   });
 
+  async function syncWikiStatus(id, status){
+    const p = S.projects.find(x=>x._id===id), n = p && p.wikiNote && wikiByPath(p.wikiNote); if (!n) return;
+    const ws = WIKI_STATUS[status] || "active";
+    let path = n.path;
+    if (ws==="done" && path.startsWith("wiki/1-projects/")) path = path.replace("wiki/1-projects/","wiki/4-archive/");
+    if (ws!=="done" && path.startsWith("wiki/4-archive/")) path = path.replace("wiki/4-archive/","wiki/1-projects/");
+    if (ws===n.project_status && path===n.path) return;
+    await db.doc("wiki/"+n._id).update({project_status:ws, path, updated:todayISO()});
+    if (path!==n.path) await db.doc("projects/"+id).update({wikiNote:path});
+    await wikiLog(`[[${n.title}]] project_status: ${ws}${path!==n.path?", moved to "+path.split("/")[1]:""}`);
+  }
   // ---------- golem ----------
   function persistChat(){ try { localStorage.setItem("orb.golem", JSON.stringify(UI.golem.msgs.slice(-30))); } catch {} }
   const clip = (t, n) => { t = String(t||"").replace(/\s+/g," ").trim(); return t.length>n ? t.slice(0,n-1).trimEnd()+"…" : t; };
@@ -852,9 +1042,9 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
         execute:() => S.projects.map(p=>({name:p.name, status:p.status, next:p.next||"", repo:p.repo||""})) },
       { name:"list_ideas", description:"Returns ideas not yet promoted as {title, stage, pitch}. Stage is thought, design or code.",
         execute:() => S.ideas.filter(i=>!i.promoted).map(i=>({title:i.title, stage:i.stage, pitch:i.pitch||""})) },
-      { name:"list_tasks", description:"Returns tasks as {title, project, due, done, source}. Optional project filters to one project; openOnly defaults to true.",
-        inputSchema:{type:"object", properties:{project:{type:"string"}, openOnly:{type:"boolean"}}},
-        execute:({project, openOnly}) => S.tasks.filter(t=>(!project || String(t.project).toLowerCase()===String(project).toLowerCase()) && (openOnly===false || !t.done)).map(t=>({title:t.title, project:t.project, due:t.due||"", done:!!t.done, source:t.source||"orb"})) },
+      { name:"list_tasks", description:"Returns tasks as {title, list, due, done}. Optional list filters to one task list (projects use their own name); openOnly defaults to true.",
+        inputSchema:{type:"object", properties:{list:{type:"string"}, openOnly:{type:"boolean"}}},
+        execute:({list:project, openOnly}) => S.tasks.filter(t=>(!project || listOf(t).toLowerCase()===String(project).toLowerCase()) && (openOnly===false || !t.done)).map(t=>({title:t.title, list:listOf(t), due:t.due||"", done:!!t.done})) },
       { name:"list_upkeep", description:"Returns upkeep checks as {name, everyDays, lastDone, daysLeft}; negative daysLeft means overdue.",
         execute:() => S.upkeep.map(u=>({name:u.name, everyDays:u.everyDays, lastDone:u.lastDone||"never", daysLeft:upkeepState(u).left})) }
     ];
@@ -868,11 +1058,11 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
           did.push(`logged: ${name}`); return {date:todayISO(), project:name, text:t};
         } },
       { name:"complete_task", description:"Marks one open task done by its exact title (and project when titles repeat). Returns the task.",
-        inputSchema:{type:"object", properties:{title:{type:"string"}, project:{type:"string"}}, required:["title"]},
-        execute: async ({title, project}) => {
-          const m = S.tasks.filter(t=>!t.done && String(t.title).toLowerCase()===String(title).toLowerCase() && (!project || String(t.project).toLowerCase()===String(project).toLowerCase()));
-          if (!m.length) throw new Error("No open task titled " + title); if (m.length>1) throw new Error("Several tasks match; give the project too");
-          await db.doc("tasks/"+m[0]._id).update({done:true, doneAt:todayISO(), doneBy:"Golem"}); did.push(`task done: ${m[0].title}`); return {title:m[0].title, project:m[0].project, done:true};
+        inputSchema:{type:"object", properties:{title:{type:"string"}, list:{type:"string"}}, required:["title"]},
+        execute: async ({title, list:project}) => {
+          const m = S.tasks.filter(t=>!t.done && String(t.title).toLowerCase()===String(title).toLowerCase() && (!project || listOf(t).toLowerCase()===String(project).toLowerCase()));
+          if (!m.length) throw new Error("No open task titled " + title); if (m.length>1) throw new Error("Several tasks match; give the list too");
+          await db.doc("tasks/"+m[0]._id).update({done:true, doneAt:todayISO(), doneBy:"Golem"}); did.push(`task done: ${m[0].title}`); return {title:m[0].title, list:listOf(m[0]), done:true};
         } },
       { name:"move_project", description:"Moves a project card to a column: next, active, blocked, paused or shipped. Returns the new status.",
         inputSchema:{type:"object", properties:{name:{type:"string"}, status:{type:"string", enum:STATUSES}}, required:["name","status"]},
@@ -881,10 +1071,10 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
           if (!STATUSES.includes(status)) throw new Error("Unknown status " + status);
           await db.doc("projects/"+p._id).update({status, updated:todayISO()}); did.push(`moved: ${p.name} → ${STATUS_LABEL[status]}`); return {name:p.name, status};
         } },
-      { name:"add_plan", description:"Adds a plan. horizon is next, later or someday. Returns the plan.",
-        inputSchema:{type:"object", properties:{text:{type:"string"}, horizon:{type:"string", enum:["next","later","someday"]}}, required:["text"]},
-        execute: async ({text, horizon}) => { const t = clip(text, 140); const h = ["next","later","someday"].includes(horizon)?horizon:"next";
-          await db.collection("plans").add({text:t, horizon:h, done:false, fav:false}); did.push(`plan added`); return {text:t, horizon:h}; } },
+      { name:"add_task", description:"Adds a task to a task list (a CalDAV collection; use a project name for project work). due is optional, YYYY-MM-DD. Returns the task.",
+        inputSchema:{type:"object", properties:{title:{type:"string"}, list:{type:"string"}, due:{type:"string"}}, required:["title","list"]},
+        execute: async ({title, list, due}) => { const t = clip(title, 120); const l = clip(list||"Inbox", 60); const d = /^\d{4}-\d{2}-\d{2}$/.test(String(due||""))?String(due):"";
+          await db.collection("tasks").add({title:t, list:l, due:d, done:false}); did.push(`task added: ${l}`); return {title:t, list:l, due:d}; } },
       { name:"add_idea", description:"Adds an idea at the thought stage with an optional one-line pitch. Returns the idea.",
         inputSchema:{type:"object", properties:{title:{type:"string"}, pitch:{type:"string"}}, required:["title"]},
         execute: async ({title, pitch}) => { const t = clip(title, 80);
@@ -900,7 +1090,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
       const sample = await window.claude?.use?.("sample");
       if (!sample){ g.msgs.push({role:"assistant", content:"I cannot speak in this view. Open the page signed in on claude.ai."}); return; }
       const st = settings();
-      const intro = `You are Golem, the stone servant of the Pondering Orb, a homelab dashboard. Speak plainly with only a light touch of wizard flavour; be brief and concrete (a few sentences or a short list). Use the tools to read the dashboard before answering questions about it. When work finished matches an open task, offer to mark it done (complete_task) and log it. ${st.golemWrites?`When the user says they did something or asks you to log it, call add_log with a short entry (at most ${logMax()} characters). Only write when asked or clearly told about finished work.`:"You are read-only: say so if asked to change anything."} Today is ${todayISO()}. Context: plans=${JSON.stringify(S.plans.filter(p=>!p.done).map(p=>p.text))}; next 14 days=${JSON.stringify(agendaBetween(todayISO(), isoOf(new Date(Date.now()+14*DAY))).map(i=>i.date+" "+i.title))}; apps=${JSON.stringify(allApps().map(a=>a.name))}.`;
+      const intro = `You are Golem, the stone servant of the Pondering Orb, a homelab dashboard. Speak plainly with only a light touch of wizard flavour; be brief and concrete (a few sentences or a short list). Use the tools to read the dashboard before answering questions about it. When work finished matches an open task, offer to mark it done (complete_task) and log it. ${st.golemWrites?`When the user says they did something or asks you to log it, call add_log with a short entry (at most ${logMax()} characters). Only write when asked or clearly told about finished work.`:"You are read-only: say so if asked to change anything."} Today is ${todayISO()}. Context: task lists=${JSON.stringify(taskLists())}; next 14 days=${JSON.stringify(agendaBetween(todayISO(), isoOf(new Date(Date.now()+14*DAY))).map(i=>i.date+" "+i.title))}; apps=${JSON.stringify(allApps().map(a=>a.name))}.`;
       const history = g.msgs.slice(-12).map(m=>({role:m.role==="user"?"user":"assistant", content:m.content}));
       history[0] = history[0].role==="user" ? {role:"user", content:intro+"\n\n"+history[0].content} : history[0];
       if (history[0].role!=="user") history.unshift({role:"user", content:intro});
