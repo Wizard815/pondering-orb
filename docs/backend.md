@@ -29,7 +29,7 @@ old Plans list is gone; it became task lists.
 
 ```
   browser ─▶ orb :8095 ─┬─▶ CalDAV (vikunja)            VTODO lists
-  agents  ─▶  /api REST │─▶ LLMWIKI :27123              Obsidian Local REST API
+  agents  ─▶  /api REST │─▶ llmwiki :27123              Obsidian Local REST API
   (MCP)    ─▶ /mcp      │─▶ Argos :8080 or frontier API Golem's brain
               web UI    │─▶ Uptime Kuma :3001           status page JSON
               SQLite    │─▶ UpstreamManager :5000       /api/repos, /api/requests
@@ -46,7 +46,7 @@ old Plans list is gone; it became task lists.
 - Config is `orb.yaml`, mounted at `/config/orb.yaml`. Secrets come from
   environment variables named in the YAML (`token_env`, `key_env`), never
   from the YAML itself, and never reach the browser.
-- Networks: `edge` for the Cloudflare tunnel, `ai_net` for Argos, LLMWIKI and
+- Networks: `edge` for the Cloudflare tunnel, `ai_net` for Argos, llmwiki and
   the gateway, plus whatever network the media apps use.
 
 ## Data model (SQLite)
@@ -58,7 +58,7 @@ projects(id, name, status, next, repo, fav, task_list, wiki_note, updated_at)
   wiki_note: e.g. "wiki/1-projects/Pondering Orb.md"
 logs(id, project_id, text, by, created_at)     -- text <= settings.log_max
 upkeep(id, name, every_days, last_done)
-layout(user, panels_json)                      -- react-grid-layout positions
+layouts(user, page, items_json)                -- per page: [{panel, w, h, hidden}]
 settings(key, value)                           -- log_max, golem, main_lists
 cache(source, key, body, fetched_at)           -- last good reply per integration
 outbox(id, target, request_json, tries, error) -- writes waiting for a service
@@ -89,44 +89,79 @@ talks CalDAV directly to the server the GLANCE apps already sync with.
 
 ## LLMWIKI (notes)
 
-The vault lives in the `LLMWIKI` container on `ai_net`. Orb only uses the
-Obsidian Local REST API and never touches vault files (direct writes leave
-files owned by root, which breaks the API for other agents).
+The vault lives in the `llmwiki` container. Orb is on `ai_net`, so it uses
+`http://llmwiki:27123` (agents on Codebox, such as Hermes, use the LAN URL
+`http://192.168.20.5:27123` instead). Orb only uses the Obsidian Local REST
+API and never touches vault files: direct writes leave files owned by root,
+which breaks the API for other agents. Orb never commits; the Obsidian Git
+plugin commits every 10 minutes.
 
-- Base URL `http://LLMWIKI:27123`, `Authorization: Bearer` key from
-  `WIKI_API_KEY`. Never logged, never written to a note.
-- **Read** a project note: `GET /vault/<path>` with
-  `Accept: application/vnd.olrapi.note+json` for parsed front-matter.
-- **Edit** only the sections Orb shows, "Current state" and "Next steps":
-  `PATCH /vault/<path>` with `Operation: replace`, `Target-Type: heading`,
-  `Target: <heading>`. Never rewrite a whole note.
-- **Front-matter:** set `updated` to today on every change. `status` (note
-  quality) is never changed by Orb; `project_status` follows the board:
-
-  | Orb board | wiki `project_status` |
-  | --- | --- |
-  | next, active, blocked | active |
-  | paused | paused |
-  | shipped | done, and the note moves to `wiki/4-archive/` |
-
-  Moving a note means `PUT` at the new path, then `DELETE` the old one, then
-  update `projects.wiki_note`.
-- **Log every write** with `POST /vault/wiki/logs/Log - YYYY-MM-DD.md`
-  (append; the API creates the file if it is missing).
-- Only approved tags, never anything under `raw/`.
+- **Auth:** `Authorization: Bearer` key from `WIKI_API_KEY`. Never logged,
+  never written to a note.
+- **Read** a note: `GET /vault/<path>` (URL-encode spaces) with
+  `Accept: application/vnd.olrapi.note+json` for parsed front-matter. The
+  parser must accept quoted and unquoted `title` values.
+- **Edit** only "Current state" and "Next steps": `PATCH /vault/<path>` with
+  `Operation: replace`, `Target-Type: heading` and a full heading path such
+  as `Pondering Orb::Current state`. Template-built notes have the H1 equal to
+  the title, but Orb reads the note's headings first and uses the real path,
+  because hand-written notes can differ.
+- **Front-matter on every change:** `updated` = today. `status` (note
+  quality) is never touched by Orb.
+- **`project_status` follows the board:** next, active and blocked map to
+  `active`; paused maps to `paused`; shipped maps to `done`. Orb only sets
+  `done`. It does not move the note: the vault's maintain workflow moves done
+  projects to `4-archive/`. Note names are unique, so `[[links]]` survive.
+- **Tags:** one type tag matching `type` (project, area, resource, log,
+  source), `wiki` on everything under `wiki/`, and an optional domain tag from
+  raidlab, ai, ttrpg, homelab. Nothing else; other domains use `area:` only.
+- **`source`:** `manual` for notes the user asked Orb to create;
+  `live-check YYYY-MM-DD` for facts Orb checked against a running system.
+  Never a new value (lint checks it).
+- **New projects:** adding a project with an area creates
+  `wiki/1-projects/<Name>.md` from the PROJECT template (`type: project`,
+  `project_status`, `status: draft`, `source: manual`, `related: []`) and adds
+  `- [[Name]]` under `## Projects` in that area's hub note. Orb asks for the
+  area (homelab, ai, automation, hardware, ttrpg, gaming, travel, personal,
+  knowledge); it never guesses. Hub names come from `wiki.area_hubs`.
+- **Linking existing notes:** an exact name match links automatically and
+  shows the result; close matches (shared words) are only suggestions; a
+  picker allows a manual choice. Today's project notes are outcome-named
+  (for example "Plex Media Conversion Pipeline"), so most Orb projects will
+  need the picker once.
+- **`related`:** Orb may add `[[links]]` to other project notes that exist;
+  it never removes entries and skips links that don't resolve.
+- **Log:** every write appends a bullet to `wiki/logs/Log - YYYY-MM-DD.md`
+  under `## Pondering Orb`, such as `- [[Argos]]: edited Next steps`. If the
+  file is missing, Orb creates it from the LOG template (`type: log`,
+  `tags: [wiki, log]`, `source: ""`). Orb's own short project logs are not
+  mirrored; an optional daily digest bullet ("Orb: 4 log entries on
+  [[Pondering Orb]]") can be turned on in Settings.
+- **Never** anything under `raw/`, and never secrets in a note.
 - **Wiki down:** reads come from `cache` with a "stale since" note; writes go
-  to `outbox` and show as pending on the note until they succeed. Nothing is
-  dropped silently.
-- **Golem** also gets the vault's MCP endpoint (`POST /mcp/`, session
-  handshake) with `query_wiki`, `get_wiki`, `wiki_card` and `search_*`, read
-  only.
+  to `outbox` and show as pending until they succeed. Nothing is dropped
+  silently.
+- **Golem** gets the vault's MCP endpoint (`POST /mcp`, session handshake),
+  limited to read tools: `query_wiki`, `get_wiki`, `wiki_card`,
+  `search_simple` and the read-side `vault_*` tools. All writes go through
+  Orb so the rules above hold.
 
-## Main page panels
+## Pages and panels
 
-Every Main panel is a module: built-in ones (Golem, favorite projects, open
-tasks, upkeep, uptime, log, calendar) and one per app or app group from
-`orb.yaml`. Panels can be added, moved and resized; positions are saved per
-user.
+Every page is a set of panels on a 12-column grid, and every page has an
+**Edit layout** mode: add and remove panels, hide and show them, move them by
+dragging, and resize them from the corner (width in columns, height snapped to
+40 px or automatic). Each page keeps its own layout, so System can put a
+44-core CPU panel full width at the bottom while Main stays compact. On a
+phone every panel is full width.
+
+Main's panels are built-in modules (Golem, favorite projects, open tasks,
+upkeep, uptime, log, calendar) plus one per app and one per app group from
+`orb.yaml`. System has three panels per host: CPU (per-core meters), memory
+and disks, and containers.
+
+In the React build this is `react-grid-layout`; the demo has its own small
+version with the same behaviour.
 
 **Live app panels** come from small adapters in the Go server. Each adapter
 polls its app, keeps the last result in `cache`, and serves the browser a
@@ -257,8 +292,10 @@ caldav:
   password_env: CALDAV_PASSWORD
   main_lists: [Homelab, Pondering Orb]
 wiki:
-  base_url: http://LLMWIKI:27123
+  base_url: http://llmwiki:27123
   token_env: WIKI_API_KEY
+  daily_digest: false
+  area_hubs: { homelab: Homelab, ai: Local AI }   # area -> hub note title
 uptime:
   base_url: http://uptime-kuma:3001
   status_page: orb
@@ -297,5 +334,5 @@ servers.
 
 - Single user, or per-person like ALLGlance's roster?
 - Which CalDAV server and path holds the task lists today?
-- Which tags are on the vault's approved list for project notes?
+- Hub note titles for the other areas (automation, hardware, ttrpg, ...).
 - Should Main layouts be per device (phone vs desktop) or one layout?
