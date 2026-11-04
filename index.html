@@ -154,7 +154,7 @@ input[type=checkbox]{accent-color:var(--gold);margin-top:5px}
 .note-list button[aria-current="true"]{background:var(--inset);color:var(--gold)}
 .note-list button:hover{background:var(--inset)}
 .editor{display:flex;flex-direction:column;gap:8px}
-.editor input[type=text]{font-family:var(--f-display);font-size:1.05rem}
+
 .editor textarea{min-height:240px;font-family:var(--f-body);line-height:1.55}
 
 /* calendar */
@@ -292,6 +292,45 @@ a.app:hover{border-color:var(--gold)}
 .btop1{font-family:var(--f-mono);font-size:.82rem;display:flex;flex-direction:column;gap:4px}
 @media (max-width:720px){.pgrid{grid-template-columns:minmax(0,1fr)}.pgrid > .mp{grid-column:1/-1!important}.rz{display:none}}
 
+/* menus, popups */
+.cmenu,.pop{position:fixed;z-index:50;background:var(--panel);border:1px solid var(--line-hi);border-radius:8px;box-shadow:0 14px 34px -12px rgba(0,0,0,.6);padding:5px}
+.cmenu{min-width:200px;display:flex;flex-direction:column}
+.cmenu button{text-align:left;border:0;background:none;padding:6px 10px;border-radius:5px;font-size:.9rem}
+.cmenu button:hover:not(:disabled),.cmenu button:focus-visible{background:var(--inset);color:var(--gold)}
+.cmenu button:disabled{opacity:.45;cursor:default}
+.cmenu button.danger{color:var(--bad)}
+.cmenu .sep{height:1px;background:var(--line);margin:4px 2px}
+.mh{font-family:var(--f-display);font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:6px 10px 2px;max-width:280px}
+.pop{padding:12px}
+.pop-form{display:flex;flex-direction:column;gap:8px;min-width:min(280px,86vw)}
+.pop-form label{display:flex;flex-direction:column;gap:3px}
+.pop-form label.row{flex-direction:row;align-items:center}
+.pgrid.editing .mp > h3[data-drag]{cursor:move;user-select:none;touch-action:none}
+.pgrid.editing{min-height:200px;padding-bottom:80px}
+/* linked tabs */
+nav.tabs a.linked{color:var(--arcane)}
+nav.tabs a.linked[aria-current="page"]{color:var(--gold)}
+nav.tabs a.tab-drop{outline:2px dashed var(--gold);outline-offset:-2px}
+.split-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
+.half{display:flex;flex-direction:column;gap:16px;min-width:0;border-left:1px solid var(--line);padding-left:20px}
+.half:first-child{border-left:0;padding-left:0}
+@media (max-width:980px){.split{grid-template-columns:minmax(0,1fr)}.half{border-left:0;padding-left:0}}
+/* appearance + connections */
+.presets{display:flex;flex-wrap:wrap;gap:8px}
+.preset{display:flex;flex-direction:column;align-items:flex-start;gap:6px;border:1px solid var(--line);background:var(--inset);border-radius:7px;padding:8px 10px;font-size:.84rem}
+.preset.on{border-color:var(--gold);color:var(--gold)}
+.sw{display:flex;gap:2px}
+.sw i{width:16px;height:16px;border-radius:3px;border:1px solid var(--line-hi);display:block}
+.colors{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:8px}
+.colors label{display:flex;align-items:center;gap:8px;font-size:.86rem}
+.colors input[type=color]{width:34px;height:26px;border:1px solid var(--line);border-radius:4px;background:none;padding:0}
+.conns{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr));gap:12px}
+.conn{display:flex;flex-direction:column;gap:6px;background:var(--inset);border-radius:7px;padding:10px}
+.conn label{display:flex;flex-direction:column;gap:2px}
+.chips button[aria-pressed="true"]{border-color:var(--gold);color:var(--gold)}
+input[type=search]{background:var(--inset);border:1px solid var(--line);border-radius:5px;padding:5px 9px;width:100%}
+
 /* golem */
 .golem{display:flex;flex-direction:column;gap:10px}
 .golem-head{display:flex;align-items:center;gap:10px}
@@ -356,7 +395,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
   let db = null;
   let savedChat = [];
   try { savedChat = JSON.parse(localStorage.getItem("orb.golem") || "[]"); if (!Array.isArray(savedChat)) savedChat = []; } catch { savedChat = []; }
-  const UI = { tab:"main", noteId:null, noteDraft:null, calMonth:new Date(new Date().getFullYear(), new Date().getMonth(), 1), logLimit:15, logFilter:"", configuring:false, yamlDraft:null, yamlMsg:"", confirmDel:null, dragId:null, projectId:null, moving:null, todoLists:[], wikiPath:null, wikiEdit:null, editing:false, room:null, items:[],
+  const UI = { tab:"main", noteId:null, noteDraft:null, calMonth:new Date(new Date().getFullYear(), new Date().getMonth(), 1), logLimit:15, logFilter:"", configuring:false, yamlDraft:null, yamlMsg:"", confirmDel:null, dragId:null, projectId:null, moving:null, todoLists:[], wikiPath:null, wikiEdit:null, editing:false, room:null, items:[], rooms:{}, split:null, dragTab:null, pendingLog:"", lastLogProject:"", showArchived:false, wikiQ:"", wikiTag:"", connTest:{},
     golem:{busy:false, text:"", status:"", msgs:savedChat.slice(-30)} };
 
   const TABS = [
@@ -472,7 +511,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
   }
   const statusSelect = p => `<select data-act="proj-status" data-id="${esc(p._id)}" class="st-${esc(p.status)}" aria-label="Move ${esc(p.name)}">${STATUSES.map(s=>`<option value="${s}" ${s===p.status?"selected":""}>${STATUS_LABEL[s]}</option>`).join("")}</select>`;
   function projectCards(){
-    const list = S.projects.filter(p=>p.status==="active"||p.status==="blocked").sort((a,b)=>String(a.name).localeCompare(b.name));
+    const list = S.projects.filter(p=>!p.archived && (p.status==="active"||p.status==="blocked")).sort((a,b)=>String(a.name).localeCompare(b.name));
     if (!list.length) return `<div class="empty">Nothing active. Move a card on the Projects board.</div>`;
     return `<div class="projects">${list.map(p=>`<article class="proj">
       <div class="name"><span>${esc(p.name)}</span><span class="small st-${esc(p.status)}">${esc(p.status)}</span></div>
@@ -481,7 +520,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
   function kanbanHTML(){
     const logCount = {}; S.logs.forEach(l=>{ logCount[l.project] = (logCount[l.project]||0)+1; });
     return `<div class="kanban" role="list">${STATUSES.map(s=>{
-      const cards = S.projects.filter(p=>(STATUSES.includes(p.status)?p.status:"next")===s).sort((a,b)=>String(b.updated||"").localeCompare(String(a.updated||"")));
+      const cards = S.projects.filter(p=>!p.archived && (STATUSES.includes(p.status)?p.status:"next")===s).sort((a,b)=>String(b.updated||"").localeCompare(String(a.updated||"")));
       return `<div class="kcol" data-col="${s}" role="listitem" aria-label="${STATUS_LABEL[s]}"><h4><span class="st-${s}">${STATUS_LABEL[s]}</span><span class="n">${cards.length}</span></h4>
         ${cards.map(p=>`<article class="kcard" draggable="true" data-card="${esc(p._id)}">
           <div class="name" style="display:flex;justify-content:space-between;gap:6px"><a href="${projHref(p)}" draggable="false">${esc(p.name)}</a>${star("projects",p)}</div>
@@ -489,16 +528,16 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
           ${p.next?`<div class="next">${esc(p.next)}</div>`:""}
           <div class="foot">${statusSelect(p)}<span class="small muted">${logCount[p.name]||0} log${logCount[p.name]===1?"":"s"} · ${openTasks(p.name).length} task${openTasks(p.name).length===1?"":"s"}</span></div>
         </article>`).join("") || `<div class="empty small">Drop a card here.</div>`}</div>`;
-    }).join("")}</div>`;
+    }).join("")}</div>${archivedHTML()}`;
+  }
+  function archivedHTML(){
+    const arc = S.projects.filter(p=>p.archived);
+    if (!UI.showArchived || !arc.length) return "";
+    return `<h4 class="group-name">Archived</h4><div class="projects">${arc.map(p=>`<article class="proj" data-card="${esc(p._id)}"><div class="name"><a href="${projHref(p)}">${esc(p.name)}</a><span class="small muted">${esc(STATUS_LABEL[p.status]||p.status)}</span></div>
+      <div class="row"><button class="btn" data-act="proj-restore" data-id="${esc(p._id)}">Restore</button></div></article>`).join("")}</div>`;
   }
   const logSorted = () => [...S.logs].sort((a,b)=>String(b.date).localeCompare(String(a.date)) || (b.created||0)-(a.created||0));
-  function logForm(){
-    const max = logMax();
-    return `<form class="row" data-form="log"><select name="project" aria-label="Project">${["General",...S.projects.map(p=>p.name)].map(n=>`<option ${n===UI.logFilter?"selected":""}>${esc(n)}</option>`).join("")}</select>
-      <input type="text" name="text" maxlength="${max}" data-counter placeholder="What changed (${max} characters)" aria-label="Log entry, up to ${max} characters" required>
-      <span class="counter">0/${max}</span><button class="btn primary" type="submit">Log it</button></form>`;
-  }
-  function logHTML(limit, withFilter){
+  function logHTML(limit, withFilter, more){
     let list = logSorted();
     if (withFilter && UI.logFilter) list = list.filter(l=>l.project===UI.logFilter);
     const names = [...new Set(S.logs.map(l=>l.project))].sort();
@@ -506,7 +545,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
       ${UI.logFilter?`<button class="btn" data-act="log-filter" data-p="">Clear filter</button>`:""}</div>` : "";
     const body = list.length ? `<ul class="list">${list.slice(0,limit).map(l=>`<li><span class="date">${esc(l.date)}</span><div class="grow"><button class="btn link tag" data-act="log-filter" data-p="${esc(l.project)}" title="Show only ${esc(l.project)}">${esc(l.project)}</button> ${esc(l.text)}${l.by==="golem"?` <span class="hint">· Golem</span>`:""}</div></li>`).join("")}</ul>`
       : `<div class="empty">${UI.logFilter&&withFilter?"No entries for "+esc(UI.logFilter)+".":"No log entries yet."}</div>`;
-    return filter + body + (list.length>limit && withFilter ? `<button class="btn" data-act="log-more">Show older</button>` : "");
+    return filter + body + (list.length>limit && more ? `<button class="btn" data-act="log-more">Show older</button>` : "");
   }
   function plansHTML(only){
     const hz = {next:"Next", later:"Later", someday:"Someday"};
@@ -529,7 +568,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
   const projByHash = h => S.projects.find(p => String(p._id).replace(/[^A-Za-z0-9-]/g,"") === h);
   const openTasks = name => S.tasks.filter(t=>!t.done && t.project===name);
   function favoritesHTML(){
-    const favs = S.projects.filter(p=>p.fav).sort((a,b)=>String(a.name).localeCompare(b.name));
+    const favs = S.projects.filter(p=>p.fav && !p.archived).sort((a,b)=>String(a.name).localeCompare(b.name));
     if (!favs.length) return `<div class="empty">Star a project on the Projects board to keep it here.</div>`;
     return `<ul class="list">${favs.map(p=>{
       const last = logSorted().find(l=>l.project===p.name), n = openTasks(p.name).length;
@@ -612,6 +651,24 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     }
   }
 
+  const otherFolders = () => [...new Set(S.wiki.map(w=>w.path.split("/").slice(0,-1).join("/")+"/").filter(f=>!PARA.some(([pre])=>f.startsWith(pre))))].map(f=>[f, f.replace(/\/$/,"")+" (read only)"]);
+  function wikiSearchHTML(){
+    const q = (UI.wikiQ||"").trim().toLowerCase(), tag = UI.wikiTag;
+    const hits = (q||tag) ? S.wiki.filter(w=>(!tag || (w.tags||[]).includes(tag)) && (!q || w.title.toLowerCase().includes(q) || String(w.body||"").toLowerCase().includes(q))) : [];
+    const snip = w => { const b = String(w.body||""), i = q ? b.toLowerCase().indexOf(q) : -1; return i<0 ? "" : "…"+b.slice(Math.max(0,i-40), i+60).replace(/\n/g," ")+"…"; };
+    return `<input type="search" id="wiki-q" data-act="wiki-q" value="${esc(UI.wikiQ||"")}" placeholder="Search titles and text" aria-label="Search the wiki">
+      ${tag?`<div class="row small">Tag <span class="src">#${esc(tag)}</span><button class="btn" data-act="wiki-tag" data-t="">Clear</button></div>`:""}
+      ${(q||tag) ? (hits.length ? `<ul class="list">${hits.slice(0,30).map(w=>`<li><div class="grow"><button class="btn link" data-act="wiki-open" data-path="${esc(w.path)}">${esc(w.title)}</button> <span class="src">${esc(w.path.split("/").slice(0,-1).join("/"))}</span>${snip(w)?`<div class="small muted">${esc(snip(w))}</div>`:""}</div></li>`).join("")}</ul>` : `<div class="empty">No notes match.</div>`) : `<div class="hint">In the container this also uses the vault's semantic search (query_wiki).</div>`}`;
+  }
+  function backlinksHTML(cur){
+    const back = S.wiki.filter(w=>w.path!==cur.path && String(w.body||"").includes(`[[${cur.title}]]`));
+    return back.length ? `<ul class="list">${back.map(w=>`<li><button class="btn link" data-act="wiki-open" data-path="${esc(w.path)}">${esc(w.title)}</button></li>`).join("")}</ul>` : `<div class="empty">No notes link here.</div>`;
+  }
+  function wikiTagsHTML(){
+    const c = {}; S.wiki.forEach(w=>(w.tags||[]).forEach(t=>{ c[t]=(c[t]||0)+1; }));
+    const list = Object.entries(c).sort((a,b)=>b[1]-a[1]);
+    return list.length ? `<div class="chips">${list.map(([t,n])=>`<button data-act="wiki-tag" data-t="${esc(t)}" aria-pressed="${UI.wikiTag===t}">#${esc(t)} <span class="mono">${n}</span></button>`).join("")}</div>` : `<div class="empty">No tags.</div>`;
+  }
   function wikiCard(p){
     const n = p.wikiNote && wikiByPath(p.wikiNote);
     const projNotes = S.wiki.filter(w=>w.type==="project");
@@ -742,7 +799,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     tasks:()=>tasksHTML("", 6),
     ideas:()=>ideasCompact(),
     system:()=>hostsHTML(true),
-    log:()=>logForm() + logHTML(6, false),
+    log:()=>logForm() + logHTML(6, true, false),
     uptime:()=>uptimeHTML(true),
     mail:()=>`<div class="empty">Gmail is not connected yet. <a href="#mail">See the Mail room</a>.</div>`,
     apps:()=>appsHTML(true)
@@ -769,13 +826,8 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     },
     projects(){
       return { panels: [
-        P("board","Board", `<p class="hint" style="margin:0">Drag a card to another column, or use its menu.</p>${kanbanHTML()}`, {w:12}),
-        P("add","Add project", `<form class="row" data-form="proj"><input type="text" name="name" placeholder="Project name" aria-label="Project name" required><input type="text" name="next" placeholder="Next step" aria-label="Next step">
-          <select name="status" aria-label="Column">${STATUSES.map(s=>`<option value="${s}" ${s==="next"?"selected":""}>${STATUS_LABEL[s]}</option>`).join("")}</select>
-          <select name="area" aria-label="Wiki area"><option value="">No wiki note</option>${AREAS.map(a=>`<option value="${a}">Wiki note in ${a}</option>`).join("")}</select>
-          <button class="btn primary" type="submit">Add project</button></form>
-          <p class="hint" style="margin:0">Pick an area to create the project's wiki note from the PROJECT template and link it from that area's hub.</p>`, {w:12}),
-        P("log","Project log", logForm()+logHTML(UI.logLimit, true), {w:12})
+        P("board","Board", `<p class="hint" style="margin:0">Drag a card to another column. Right-click a card to archive or delete it.</p>${kanbanHTML()}`, {w:12, act:`<span class="act row" style="gap:6px"><label class="small row" style="gap:4px"><input type="checkbox" data-act="show-archived" ${UI.showArchived?"checked":""}> Show archived (${S.projects.filter(p=>p.archived).length})</label><button class="btn primary" data-act="proj-new">+ New project</button></span>`}),
+        P("log","Project log", logForm()+logHTML(UI.logLimit, true, true), {w:12})
       ]};
     },
     project(){
@@ -784,7 +836,8 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
       const logs = logSorted().filter(l=>l.project===p.name), max = logMax();
       return { head:`<p class="crumb"><a href="#projects">← Projects</a></p>
         <div class="room-head"><div class="titles"><h2>${esc(p.name)}</h2><span class="flavor">${esc(p.next||"No next step set.")}</span></div>
-          <div class="proj-head">${statusSelect(p)}${star("projects",p)}${p.repo?`<span class="mono small muted">${esc(p.repo)}</span>`:""}${editBtn()}</div></div>`,
+          <div class="proj-head">${statusSelect(p)}${star("projects",p)}${p.repo?`<span class="mono small muted">${esc(p.repo)}</span>`:""}${p.archived?`<span class="pill warn"><i></i>Archived</span>`:""}
+          <button class="btn" data-act="proj-menu" data-id="${esc(p._id)}">More…</button>${editBtn()}</div></div>`,
         panels: [
           P("changes","Recent changes", `<form class="row" data-form="log"><input type="hidden" name="project" value="${esc(p.name)}">
               <input type="text" name="text" maxlength="${max}" data-counter placeholder="What changed (${max} characters)" aria-label="Log entry for ${esc(p.name)}" required>
@@ -868,12 +921,15 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
         <div class="md">${md(cur.body)}</div>` : `<div class="empty">No notes yet.</div>`;
       return { extra:`<span class="pill warn"><i></i>Preview: LLMWIKI is not reachable from claude.ai</span>`, panels: [
         P("vault","Vault", `${S.wiki.some(w=>w.example)?`<div class="banner">Example notes standing in for your vault.</div>`:""}
-          ${PARA.map(([pre,label])=>{ const notes = S.wiki.filter(w=>w.path.startsWith(pre)).sort((a,b)=>a.title.localeCompare(b.title)); return `<h4 class="group-name">${label}</h4>
+          ${[...PARA, ...otherFolders()].map(([pre,label])=>{ const notes = S.wiki.filter(w=>w.path.startsWith(pre)).sort((a,b)=>a.title.localeCompare(b.title)); return `<h4 class="group-name">${label}</h4>
             <ul class="note-list">${notes.map(n=>`<li><button data-act="wiki-open" data-path="${esc(n.path)}" aria-current="${cur&&cur.path===n.path?"true":"false"}"><span class="grow">${esc(n.title)}</span></button></li>`).join("") || `<li class="empty small">Empty</li>`}</ul>`; }).join("")}`, {w:3}),
-        P("note", cur?cur.title:"Note", view, {w:9})
+        P("note", cur?cur.title:"Note", view, {w:9}),
+        P("search","Search", wikiSearchHTML(), {w:6}),
+        P("backlinks","Backlinks", cur ? backlinksHTML(cur) : `<div class="empty">Open a note.</div>`, {w:3}),
+        P("tags","Tags", wikiTagsHTML(), {w:3})
       ]};
     },
-    uptime(){ return { panels:[P("monitors","Monitors", uptimeHTML(false), {w:12})] }; },
+    uptime(){ const c = conn().uptime; return { extra:`${isUrl(c.baseUrl)?`<a class="btn" href="${esc(c.baseUrl)}" target="_blank" rel="noopener">Open Uptime Kuma</a>`:""}<a class="btn" href="#config">Connection settings</a>`, panels:[P("monitors","Monitors", uptimeHTML(false), {w:12})] }; },
     system(){
       const st = S.stats, hosts = (st && st.hosts) || [];
       const banner = st && st.example ? `<div class="banner">Example numbers. In the container Orb reads /proc and the Docker API itself.</div>` : "";
@@ -902,8 +958,10 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
           <div class="hint">${st.mainLists.length?"":"None ticked: Open tasks shows every list."}</div>`, {w:6}),
         P("logs","Logs", `<form class="setting" data-form="logmax"><div><label for="logmax">Log entry length</label><div class="d">Most characters in one entry, for you and Golem. 20 to 200.</div></div>
           <div class="row"><input type="number" id="logmax" name="logmax" min="20" max="200" value="${logMax()}"><button class="btn" type="submit">Save</button></div></form>
-          <div class="setting"><div><div>Daily digest in the wiki log</div><div class="d">Off: the wiki log only records Orb's edits to wiki notes. On: also one line a day, such as "Orb: 4 log entries on [[Pondering Orb]]".</div></div><input type="checkbox" data-act="set-digest" ${st.wikiDigest?"checked":""} aria-label="Daily digest in the wiki log"></div>`, {w:6}),
-        P("layout","Layouts", `<p class="small" style="margin:0">Every page has <b>Edit layout</b> in its header: add, remove, hide, move and resize panels there. Each page keeps its own layout.</p><div class="row"><button class="btn" data-act="layout-reset-all">${UI.confirmDel==="layouts"?"Click again to reset every page":"Reset every page's layout"}</button></div>`, {w:6}),
+          <div class="setting"><div><div>Note my log activity in the wiki</div><div class="d">The wiki's daily log always lists Orb's edits to wiki notes. Turn this on to also add one summary line a day, such as “Orb: 4 log entries on [[Pondering Orb]]”. The text of your entries is not copied.</div></div><input type="checkbox" data-act="set-digest" ${st.wikiDigest?"checked":""} aria-label="Note my log activity in the wiki"></div>`, {w:6}),
+        P("appearance","Appearance", appearanceHTML(), {w:6}),
+        P("connections","Connections", connectionsHTML(), {w:12}),
+        P("layout","Layouts", `<p class="small" style="margin:0">Every page has <b>Edit layout</b>: drag panels by their title, drag the corner to resize, right-click a panel to hide or remove it, right-click empty space to add one. Drag a tab onto another to show both pages side by side; right-click a joined tab to unlink.</p><div class="row"><button class="btn" data-act="layout-reset-all">${UI.confirmDel==="layouts"?"Click again to reset every page":"Reset every page's layout"}</button></div>`, {w:6}),
         P("yaml","Apps (orb.yaml)", `<p class="hint" style="margin:0">Groups hold apps. An app takes name, url, description, rune, optional links, and an optional widget: {type: plex | sabnzbd | upstreammanager} for a live panel.</p>
           <textarea class="yaml" id="yaml" spellcheck="false" aria-label="Apps configuration in YAML">${esc(draft)}</textarea>
           <div class="row"><button class="btn primary" data-act="yaml-save">Save YAML</button><button class="btn" data-act="yaml-revert">Discard changes</button>${UI.yamlMsg?`<span class="okmsg">${esc(UI.yamlMsg)}</span>`:""}</div>
@@ -940,59 +998,132 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     layoutTimer = setTimeout(async ()=>{ if(!db) return; try { await db.doc("config/layouts").set({pages:S.layouts.pages}); } catch(e){ fail(e); } }, 400);
   }
   const editBtn = () => `<button class="btn ${UI.editing?"primary":""}" data-act="edit-layout">${UI.editing?"Done editing":"Edit layout"}</button>`;
-  function renderPage(t){
-    const page = pageKey(), room = (UI.projectId ? ROOMS.project : ROOMS[t.id])();
-    UI.room = room;
-    const head = room.head !== undefined ? room.head : roomHead(t, `<div class="row">${room.extra&&!String(room.extra).includes("banner")?room.extra:""}${editBtn()}</div>`);
+  function renderPage(t, inSplit){
+    const page = UI.projectId && !inSplit ? "project" : t.id;
+    const room = (page==="project" ? ROOMS.project : ROOMS[t.id])();
+    UI.rooms[page] = room;
+    const extra = room.extra && !String(room.extra).includes("banner") ? room.extra : "";
+    const head = room.head !== undefined ? room.head : roomHead(t, `<div class="row">${extra}${inSplit?"":editBtn()}</div>`);
     const banner = room.extra && String(room.extra).includes("banner") ? room.extra : "";
     if (!room.panels.length) return head;
-    const {items, removed} = resolveLayout(page, room);
-    UI.items = items;
-    const tray = UI.editing ? `<div class="tray"><span class="hint">Edit mode: drag ⠿ to move, drag the corner to resize, or use the buttons.</span>
-      ${removed.length?`<span class="row"><span class="small">Add:</span>${removed.map(p=>`<button class="btn" data-act="pe-add" data-k="${esc(p.k)}">+ ${esc(p.label)}</button>`).join("")}</span>`:""}
-      <button class="btn" data-act="pe-reset">Reset this page</button></div>` : "";
+    const {items} = resolveLayout(page, room);
     const vis = UI.editing ? items : items.filter(i=>!i.hidden);
     const cells = vis.map(i=>{
       const p = room.panels.find(x=>x.k===i.k); const html = p.lazy ? widgetBody(p.k) : p.html;
       const style = `grid-column:span ${Math.max(1,Math.min(12,i.w||6))};${i.h?`height:${i.h}px;`:""}`;
-      const bar = UI.editing ? `<div class="ebar"><button class="grip" data-move aria-label="Move ${esc(p.label)}">⠿</button><span class="grow small">${esc(i.w)}/12 · ${i.h?i.h+"px":"auto"}</span>
-        <button class="btn" data-act="pe-w" data-d="-1" aria-label="Narrower">‹</button><button class="btn" data-act="pe-w" data-d="1" aria-label="Wider">›</button>
-        <button class="btn" data-act="pe-h" data-d="-1" aria-label="Shorter">⌃</button><button class="btn" data-act="pe-h" data-d="1" aria-label="Taller">⌄</button><button class="btn" data-act="pe-auto" aria-label="Auto height">A</button>
-        <button class="btn" data-act="pe-hide">${i.hidden?"Show":"Hide"}</button><button class="btn" data-act="pe-remove">Remove</button></div>` : "";
-      return `<section class="panel mp ${i.h?"fixed":""} ${i.hidden?"hiddenp":""}" data-pk="${esc(i.k)}" style="${style}">${bar}<h3>${esc(p.label)}${p.act?p.act:""}</h3><div class="pbody">${html}</div>${UI.editing?`<span class="rz" data-rz aria-hidden="true"></span>`:""}</section>`;
+      return `<section class="panel mp ${i.h?"fixed":""} ${i.hidden?"hiddenp":""}" data-pk="${esc(i.k)}" style="${style}"><h3 ${UI.editing?'data-drag title="Drag to move. Right-click for options."':""}>${esc(p.label)}${i.hidden&&UI.editing?' <span class="hint">(hidden)</span>':""}${p.act&&!UI.editing?p.act:""}</h3><div class="pbody">${html}</div>${UI.editing?`<span class="rz" data-rz aria-hidden="true"></span>`:""}</section>`;
     }).join("");
-    return head + banner + tray + `<div class="pgrid ${UI.editing?"editing":""}" id="pgrid">${cells || `<div class="empty">No panels. Use Edit layout to add some.</div>`}</div>`;
+    const hint = UI.editing && !inSplit ? `<div class="tray"><span class="small">Editing. Drag a panel by its title to move it, drag the gold corner to resize. Right-click a panel for hide and remove; right-click empty space to add panels.</span></div>` : "";
+    return head + banner + hint + `<div class="pgrid ${UI.editing?"editing":""}" data-page="${esc(page)}">${cells || `<div class="empty" style="grid-column:1/-1">No panels. ${UI.editing?"Right-click here to add one.":"Use Edit layout to add some."}</div>`}</div>`;
   }
-  function panelEdit(act, k, d){
-    const page = pageKey(), room = UI.room; if (!room) return;
-    let items = resolveLayout(page, room).items;
-    const i = items.findIndex(x=>x.k===k);
-    if (act==="pe-add"){ const p = room.panels.find(x=>x.k===k); if (p) items.push({k, w:p.w||6, h:0}); }
-    else if (act==="pe-reset"){ const pages = {...layoutStore()}; delete pages[page]; S.layouts = {pages}; clearTimeout(layoutTimer); if (db) db.doc("config/layouts").set({pages}).catch(fail); render(); return; }
-    else if (i<0) return;
-    else if (act==="pe-w") items[i].w = Math.max(2, Math.min(12, (items[i].w||6) + d));
-    else if (act==="pe-h"){ const cur = items[i].h || (document.querySelector(`[data-pk="${CSS.escape(k)}"]`)?.offsetHeight||240); items[i].h = Math.max(120, Math.round((cur + d*80)/40)*40); }
-    else if (act==="pe-auto") items[i].h = 0;
-    else if (act==="pe-hide") items[i].hidden = !items[i].hidden;
-    else if (act==="pe-remove") items.splice(i,1);
+  function layoutEdit(page, fn){
+    const room = UI.rooms[page]; if (!room) return;
+    const items = resolveLayout(page, room).items; if (fn(items, room) === false) return;
     saveLayoutFor(page, items, room); render();
   }
-  // drag to move / resize
+  function panelMenu(page, k, x, y){
+    const panel = document.querySelector(`.pgrid[data-page="${CSS.escape(page)}"] [data-pk="${CSS.escape(k)}"]`);
+    const it = resolveLayout(page, UI.rooms[page]).items.find(i=>i.k===k); if (!it) return;
+    openMenu(x, y, [
+      {label: it.hidden ? "Show panel" : "Hide panel", run:()=>layoutEdit(page, items=>{ const i = items.find(z=>z.k===k); i.hidden = !i.hidden; })},
+      {label: "Fit height to content", disabled: !it.h, run:()=>layoutEdit(page, items=>{ items.find(z=>z.k===k).h = 0; })},
+      {label: "Full width", disabled: it.w===12, run:()=>layoutEdit(page, items=>{ items.find(z=>z.k===k).w = 12; })},
+      {label: "Half width", disabled: it.w===6, run:()=>layoutEdit(page, items=>{ items.find(z=>z.k===k).w = 6; })},
+      "-",
+      {label: "Remove from page", danger:true, run:()=>layoutEdit(page, items=>{ items.splice(items.findIndex(z=>z.k===k),1); })}
+    ]);
+  }
+  function spaceMenu(page, x, y){
+    const room = UI.rooms[page]; if (!room) return;
+    const {removed} = resolveLayout(page, room);
+    openMenu(x, y, [
+      {label: removed.length ? "Add a panel" : "Every panel is on this page", heading:true},
+      ...removed.map(p=>({label:"+ "+p.label, run:()=>layoutEdit(page, items=>{ items.push({k:p.k, w:p.w||6, h:0}); })})),
+      "-",
+      {label: "Reset this page", run:()=>{ const pages = {...layoutStore()}; delete pages[page]; S.layouts = {pages}; clearTimeout(layoutTimer); if (db) db.doc("config/layouts").set({pages}).catch(fail); render(); }}
+    ]);
+  }
+
+  // ---------- menus and popups ----------
+  function closeMenu(){ document.querySelectorAll(".cmenu,.pop").forEach(n=>n.remove()); }
+  function placeFloating(el, x, y){
+    document.body.appendChild(el);
+    const r = el.getBoundingClientRect(), vw = innerWidth, vh = innerHeight;
+    el.style.left = Math.max(8, Math.min(x, vw - r.width - 8)) + "px";
+    el.style.top = Math.max(8, Math.min(y, vh - r.height - 8)) + "px";
+  }
+  function openMenu(x, y, items){
+    closeMenu();
+    const m = document.createElement("div"); m.className = "cmenu"; m.setAttribute("role","menu");
+    items.forEach(it=>{
+      if (it === "-"){ const s = document.createElement("div"); s.className = "sep"; m.appendChild(s); return; }
+      if (it.heading){ const h = document.createElement("div"); h.className = "mh"; h.textContent = it.label; m.appendChild(h); return; }
+      const b = document.createElement("button"); b.type = "button"; b.setAttribute("role","menuitem"); b.textContent = it.label;
+      if (it.danger) b.className = "danger"; if (it.disabled) b.disabled = true;
+      b.addEventListener("click", ev => { ev.stopPropagation(); closeMenu(); it.run && it.run(); });
+      m.appendChild(b);
+    });
+    placeFloating(m, x, y); const first = m.querySelector("button:not([disabled])"); first && first.focus();
+  }
+  function openPop(anchor, html){
+    closeMenu();
+    const p = document.createElement("div"); p.className = "pop"; p.innerHTML = html;
+    const r = anchor.getBoundingClientRect();
+    placeFloating(p, r.left, r.bottom + 6);
+    const f = p.querySelector("input:not([type=hidden]),select,textarea"); f && f.focus();
+    return p;
+  }
+  document.addEventListener("pointerdown", e => { if (!e.target.closest(".cmenu,.pop")) closeMenu(); }, true);
+  document.addEventListener("keydown", e => { if (e.key === "Escape") closeMenu(); });
+  window.addEventListener("resize", closeMenu);
+
+  // right-click (and long-press on touch)
+  function contextAt(target, x, y){
+    const tab = target.closest && target.closest("#tabs a");
+    if (tab){ tabMenu(tab, x, y); return true; }
+    const card = target.closest && target.closest("[data-card]");
+    if (card && !UI.editing){ projectMenu(card.dataset.card, x, y); return true; }
+    if (!UI.editing) return false;
+    const grid = target.closest && target.closest(".pgrid"), mp = target.closest && target.closest(".mp");
+    if (mp && grid){ panelMenu(grid.dataset.page, mp.dataset.pk, x, y); return true; }
+    const g = grid || (target.closest && target.closest("main") && document.querySelector(".pgrid"));
+    if (g){ const halves = document.querySelectorAll(".pgrid"); let page = g.dataset.page;
+      if (!grid && halves.length>1){ const half = [...halves].find(h=>{ const r = h.parentElement.getBoundingClientRect(); return x>=r.left && x<=r.right; }); if (half) page = half.dataset.page; }
+      spaceMenu(page, x, y); return true; }
+    return false;
+  }
+  document.addEventListener("contextmenu", e => { if (contextAt(e.target, e.clientX, e.clientY)) e.preventDefault(); });
+  let pressTimer = null;
   document.addEventListener("pointerdown", e => {
-    if (!UI.editing) return;
-    const mv = e.target.closest && e.target.closest("[data-move]"), rz = e.target.closest && e.target.closest("[data-rz]");
+    if (e.pointerType !== "touch") return;
+    const sx = e.clientX, sy = e.clientY, tgt = e.target;
+    clearTimeout(pressTimer);
+    pressTimer = setTimeout(()=>{ if (contextAt(tgt, sx, sy)) navigator.vibrate?.(10); }, 550);
+    const cancel = ev => { if (!ev || Math.hypot(ev.clientX-sx, ev.clientY-sy) > 8 || ev.type!=="pointermove"){ clearTimeout(pressTimer); off(); } };
+    const off = () => { removeEventListener("pointermove", cancel); removeEventListener("pointerup", cancel); removeEventListener("pointercancel", cancel); };
+    addEventListener("pointermove", cancel); addEventListener("pointerup", cancel); addEventListener("pointercancel", cancel);
+  });
+
+  // drag a panel by its title / resize from the corner
+  document.addEventListener("pointerdown", e => {
+    if (!UI.editing || e.button > 0) return;
+    const mv = e.target.closest && e.target.closest("[data-drag]"), rz = e.target.closest && e.target.closest("[data-rz]");
     if (!mv && !rz) return;
-    const panel = (mv||rz).closest(".mp"), grid = $("pgrid"); if (!panel || !grid) return;
+    if (mv && e.target.closest("button,a,select,input")) return;
+    const panel = (mv||rz).closest(".mp"), grid = panel && panel.closest(".pgrid"); if (!panel || !grid) return;
     e.preventDefault(); (mv||rz).setPointerCapture(e.pointerId);
-    const k = panel.dataset.pk, sx = e.clientX, sy = e.clientY; UI.moving = k;
+    const page = grid.dataset.page, k = panel.dataset.pk, sx = e.clientX, sy = e.clientY; UI.moving = k;
     const gap = 16, colW = (grid.clientWidth - 11*gap)/12, startW = panel.offsetWidth, startH = panel.offsetHeight;
-    let target = null, after = false, nw = null, nh = null;
+    let target = null, after = false, nw = null, nh = null, moved = false;
     const onMove = ev => {
+      if (Math.hypot(ev.clientX-sx, ev.clientY-sy) > 4) moved = true;
+      if (!moved) return;
+      clearTimeout(pressTimer);
       if (mv){
         panel.classList.add("dragging"); panel.style.pointerEvents = "none";
         const el = document.elementFromPoint(ev.clientX, ev.clientY), tp = el && el.closest(".mp");
         document.querySelectorAll(".mp.drop-before,.mp.drop-after").forEach(n=>n.classList.remove("drop-before","drop-after"));
-        if (tp && tp!==panel){ const r = tp.getBoundingClientRect(); after = (ev.clientX - r.left) > r.width/2; tp.classList.add(after?"drop-after":"drop-before"); target = tp.dataset.pk; } else target = null;
+        if (tp && tp!==panel && tp.closest(".pgrid")===grid){ const r = tp.getBoundingClientRect(); after = (ev.clientX - r.left) > r.width/2; tp.classList.add(after?"drop-after":"drop-before"); target = tp.dataset.pk; } else target = null;
       } else {
         nw = Math.max(2, Math.min(12, Math.round((startW + ev.clientX - sx + gap)/(colW+gap))));
         nh = Math.max(120, Math.round((startH + ev.clientY - sy)/40)*40);
@@ -1001,13 +1132,128 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     };
     const onUp = () => {
       const h = mv||rz; h.removeEventListener("pointermove", onMove); h.removeEventListener("pointerup", onUp); h.removeEventListener("pointercancel", onUp);
-      UI.moving = null; const page = pageKey(), room = UI.room; let items = resolveLayout(page, room).items;
-      if (mv && target){ const from = items.findIndex(x=>x.k===k); const [it] = items.splice(from,1); let to = items.findIndex(x=>x.k===target); if (after) to++; items.splice(to,0,it); saveLayoutFor(page, items, room); }
-      if (rz && nw){ const it = items.find(x=>x.k===k); if (it){ it.w = nw; it.h = nh; saveLayoutFor(page, items, room); } }
-      render();
+      UI.moving = null;
+      if (mv && target) layoutEdit(page, items=>{ const from = items.findIndex(x=>x.k===k); const [it] = items.splice(from,1); let to = items.findIndex(x=>x.k===target); if (after) to++; items.splice(to,0,it); });
+      else if (rz && nw) layoutEdit(page, items=>{ const it = items.find(x=>x.k===k); if (it){ it.w = nw; it.h = nh; } });
+      else render();
     };
     (mv||rz).addEventListener("pointermove", onMove); (mv||rz).addEventListener("pointerup", onUp); (mv||rz).addEventListener("pointercancel", onUp);
   });
+
+  // ---------- linked tabs ----------
+  const tabLinks = () => (settings().links||[]).filter(l=>Array.isArray(l) && l.length===2 && l.every(x=>TABS.some(t=>t.id===x)) && l[0]!==l[1]);
+  const linkOf = id => tabLinks().find(l=>l.includes(id));
+  function tabMenu(a, x, y){
+    const id = a.dataset.tab, l = id && id.includes("--") ? id.split("--") : null;
+    if (l) openMenu(x, y, [
+      {label:`Unlink ${TABS.find(t=>t.id===l[0]).label} and ${TABS.find(t=>t.id===l[1]).label}`, run:()=>{ saveSettings({links: tabLinks().filter(z=>z.join("--")!==id)}); location.hash = l[0]; }},
+      {label:"Swap sides", run:()=>{ saveSettings({links: tabLinks().map(z=>z.join("--")===id?[z[1],z[0]]:z)}); location.hash = l[1]+"--"+l[0]; }}
+    ]);
+    else openMenu(x, y, [{label:"Drag this tab onto another tab to show both side by side.", heading:true}]);
+  }
+  document.addEventListener("dragstart", e => { const a = e.target.closest && e.target.closest("#tabs a[data-tab]"); if (!a || a.dataset.tab.includes("--")) return; UI.dragTab = a.dataset.tab; try { e.dataTransfer.setData("text/plain", a.dataset.tab); e.dataTransfer.effectAllowed = "link"; } catch {} });
+  document.addEventListener("dragover", e => { const a = e.target.closest && e.target.closest("#tabs a[data-tab]"); if (!a || !UI.dragTab || a.dataset.tab===UI.dragTab || a.dataset.tab.includes("--")) return; e.preventDefault(); document.querySelectorAll("#tabs a.tab-drop").forEach(n=>n!==a&&n.classList.remove("tab-drop")); a.classList.add("tab-drop"); });
+  document.addEventListener("dragleave", e => { const a = e.target.closest && e.target.closest("#tabs a"); if (a) a.classList.remove("tab-drop"); });
+  document.addEventListener("drop", e => {
+    const a = e.target.closest && e.target.closest("#tabs a[data-tab]"); const src = UI.dragTab; UI.dragTab = null;
+    document.querySelectorAll("#tabs a.tab-drop").forEach(n=>n.classList.remove("tab-drop"));
+    if (!a || !src || a.dataset.tab===src || a.dataset.tab.includes("--")) return; e.preventDefault();
+    const tgt = a.dataset.tab;
+    saveSettings({links: [...tabLinks().filter(l=>!l.includes(src) && !l.includes(tgt)), [tgt, src]]});
+    location.hash = tgt+"--"+src;
+  });
+
+  // ---------- appearance ----------
+  const TOKENS = ["bg","panel","inset","line","line-hi","ink","muted","gold","gold-soft","arcane","arcane-soft","star","ok","warn","bad","ok-bg","warn-bg","bad-bg","orb-hi","orb-mid","orb-deep"];
+  const SEM_DARK = {ok:"#7cc48f", warn:"#e2b553", bad:"#e8796c", "ok-bg":"#1a3123", "warn-bg":"#3a301b", "bad-bg":"#3e2121"};
+  const PRESETS = {
+    night:{name:"Night tower", scheme:"dark", t:{bg:"#0f1119",panel:"#161a28",inset:"#1d2133",line:"#2d3352","line-hi":"#4a4568",ink:"#ebe3cf",muted:"#9d99ad",gold:"#d9a94f","gold-soft":"#3a2f1b",arcane:"#7ccac2","arcane-soft":"#183236",star:"rgba(235,227,207,.55)",...SEM_DARK,"orb-hi":"#e8fffb","orb-mid":"#5fb6ad","orb-deep":"#141c3a"}},
+    parchment:{name:"Parchment", scheme:"light", t:{bg:"#ebe2cd",panel:"#f6efdf",inset:"#ede3cc",line:"#cfbf9c","line-hi":"#b39c6e",ink:"#2a2217",muted:"#6d604b",gold:"#8b5b12","gold-soft":"#efdbb1",arcane:"#1f6d67","arcane-soft":"#d3e7e1",star:"rgba(0,0,0,0)",ok:"#2e7a4c",warn:"#9a6a0c",bad:"#b03a2d","ok-bg":"#dcecdf","warn-bg":"#f3e4c3","bad-bg":"#f4dbd5","orb-hi":"#ffffff","orb-mid":"#4aa39a","orb-deep":"#1d3159"}},
+    library:{name:"Arcane library", scheme:"dark", t:{bg:"#0e1512",panel:"#142019",inset:"#1a2a21",line:"#2a3d32","line-hi":"#3f5a49",ink:"#e6e9dc",muted:"#98a89c",gold:"#c9a35a","gold-soft":"#33301f",arcane:"#6fc3a0","arcane-soft":"#183327",star:"rgba(230,233,220,.4)",...SEM_DARK,"orb-hi":"#eafff4","orb-mid":"#4fae86","orb-deep":"#0f2a20"}},
+    forge:{name:"Ember forge", scheme:"dark", t:{bg:"#141110",panel:"#1d1816",inset:"#261f1c",line:"#3a2f2a","line-hi":"#5a463c",ink:"#f0e4d8",muted:"#a8968a",gold:"#e8893a","gold-soft":"#3d2615",arcane:"#e0b35a","arcane-soft":"#3a2d18",star:"rgba(240,228,216,.35)",ok:"#8cc47c",warn:"#e8b04a",bad:"#ef6b5a","ok-bg":"#20301b","warn-bg":"#3d3019","bad-bg":"#432019","orb-hi":"#fff1df","orb-mid":"#e07a3a","orb-deep":"#3a1508"}},
+    frost:{name:"Frost spire", scheme:"dark", t:{bg:"#0f141b",panel:"#161d27",inset:"#1c2532",line:"#2c3a4d","line-hi":"#456079",ink:"#e4ecf4",muted:"#94a3b4",gold:"#a9c7e8","gold-soft":"#1f2d3d",arcane:"#8fe0ea","arcane-soft":"#163239",star:"rgba(228,236,244,.6)",...SEM_DARK,"orb-hi":"#f3fbff","orb-mid":"#7fb8e0","orb-deep":"#142640"}}
+  };
+  const EDITABLE = [["bg","Background"],["panel","Panels"],["inset","Insets"],["line","Borders"],["ink","Text"],["muted","Quiet text"],["gold","Accent"],["arcane","Second accent"],["orb-mid","Orb glow"]];
+  const theme = () => ({mode:"auto", preset:"night", custom:{}, ...(settings().theme||{})});
+  let themeKey = "";
+  function applyTheme(){
+    const th = theme(), key = JSON.stringify(th); if (key === themeKey) return; themeKey = key;
+    const root = document.documentElement.style;
+    if (th.mode === "auto"){ TOKENS.forEach(t=>root.removeProperty("--"+t)); root.removeProperty("color-scheme"); return; }
+    const pr = PRESETS[th.preset] || PRESETS.night, vals = {...pr.t, ...(th.mode==="custom"?th.custom:{})};
+    TOKENS.forEach(t=>{ if (vals[t]) root.setProperty("--"+t, vals[t]); });
+    root.setProperty("color-scheme", pr.scheme);
+  }
+  function appearanceHTML(){
+    const th = theme(), base = PRESETS[th.preset] || PRESETS.night, vals = {...base.t, ...th.custom};
+    const sw = p => `<span class="sw">${["bg","panel","gold","arcane","ink"].map(k=>`<i style="background:${p.t[k]}"></i>`).join("")}</span>`;
+    return `<p class="hint" style="margin:0">Follow device uses Night tower in dark mode and Parchment in light mode.</p>
+      <div class="presets"><button class="preset ${th.mode==="auto"?"on":""}" data-act="theme-auto"><span class="sw"><i style="background:${PRESETS.night.t.bg}"></i><i style="background:${PRESETS.parchment.t.bg}"></i></span>Follow device</button>
+      ${Object.entries(PRESETS).map(([id,p])=>`<button class="preset ${th.mode==="preset"&&th.preset===id?"on":""}" data-act="theme-preset" data-id="${id}">${sw(p)}${esc(p.name)}</button>`).join("")}</div>
+      <details ${th.mode==="custom"?"open":""}><summary class="small">Customize colours${th.mode==="custom"?` (based on ${esc(base.name)})`:""}</summary>
+        <form data-form="theme-custom" class="colors">${EDITABLE.map(([k,l])=>`<label><input type="color" name="${k}" value="${/^#/.test(vals[k])?vals[k]:"#888888"}"> ${l}</label>`).join("")}
+        <div class="row" style="grid-column:1/-1"><button class="btn primary" type="submit">Use these colours</button><button class="btn" type="button" data-act="theme-preset" data-id="${esc(th.preset)}">Back to ${esc(base.name)}</button></div></form></details>`;
+  }
+
+  // ---------- connections ----------
+  const CONN_DEFS = [
+    {id:"uptime", name:"Uptime Kuma", fields:[["baseUrl","Base URL"],["slug","Status page slug"],["keyEnv","Metrics key variable (optional)"]], test:c=>`GET ${c.baseUrl}/api/status-page/${c.slug} and /api/status-page/heartbeat/${c.slug}, then list the monitors it finds.`},
+    {id:"wiki", name:"LLMWIKI", fields:[["baseUrl","REST API URL"],["keyEnv","API key variable"],["vaultPath","Vault folder in the container (read only)"]], test:c=>`GET ${c.baseUrl}/ with the key from ${c.keyEnv}, and check that ${c.vaultPath} holds the vault's .md files.`},
+    {id:"caldav", name:"CalDAV tasks", fields:[["url","CalDAV URL"],["userEnv","User variable"],["passEnv","Password variable"]], test:c=>`PROPFIND ${c.url||"(set a URL)"} and list the collections that hold tasks.`},
+    {id:"upstream", name:"UpstreamManager", fields:[["baseUrl","Base URL"]], test:c=>`GET ${c.baseUrl}/api/repos and /api/requests.`}
+  ];
+  const CONN_DEFAULT = {uptime:{baseUrl:"http://uptime-kuma:3001", slug:"orb", keyEnv:""}, wiki:{baseUrl:"http://llmwiki:27123", keyEnv:"WIKI_API_KEY", vaultPath:"/vault"}, caldav:{url:"", userEnv:"CALDAV_USER", passEnv:"CALDAV_PASSWORD"}, upstream:{baseUrl:"http://upstream-manager:5000"}};
+  const conn = () => { const c = settings().conn || {}; return Object.fromEntries(Object.entries(CONN_DEFAULT).map(([k,v])=>[k, {...v, ...(c[k]||{})}])); };
+  function connectionsHTML(){
+    const c = conn();
+    return `<p class="hint" style="margin:0">Addresses are as the container sees them. Keys and passwords stay in environment variables; only their names are saved here.</p>
+      <div class="conns">${CONN_DEFS.map(d=>`<form class="conn" data-form="conn" data-id="${d.id}"><h4 class="group-name">${esc(d.name)}</h4>
+        ${d.fields.map(([f,l])=>`<label class="small">${esc(l)}<input type="text" name="${f}" value="${esc(c[d.id][f]||"")}" aria-label="${esc(d.name)} ${esc(l)}"></label>`).join("")}
+        <div class="row"><button class="btn primary" type="submit">Save</button><button class="btn" type="button" data-act="conn-test" data-id="${d.id}">Test</button></div>
+        ${UI.connTest[d.id]?`<div class="banner">${esc(UI.connTest[d.id])}</div>`:""}</form>`).join("")}</div>`;
+  }
+
+  // ---------- quick log ----------
+  function logForm(){
+    const max = logMax();
+    return `<form class="row" data-form="logq"><input type="text" name="text" maxlength="${max}" data-counter placeholder="What changed (${max} characters)" aria-label="Log entry, up to ${max} characters" required>
+      <span class="counter">0/${max}</span><button class="btn primary" type="submit">Log it</button></form>`;
+  }
+  const liveProjects = () => S.projects.filter(p=>!p.archived);
+  function logPick(anchor, text){
+    UI.pendingLog = text;
+    const names = liveProjects().map(p=>p.name).sort((a,b)=>(b===UI.lastLogProject)-(a===UI.lastLogProject) || a.localeCompare(b));
+    const def = UI.logFilter && names.includes(UI.logFilter) ? UI.logFilter : (UI.lastLogProject && names.includes(UI.lastLogProject) ? UI.lastLogProject : names[0]||"General");
+    openPop(anchor, `<form data-form="log-pick" class="pop-form"><div class="small">Log <b>“${esc(text)}”</b> for which project?</div>
+      <select name="project" id="pick-project" data-act="pick-project" aria-label="Project">${names.map(n=>`<option ${n===def?"selected":""}>${esc(n)}</option>`).join("")}<option>General</option><option value="__new">+ New project…</option></select>
+      <input type="text" name="newName" id="pick-new" placeholder="New project name" aria-label="New project name" hidden>
+      <div class="row"><button class="btn primary" type="submit">Log it</button><button class="btn" type="button" data-act="pop-close">Cancel</button></div></form>`);
+  }
+  function newProjectPop(anchor){
+    openPop(anchor, `<form data-form="proj" class="pop-form" style="min-width:min(320px,86vw)"><div class="mh" style="padding:0">New project</div>
+      <label class="small">Name<input type="text" name="name" required aria-label="Project name"></label>
+      <label class="small">Next step<input type="text" name="next" aria-label="Next step"></label>
+      <label class="small">Column<select name="status">${STATUSES.map(s=>`<option value="${s}" ${s==="next"?"selected":""}>${STATUS_LABEL[s]}</option>`).join("")}</select></label>
+      <label class="small row"><input type="checkbox" name="wiki" checked data-act="np-wiki"> Create a note in the wiki</label>
+      <label class="small" id="np-area">Wiki area<select name="area"><option value="">Choose an area…</option>${AREAS.map(a=>`<option value="${a}">${a}</option>`).join("")}</select></label>
+      <div class="err" id="np-err" hidden></div>
+      <div class="row"><button class="btn primary" type="submit">Create project</button><button class="btn" type="button" data-act="pop-close">Cancel</button></div></form>`);
+  }
+  function projectMenu(id, x, y){
+    const p = S.projects.find(z=>z._id===id); if (!p) return;
+    openMenu(x, y, [
+      {label:"Open project page", run:()=>{ location.hash = projHref(p).slice(1); }},
+      {label: p.archived ? "Restore from archive" : "Archive (hide from the board)", run:()=>setArchived(p, !p.archived)},
+      "-",
+      {label:"Delete…", danger:true, run:()=>openMenu(x, y, [
+        {label:`Delete ${p.name}? Its log entries and wiki note stay.`, heading:true},
+        {label:"Delete project", danger:true, run:()=>deleteProject(p)},
+        {label:"Cancel", run:()=>{}}
+      ])}
+    ]);
+  }
+  async function setArchived(p, on){ if(!need()) return; try { await db.doc("projects/"+p._id).update({archived:on, updated:todayISO()}); setStatus(on?`${p.name} archived. Its wiki note is unchanged.`:`${p.name} restored.`); } catch(e){ fail(e); } }
+  async function deleteProject(p){ if(!need()) return; try { await db.doc("projects/"+p._id).delete(); setStatus(`${p.name} deleted from Orb. Its wiki note is unchanged.`); if (UI.projectId) location.hash = "projects"; } catch(e){ fail(e); } }
 
   // ---------- render ----------
   function renderSummary(){
@@ -1025,27 +1271,52 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     $("summary").innerHTML = p.join("");
   }
   function renderTabs(){
-    $("tabs").innerHTML = TABS.map(t=>`<a href="#${t.id}" ${t.id===UI.tab?'aria-current="page"':""}>${esc(t.label)}</a>`).join("");
+    const links = tabLinks(), seen = new Set(), cur = UI.split ? UI.split.join("--") : UI.tab;
+    const out = [];
+    for (const t of TABS){
+      if (seen.has(t.id)) continue;
+      const l = links.find(z=>z.includes(t.id));
+      if (l){ l.forEach(x=>seen.add(x)); const id = l.join("--"), lab = l.map(x=>TABS.find(z=>z.id===x).label).join(" / ");
+        out.push(`<a href="#${id}" data-tab="${id}" class="linked" ${cur===id?'aria-current="page"':""} title="Right-click to unlink">${esc(lab)}</a>`); }
+      else out.push(`<a href="#${t.id}" data-tab="${t.id}" draggable="true" ${cur===t.id?'aria-current="page"':""}>${esc(t.label)}</a>`);
+    }
+    $("tabs").innerHTML = out.join("");
   }
   function captureDrafts(){
-    const ti = $("note-title"), bo = $("note-body");
-    if (ti && bo && UI.noteId) UI.noteDraft = {id:UI.noteId, title:ti.value, body:bo.value};
     const y = $("yaml"); if (y) UI.yamlDraft = y.value === (S.yaml ?? "") ? null : y.value;
     const a = $("golem-in"); if (a) UI.golem.text = a.value;
     const ws = $("wiki-sec"); if (ws && UI.wikiEdit) UI.wikiEdit.text = ws.value;
   }
   function render(){
-    captureDrafts();
+    captureDrafts(); applyTheme();
+    if (!UI.projectId) UI.split = linkOf(UI.tab) || null;
     const active = document.activeElement && document.activeElement.id;
+    const caret = active && document.activeElement.selectionStart;
     renderSummary(); renderTabs();
-    const t = TABS.find(x=>x.id===UI.tab) || TABS[0];
-    $("main").innerHTML = `<div class="room">${renderPage(t)}</div>`;
-    if (active && $(active) && /^(note-title|note-body|yaml|golem-in|logmax|wiki-sec)$/.test(active)) $(active).focus();
+    let html;
+    if (UI.split){
+      const [a,b] = UI.split.map(id=>TABS.find(t=>t.id===id));
+      html = `<div class="split-bar"><span class="small muted">${esc(a.label)} and ${esc(b.label)} are linked. Right-click the tab to unlink.</span>${editBtn()}</div>
+        ${UI.editing?`<div class="tray"><span class="small">Editing both halves. Drag panels by their title, drag the corner to resize, right-click for options.</span></div>`:""}
+        <div class="split"><div class="half">${renderPage(a, true)}</div><div class="half">${renderPage(b, true)}</div></div>`;
+    } else {
+      const t = TABS.find(x=>x.id===UI.tab) || TABS[0];
+      html = renderPage(t, false);
+    }
+    $("main").innerHTML = `<div class="room">${html}</div>`;
+    if (active && $(active) && /^(yaml|golem-in|logmax|wiki-sec|wiki-q)$/.test(active)){ const el = $(active); el.focus(); try { if (caret!=null) el.setSelectionRange(caret, caret); } catch {} }
   }
   function route(){
     const h = location.hash.replace(/^#/,"");
-    UI.projectId = /^p-/.test(h) ? h.slice(2) : null; UI.editing = false;
-    UI.tab = UI.projectId ? "projects" : TABS.some(t=>t.id===h) ? h : "main";
+    UI.projectId = /^p-/.test(h) ? h.slice(2) : null; UI.editing = false; UI.split = null;
+    if (UI.projectId){ UI.tab = "projects"; }
+    else if (h.includes("--")){
+      const l = tabLinks().find(z=>z.join("--")===h);
+      if (l){ UI.split = l; UI.tab = l[0]; } else { const first = h.split("--")[0]; UI.tab = TABS.some(t=>t.id===first) ? first : "main"; }
+    } else {
+      UI.tab = TABS.some(t=>t.id===h) ? h : "main";
+      const l = linkOf(UI.tab); if (l){ UI.split = l; }
+    }
     render();
   }
   window.addEventListener("hashchange", route);
@@ -1106,8 +1377,14 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
       case "yaml-revert": UI.yamlDraft = null; UI.yamlMsg = ""; applyYaml(); render(); break;
       case "log-filter": UI.logFilter = el.dataset.p || ""; if (UI.tab!=="projects") location.hash = "projects"; else render(); break;
       case "edit-layout": UI.editing = !UI.editing; render(); break;
-      case "pe-add": case "pe-reset": panelEdit(act, el.dataset.k); break;
-      case "pe-w": case "pe-h": case "pe-auto": case "pe-hide": case "pe-remove": { const mp = el.closest(".mp"); if (mp) panelEdit(act, mp.dataset.pk, Number(el.dataset.d)||0); break; }
+      case "pop-close": closeMenu(); break;
+      case "proj-new": newProjectPop(el); break;
+      case "proj-restore": { const pr = S.projects.find(z=>z._id===id); if (pr) setArchived(pr, false); break; }
+      case "proj-menu": { const r = el.getBoundingClientRect(); projectMenu(id, r.left, r.bottom+4); break; }
+      case "theme-auto": saveSettings({theme:{...theme(), mode:"auto"}}); break;
+      case "theme-preset": saveSettings({theme:{...theme(), mode:"preset", preset:el.dataset.id, custom:{}}}); break;
+      case "conn-test": { const d = CONN_DEFS.find(z=>z.id===id); UI.connTest[id] = `Can't test from claude.ai: this page isn't allowed to reach your network. In the container, Test runs ${d.test(conn()[id])}`; render(); break; }
+      case "wiki-tag": UI.wikiTag = UI.wikiTag===el.dataset.t ? "" : el.dataset.t; render(); break;
       case "layout-reset-all": if (UI.confirmDel!=="layouts"){ UI.confirmDel = "layouts"; render(); break; } UI.confirmDel = null; S.layouts = {pages:{}}; if (db) db.doc("config/layouts").set({pages:{}}).catch(fail); render(); break;
       case "wiki-link": if(!need())return; db.doc("projects/"+el.dataset.id).update({wikiNote:el.dataset.path}).catch(fail); break;
       case "wiki-unlink": if(!need())return; db.doc("projects/"+el.dataset.id).update({wikiNote:""}).catch(fail); break;
@@ -1128,6 +1405,9 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     const el = e.target, act = el.dataset && el.dataset.act; if (!act) return;
     if (act === "proj-status"){ if(!need())return; const id = el.dataset.id, val = el.value; db.doc("projects/"+id).update({status:val, updated:todayISO()}).then(()=>syncWikiStatus(id, val)).catch(fail); }
     if (act === "plan-toggle"){ if(!need())return; db.doc("plans/"+el.dataset.id).update({done:el.checked}).catch(fail); }
+    if (act === "show-archived"){ UI.showArchived = el.checked; render(); }
+    if (act === "pick-project"){ const n = $("pick-new"); if (n){ n.hidden = el.value!=="__new"; if (!n.hidden) n.focus(); } }
+    if (act === "np-wiki"){ const a = $("np-area"); if (a) a.hidden = !el.checked; }
     if (act === "set-digest"){ saveSettings({wikiDigest:el.checked}); }
     if (act === "wiki-pick"){ if(!need())return; db.doc("projects/"+el.dataset.id).update({wikiNote:el.value}).catch(fail); }
     if (act === "todo-list"){ const l = el.dataset.l; UI.todoLists = el.checked ? [...new Set([...UI.todoLists, l])] : UI.todoLists.filter(x=>x!==l); render(); }
@@ -1145,11 +1425,22 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     const v = Object.fromEntries(new FormData(f).entries());
     try {
       switch (f.dataset.form){
+        case "logq": { const text = (v.text||"").trim().slice(0,logMax()); if (!text) return; logPick(e.submitter || f.querySelector("button[type=submit]"), text); f.reset(); const c = f.querySelector(".counter"); if (c) c.textContent = "0/"+logMax(); return; }
+        case "log-pick": {
+          let name = v.project;
+          if (name === "__new"){ name = (v.newName||"").trim(); if (!name) { $("pick-new")?.focus(); return; } if (!S.projects.some(z=>z.name===name)) await db.collection("projects").add({name, next:"", status:"next", repo:"", updated:todayISO()}); }
+          await db.collection("logs").add({date:todayISO(), project:name||"General", text:UI.pendingLog, created:Date.now()});
+          UI.lastLogProject = name; UI.pendingLog = ""; closeMenu(); setStatus(`Logged to ${name}.`); return;
+        }
+        case "theme-custom": { const th = theme(); const custom = {}; EDITABLE.forEach(([k])=>{ if (v[k]) custom[k] = v[k]; }); await saveSettings({theme:{...th, mode:"custom", custom}}); return; }
+        case "conn": { const id = f.dataset.id, d = CONN_DEFS.find(z=>z.id===id); const vals = {}; d.fields.forEach(([k])=>{ vals[k] = (v[k]||"").trim(); }); await saveSettings({conn:{...(settings().conn||{}), [id]:vals}}); UI.connTest[id] = "Saved."; render(); return; }
         case "proj": {
           if(!v.name.trim()) return; const name = v.name.trim(), status = STATUSES.includes(v.status)?v.status:"next";
+          if (v.wiki && !v.area){ const er = $("np-err"); if (er){ er.hidden = false; er.textContent = "Choose a wiki area, or untick “Create a note in the wiki”."; } return; }
+          closeMenu();
           const ref = await db.collection("projects").add({name, next:(v.next||"").trim(), status, repo:"", updated:todayISO()});
-          if (v.area) await createWikiNote(ref.id, name, v.area, status, (v.next||"").trim());
-          break;
+          if (v.wiki && v.area) await createWikiNote(ref.id, name, v.area, status, (v.next||"").trim());
+          return;
         }
         case "log": if(!v.text.trim()) return; await db.collection("logs").add({date:todayISO(), project:v.project||"General", text:v.text.trim().slice(0,logMax()), created:Date.now()}); f.reset(); const c = f.querySelector(".counter"); if (c) c.textContent = "0/"+logMax(); return;
         case "idea": if(!v.title.trim()) return; await db.collection("ideas").add({title:v.title.trim(), pitch:(v.pitch||"").trim(), stage:"thought", updated:todayISO()}); break;
@@ -1200,7 +1491,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
         inputSchema:{type:"object", properties:{project:{type:"string"}, limit:{type:"number"}}},
         execute:({project, limit}) => logSorted().filter(l=>!project || l.project.toLowerCase()===String(project).toLowerCase()).slice(0, Math.min(Number(limit)||20, 60)).map(l=>({date:l.date, project:l.project, text:l.text})) },
       { name:"list_projects", description:"Returns every project as {name, status, next, repo}. Status is one of next, active, blocked, paused, shipped.",
-        execute:() => S.projects.map(p=>({name:p.name, status:p.status, next:p.next||"", repo:p.repo||""})) },
+        execute:() => S.projects.map(p=>({name:p.name, status:p.status, next:p.next||"", repo:p.repo||"", archived:!!p.archived})) },
       { name:"list_ideas", description:"Returns ideas not yet promoted as {title, stage, pitch}. Stage is thought, design or code.",
         execute:() => S.ideas.filter(i=>!i.promoted).map(i=>({title:i.title, stage:i.stage, pitch:i.pitch||""})) },
       { name:"list_tasks", description:"Returns tasks as {title, list, due, done}. Optional list filters to one task list (projects use their own name); openOnly defaults to true.",
@@ -1298,6 +1589,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     };
     grip.addEventListener("pointermove", move); grip.addEventListener("pointerup", up); grip.addEventListener("pointercancel", up);
   });
+  document.addEventListener("input", e => { if (e.target.id === "wiki-q"){ UI.wikiQ = e.target.value; render(); } });
   document.addEventListener("input", e => { if (e.target.matches && e.target.matches("[data-counter]")){ const c = e.target.parentElement.querySelector(".counter"); if (c){ const n = e.target.value.length, m = Number(e.target.maxLength); c.textContent = n+"/"+m; c.classList.toggle("full", n>=m); } } });
   document.addEventListener("keydown", e => { if (e.target.id==="golem-in" && e.key==="Enter" && !e.shiftKey){ e.preventDefault(); golemSend(e.target.value); } });
 
