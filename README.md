@@ -5,6 +5,7 @@ upkeep checks, system stats, and links into the rest of the stack.
 
 Tabs (each one a room of the tower):
 
+- **Edit layout** on every page: add, remove, hide, move and resize panels
 - **Main**: modular panels; Golem, favorite projects, open tasks, uptime,
   the log, and one panel per app or app group, with live views for Plex,
   SABnzbd and UpstreamManager
