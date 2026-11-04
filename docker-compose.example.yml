@@ -1,0 +1,63 @@
+# Pondering Orb stack (planned). The orb image does not exist yet; it comes
+# with build step 1 in docs/backend.md. Uptime Kuma and the Docker socket proxy
+# are ordinary images and work today.
+#
+# One file, separate containers: Orb, Uptime Kuma, and a read-only proxy in
+# front of the Docker socket. UpstreamManager runs on another computer and is
+# reached by URL (UPSTREAM_URL). If you already run Uptime Kuma, delete its
+# service and point UPTIME_URL at yours.
+
+services:
+  orb:
+    image: ghcr.io/wizard815/pondering-orb:latest   # planned
+    container_name: pondering-orb
+    restart: unless-stopped
+    ports:
+      - "8095:8095"
+    environment:
+      ORB_CONFIG: /config/orb.yaml
+      UPTIME_URL: http://uptime-kuma:3001
+      UPSTREAM_URL: http://192.168.20.10:5000        # the computer running UpstreamManager
+      DOCKER_HOST: tcp://docker-proxy:2375
+      WIKI_API_KEY: ${WIKI_API_KEY}
+      CALDAV_USER: ${CALDAV_USER}
+      CALDAV_PASSWORD: ${CALDAV_PASSWORD}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+    volumes:
+      - ./config:/config
+      - ./data:/data                                 # orb.db (SQLite)
+      - /proc:/host/proc:ro                          # System tab: cores, memory, network
+      - /mnt/user/appdata/llmwiki/vault:/vault:ro    # Wiki tab reads the whole vault; writes go through the REST API
+    networks: [edge, ai_net, orb]
+    depends_on: [docker-proxy]
+
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: uptime-kuma
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./uptime-kuma:/app/data
+    networks: [orb]
+
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:latest      # pin a version you have tested
+    container_name: orb-docker-proxy
+    restart: unless-stopped
+    environment:
+      CONTAINERS: 1
+      INFO: 1
+      POST: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [orb]
+
+networks:
+  orb: {}
+  edge:
+    external: true
+    name: proxynat
+  ai_net:
+    external: true
+    name: ai_net

@@ -52,7 +52,8 @@ old Plans list is gone; it became task lists.
 ## Data model (SQLite)
 
 ```
-projects(id, name, status, next, repo, fav, archived, task_list, wiki_note, updated_at)
+projects(id, name, status, next, repo, fav, archived, task_list, wiki_note,
+         upstream_repo, log_commits, last_logged_sha, updated_at)
   status: next | active | blocked | paused | shipped
   task_list: CalDAV collection for this project's tasks (default: its name)
   wiki_note: e.g. "wiki/1-projects/Pondering Orb.md"
@@ -178,7 +179,9 @@ How editing works:
   the page.
 - **Linked pages:** drag one tab onto another to show both side by side under
   one tab ("Projects / To-do"). The link is saved; right-click the joined tab
-  to unlink or swap sides. Each half keeps its own panel layout. On narrow
+  to unlink or swap sides. Drag the bar between the halves to resize them
+  (20 to 80 percent; double-click resets to half); the split is saved per
+  link. Each half keeps its own panel layout. On narrow
   screens the halves stack.
 
 In the React build this is `react-grid-layout`; the demo has its own small
@@ -230,23 +233,53 @@ small JSON shape. The browser never sees an app's key.
 New types are one Go file each; Homepage's widget list is a good backlog
 (Sonarr, Radarr, qBittorrent, Proxmox, Home Assistant).
 
-## UpstreamManager
+## UpstreamManager (the Upkeep tab)
 
-UpstreamManager is its own app with its own page; Orb's Upkeep tab is a
-separate, simpler list of recurring chores. They connect through
-UpstreamManager's JSON API on port 5000:
+UpstreamManager runs on another computer. Orb talks to its JSON API over the
+LAN; Orb's own chore list stays as one panel on the same tab.
 
-- `GET /api/repos` and `GET /api/requests` feed the UpstreamManager panel;
-- `POST /api/request/<id>/decide` lets Orb approve or reject a request;
-- `POST /api/run-daily` can be the action behind an "Upstream sync" upkeep
-  check, which Orb then stamps as done.
+| Panel | Call | Notes |
+| --- | --- | --- |
+| Repositories | `GET /api/repos` | per repo: `focus_branch`, `behind`, `ahead`, `conflicts`, `upstream_details`, `components`, `last_commit`, `dirty`, `error` |
+| Approval requests | `GET /api/requests` | `type` (merge, components, push, actions), `upstreams[]` with `behind` and `reason`, `safe`, `status` |
+| Approve / Deny | `POST /api/request/<id>/decide` | body `{"decision": "approve" \| "deny", "comment": "..."}`; 409 if already decided |
+| Daily check | `POST /api/run-daily` | returns `results[]` with `status` merged, request_raised or error |
+| Fetch | `POST /api/repo/<id>/fetch` | returns a merge `plan` |
+| Project commits | `GET /api/repo/<id>/commits?view=all&limit=50` | items `{full, sha, date, author, subject}` |
 
-The API has no login of its own, so Orb reaches it on the internal network
-only and never exposes it through the tunnel.
+Orb calls these from its Go server, never from the browser. Every POST must
+send `Content-Type: application/json`, because UpstreamManager refuses
+anything else to block cross-site requests. Server-to-server calls carry no
+`Origin` header, so they pass that check.
+
+**Reaching it on another computer.** UpstreamManager has no login and can run
+git, so it listens on `127.0.0.1` unless told otherwise. On that computer:
+
+1. start it with `HOST=0.0.0.0` (and `PORT` if not 5000);
+2. allow port 5000 only from the Orb host in the firewall, for example
+   `ufw allow from <orb-ip> to any port 5000 proto tcp`;
+3. never publish it through the Cloudflare tunnel.
+
+If you put a reverse proxy in front of it, add the proxy's host to
+`UPSTREAM_ALLOWED_HOSTS` and let Orb send the proxy's auth header (set
+`upstream.header_env` in `orb.yaml`).
+
+### Linking a project to a repo
+
+A project can be linked to one UpstreamManager repo (`projects.upstream_repo`).
+Then:
+
+- the project page shows the repo's branch, behind/ahead and recent commits;
+- the board card shows a ↓N chip when upstream has new commits;
+- with **Log new commits** on, Orb polls `GET /api/repo/<id>/commits` every
+  15 minutes and writes each new commit as a log entry: its subject cut to
+  `log_max`, `by: git`, the short sha kept with it. `projects.last_logged_sha`
+  stops it logging a commit twice.
 
 ## Uptime
 
-Run Uptime Kuma as its own container and read it; don't copy its code into
+Uptime Kuma ships in the same `docker-compose.example.yml` as Orb: one file,
+two containers. Delete its service if you already run one. Read it; don't copy its code into
 Orb. It is MIT, so copying is allowed, but it is a full Node app with its own
 database and Socket.io API, and a fork would have to be kept up to date by
 hand. As a separate container it keeps getting upstream fixes (and
@@ -381,7 +414,8 @@ servers.
 5. Golem with both provider types.
 6. Live panels: UpstreamManager, Plex, SABnzbd; Uptime Kuma tab.
 7. System tab from `/proc` and the Docker proxy; optional btop sidecar.
-8. Miladash and the Ideas tab (see `miladash.md`).
+8. Miladash and the Ideas tab (see `miladash.md`); the demo's Ideas board
+   is the reference for its look and tools.
 
 ## Open questions
 
