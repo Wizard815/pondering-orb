@@ -9,8 +9,8 @@ Tabs (each one a room of the tower):
   Apps, Recent log, Next 7 days, Upkeep due and more)
 - **Projects**: kanban board (Up next, Active, Blocked, Paused, Shipped) and
   the project log, filterable by project
-- **Ideas**: ideas moving through Thought, Design and Code; Promote one to
-  put it on the board
+- **Ideas**: a free-form board (a preview of Miladash); where a card sits
+  sets its stage (Thought, Design, Code); Promote puts it on the board
 - **Notes & Plans**: notes editor and next / later / someday plans
 - **Calendar**: month view of your events and upkeep due dates
 - **Mail**: waiting for the Gmail connector
@@ -18,7 +18,8 @@ Tabs (each one a room of the tower):
 - **System**: per-host CPU, memory, disk and GPU
 - **Settings**: Golem, log length, Main layout and the apps YAML
 
-Star a note or plan to put it in Favorites on the Main tab. Log entries are
+Star a project to put it in Favorites on the Main tab; each project has its
+own page with its tasks and recent log entries. Log entries are
 short: 50 characters by default, set in Settings.
 
 ## Golem
@@ -46,6 +47,13 @@ groups:
           source: n8n
           workflow: argos-status
 ```
+
+## Container backend
+
+The page here is the demo. The real Orb runs as a container with its own
+REST API and MCP endpoint, reads and completes tasks through ALLGlance, runs
+Golem on Argos, and uses Miladash (a Milaclone branch) for ideas. See
+[docs/backend.md](docs/backend.md).
 
 ## Status
 
