@@ -5,23 +5,33 @@ upkeep checks, system stats, and links into the rest of the stack.
 
 Tabs (each one a room of the tower):
 
-- **Main**: the scrying table; choose and order its panels with Arrange
-- **Projects**: project cards with status, plus the project log
+- **Main**: the scrying table; pick and order its panels (Golem, Favorites,
+  Apps, Recent log, Next 7 days, Upkeep due and more)
+- **Projects**: kanban board (Up next, Active, Blocked, Paused, Shipped) and
+  the project log, filterable by project
+- **Ideas**: ideas moving through Thought, Design and Code; Promote one to
+  put it on the board
 - **Notes & Plans**: notes editor and next / later / someday plans
 - **Calendar**: month view of your events and upkeep due dates
 - **Mail**: waiting for the Gmail connector
 - **Upkeep**: recurring checks, amber when due, red when overdue
 - **System**: per-host CPU, memory, disk and GPU
-- **Agents**: Argos and Odysseus links, and "ask the orb"
-- **Apps**: the stack, defined in YAML (see below)
+- **Settings**: Golem, log length, Main layout and the apps YAML
 
-Star a project, note or plan to put it in Favorites on the Main tab.
+Star a note or plan to put it in Favorites on the Main tab. Log entries are
+short: 50 characters by default, set in Settings.
+
+## Golem
+
+The dashboard assistant on the Main tab. It reads projects, logs, ideas and
+upkeep, and when allowed it adds logs, plans and ideas and moves project
+cards. It thinks with Claude today. Argos already serves MCP at `/api/mcp`;
+once that is added as a claude.ai connector, Golem can read GPU and request
+status from it.
 
 ## orb.yaml
 
 ```yaml
-favorites:
-  - Odysseus
 groups:
   - name: The Tower
     apps:

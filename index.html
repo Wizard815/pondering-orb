@@ -114,7 +114,7 @@ form.row input[type=text]{flex:1 1 180px}
 .proj .next b{font-weight:700;color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;display:block}
 .proj .foot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:auto}
 .proj select{font-size:.8rem;padding:2px 4px}
-.st-active{color:var(--ok)} .st-blocked{color:var(--bad)} .st-paused{color:var(--warn)} .st-shipped{color:var(--arcane)} .st-idea{color:var(--gold)}
+.st-next{color:var(--gold)} .st-active{color:var(--ok)} .st-blocked{color:var(--bad)} .st-paused{color:var(--warn)} .st-shipped{color:var(--arcane)} .st-idea{color:var(--gold)}
 
 /* upkeep */
 .uk{display:grid;grid-template-columns:4px minmax(0,1fr) auto;gap:10px;align-items:center;background:var(--inset);border-radius:5px;padding:8px 10px 8px 0;margin-bottom:6px}
@@ -196,6 +196,47 @@ a.app:hover{border-color:var(--gold)}
 .cfg input[type=checkbox]{margin-top:0}
 
 .agent-out{white-space:pre-wrap;background:var(--inset);border-radius:5px;padding:10px;overflow-wrap:anywhere}
+
+/* kanban */
+.kanban{display:grid;grid-template-columns:repeat(5,minmax(200px,1fr));gap:10px;overflow-x:auto;padding-bottom:6px}
+.kcol{background:var(--inset);border:1px solid var(--line);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px;min-height:160px;min-width:0}
+.kcol.drop{border-color:var(--gold);background:var(--gold-soft)}
+.kcol h4{margin:0;font-family:var(--f-display);font-size:.8rem;letter-spacing:.1em;text-transform:uppercase;display:flex;justify-content:space-between}
+.kcol h4 .n{font-family:var(--f-mono);color:var(--muted)}
+.kcard{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:9px 10px;display:flex;flex-direction:column;gap:4px;cursor:grab}
+.kcard.dragging{opacity:.45}
+.kcard .name{font-family:var(--f-display);font-weight:600}
+.kcard .repo{font-family:var(--f-mono);font-size:.72rem;color:var(--muted);overflow-wrap:anywhere}
+.kcard .next{font-size:.88rem}
+.kcard .foot{display:flex;justify-content:space-between;align-items:center;gap:6px}
+.kcard select{font-size:.76rem;padding:1px 3px}
+.kcard .logs{font-size:.78rem}
+.counter{font-family:var(--f-mono);font-size:.76rem;color:var(--muted)}
+.counter.full{color:var(--warn)}
+
+/* golem */
+.golem{display:flex;flex-direction:column;gap:10px}
+.golem-head{display:flex;align-items:center;gap:10px}
+.golem-face{width:34px;height:34px;flex:none;border-radius:7px;background:var(--inset);border:1px solid var(--line-hi);display:grid;place-items:center;position:relative}
+.golem-face::before,.golem-face::after{content:"";position:absolute;top:13px;width:6px;height:6px;border-radius:50%;background:var(--arcane);box-shadow:0 0 6px var(--arcane)}
+.golem-face::before{left:8px}.golem-face::after{right:8px}
+.golem-face.busy::before,.golem-face.busy::after{background:var(--gold);box-shadow:0 0 8px var(--gold)}
+.chat{display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto;padding-right:4px}
+.msg{padding:8px 11px;border-radius:8px;max-width:92%;white-space:pre-wrap;overflow-wrap:anywhere;font-size:.94rem}
+.msg.user{align-self:flex-end;background:var(--gold-soft);border:1px solid var(--line)}
+.msg.golem{align-self:flex-start;background:var(--inset);border:1px solid var(--line)}
+.msg .did{display:block;font-family:var(--f-mono);font-size:.72rem;color:var(--arcane);margin-top:4px}
+.golem form{display:flex;gap:8px}
+.golem form textarea{flex:1;min-height:40px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{font-size:.8rem;border:1px solid var(--line);background:var(--inset);border-radius:999px;padding:2px 10px}
+.chips button:hover{border-color:var(--gold)}
+.setting{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 16px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+.setting:first-of-type{border-top:0}
+.setting .d{font-size:.84rem;color:var(--muted)}
+input[type=number]{background:var(--inset);border:1px solid var(--line);border-radius:5px;padding:5px 8px;width:5.5em}
+.radio{display:flex;flex-direction:column;gap:6px}
+.radio label{display:flex;gap:8px;align-items:flex-start}
 .status-line{font-size:.8rem;color:var(--muted);font-family:var(--f-mono);margin-top:24px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
@@ -233,30 +274,39 @@ a.app:hover{border-color:var(--gold)}
   $("today").textContent = new Date().toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric",year:"numeric"});
 
   // ---------- state ----------
-  const S = { projects:[], logs:[], plans:[], upkeep:[], notes:[], events:[], stats:null, yaml:null, layout:null, loaded:false };
+  const S = { ideas:[], projects:[], logs:[], plans:[], upkeep:[], notes:[], events:[], stats:null, yaml:null, layout:null, settings:null, loaded:false };
   let db = null;
-  const UI = { tab:"main", noteId:null, noteDraft:null, calMonth:new Date(new Date().getFullYear(), new Date().getMonth(), 1), logLimit:15, configuring:false, yamlDraft:null, yamlMsg:"", ask:{busy:false,text:"",status:""}, confirmDel:null };
+  let savedChat = [];
+  try { savedChat = JSON.parse(localStorage.getItem("orb.golem") || "[]"); if (!Array.isArray(savedChat)) savedChat = []; } catch { savedChat = []; }
+  const UI = { tab:"main", noteId:null, noteDraft:null, calMonth:new Date(new Date().getFullYear(), new Date().getMonth(), 1), logLimit:15, logFilter:"", configuring:false, yamlDraft:null, yamlMsg:"", confirmDel:null, dragId:null,
+    golem:{busy:false, text:"", status:"", msgs:savedChat.slice(-30)} };
 
   const TABS = [
     {id:"main", label:"Main", title:"Scrying Table", flavor:"Everything you chose to keep in view."},
     {id:"projects", label:"Projects", title:"Workshop", flavor:"What is on the bench, and the log of how it got there."},
+    {id:"ideas", label:"Ideas", title:"Alchemy Bench", flavor:"Ideas still in thought, design or first code. Promote one when it earns a place on the board."},
     {id:"notes", label:"Notes & Plans", title:"Library", flavor:"Notes worth keeping and plans for later."},
     {id:"calendar", label:"Calendar", title:"Star Chart", flavor:"Events and upkeep due dates by day."},
     {id:"mail", label:"Mail", title:"Raven Post", flavor:"Your inbox, once the ravens are allowed in."},
     {id:"upkeep", label:"Upkeep", title:"Wards", flavor:"Recurring checks that keep the tower standing."},
     {id:"system", label:"System", title:"Engine Room", flavor:"How the machines are holding up."},
-    {id:"agents", label:"Agents", title:"Familiars", flavor:"Argos, Odysseus and a question for the orb."},
-    {id:"apps", label:"Apps", title:"Portals", flavor:"Every app in the stack, defined in YAML."}
+    {id:"config", label:"Settings", title:"Sanctum", flavor:"Golem, logs, the Main table and the apps YAML."}
   ];
 
   const WIDGETS = {
-    favorites:{label:"Favorites"}, week:{label:"Next 7 days"}, upkeep:{label:"Upkeep due"}, projects:{label:"Active projects"},
-    system:{label:"System"}, log:{label:"Recent log"}, plans:{label:"Next plans"}, mail:{label:"Mail"}, apps:{label:"Apps"}, ask:{label:"Ask the orb"}
+    golem:{label:"Golem", wide:true}, favorites:{label:"Favorites"}, apps:{label:"Apps"}, week:{label:"Next 7 days"}, upkeep:{label:"Upkeep due"},
+    projects:{label:"Active projects"}, ideas:{label:"Ideas brewing"}, system:{label:"System"}, log:{label:"Recent log"}, plans:{label:"Next plans"}, mail:{label:"Mail"}
   };
-  const DEFAULT_MAIN = ["favorites","week","upkeep","projects","system","log"];
+  const DEFAULT_MAIN = ["golem","favorites","apps","log","week","upkeep"];
   const mainLayout = () => (S.layout && Array.isArray(S.layout.main) ? S.layout.main.filter(w=>WIDGETS[w]) : DEFAULT_MAIN);
 
-  const STATUSES = ["active","blocked","paused","shipped","idea"];
+  const STATUSES = ["next","active","blocked","paused","shipped"];
+  const STATUS_LABEL = {next:"Up next", active:"Active", blocked:"Blocked", paused:"Paused", shipped:"Shipped"};
+  const STAGES = ["thought","design","code"];
+  const STAGE_LABEL = {thought:"Thought", design:"Design", code:"Code"};
+  const STAGE_HINT = {thought:"Just a spark. Why would it matter?", design:"Sketching how it works.", code:"First code, no promises."};
+  const settings = () => ({ logMax:50, golemWrites:true, golemBrain:"claude", argosConnector:"Argos", ...(S.settings||{}) });
+  const logMax = () => Math.max(20, Math.min(200, Number(settings().logMax)||50));
 
   // ---------- yaml config ----------
   let CFG = { groups:[], favorites:[] }, cfgError = "";
@@ -333,23 +383,43 @@ a.app:hover{border-color:var(--gold)}
         <button class="btn" data-act="upkeep-done" data-id="${esc(u._id)}">Done</button></div>`;
     }).join("");
   }
-  function projectCards(filterActive){
-    const order = s => STATUSES.indexOf(s);
-    let list = [...S.projects].sort((a,b)=>order(a.status)-order(b.status) || String(a.name).localeCompare(b.name));
-    if (filterActive) list = list.filter(p=>p.status==="active"||p.status==="blocked");
-    if (!list.length) return `<div class="empty">No projects yet.</div>`;
+  const statusSelect = p => `<select data-act="proj-status" data-id="${esc(p._id)}" class="st-${esc(p.status)}" aria-label="Move ${esc(p.name)}">${STATUSES.map(s=>`<option value="${s}" ${s===p.status?"selected":""}>${STATUS_LABEL[s]}</option>`).join("")}</select>`;
+  function projectCards(){
+    const list = S.projects.filter(p=>p.status==="active"||p.status==="blocked").sort((a,b)=>String(a.name).localeCompare(b.name));
+    if (!list.length) return `<div class="empty">Nothing active. Move a card on the Projects board.</div>`;
     return `<div class="projects">${list.map(p=>`<article class="proj">
-      <div class="name"><span>${esc(p.name)}</span>${star("projects",p)}</div>
-      ${p.repo?`<div class="repo">${esc(p.repo)}</div>`:""}
-      ${p.next?`<div class="next"><b>Next</b>${esc(p.next)}</div>`:""}
-      <div class="foot"><select data-act="proj-status" data-id="${esc(p._id)}" class="st-${esc(p.status)}" aria-label="Status of ${esc(p.name)}">${STATUSES.map(s=>`<option value="${s}" ${s===p.status?"selected":""}>${s}</option>`).join("")}</select>
-      <span class="small muted mono">${p.updated?esc(fmtDate(p.updated)):""}</span></div></article>`).join("")}</div>`;
+      <div class="name"><span>${esc(p.name)}</span><span class="small st-${esc(p.status)}">${esc(p.status)}</span></div>
+      ${p.next?`<div class="next"><b>Next</b>${esc(p.next)}</div>`:""}</article>`).join("")}</div>`;
   }
-  function logHTML(limit){
-    const list = [...S.logs].sort((a,b)=>String(b.date).localeCompare(String(a.date)) || (b.created||0)-(a.created||0));
-    if (!list.length) return `<div class="empty">No log entries yet.</div>`;
-    return `<ul class="list">${list.slice(0,limit).map(l=>`<li><span class="date">${esc(l.date)}</span><div class="grow"><span class="tag">${esc(l.project)}</span> ${esc(l.text)}</div></li>`).join("")}</ul>` +
-      (list.length>limit && UI.tab==="projects" ? `<button class="btn" data-act="log-more">Show older</button>` : "");
+  function kanbanHTML(){
+    const logCount = {}; S.logs.forEach(l=>{ logCount[l.project] = (logCount[l.project]||0)+1; });
+    return `<div class="kanban" role="list">${STATUSES.map(s=>{
+      const cards = S.projects.filter(p=>(STATUSES.includes(p.status)?p.status:"next")===s).sort((a,b)=>String(b.updated||"").localeCompare(String(a.updated||"")));
+      return `<div class="kcol" data-col="${s}" role="listitem" aria-label="${STATUS_LABEL[s]}"><h4><span class="st-${s}">${STATUS_LABEL[s]}</span><span class="n">${cards.length}</span></h4>
+        ${cards.map(p=>`<article class="kcard" draggable="true" data-card="${esc(p._id)}">
+          <div class="name">${esc(p.name)}</div>
+          ${p.repo?`<div class="repo">${esc(p.repo)}</div>`:""}
+          ${p.next?`<div class="next">${esc(p.next)}</div>`:""}
+          <div class="foot">${statusSelect(p)}${logCount[p.name]?`<button class="btn link logs" data-act="log-filter" data-p="${esc(p.name)}">${logCount[p.name]} log${logCount[p.name]>1?"s":""}</button>`:""}</div>
+        </article>`).join("") || `<div class="empty small">Drop a card here.</div>`}</div>`;
+    }).join("")}</div>`;
+  }
+  const logSorted = () => [...S.logs].sort((a,b)=>String(b.date).localeCompare(String(a.date)) || (b.created||0)-(a.created||0));
+  function logForm(){
+    const max = logMax();
+    return `<form class="row" data-form="log"><select name="project" aria-label="Project">${["General",...S.projects.map(p=>p.name)].map(n=>`<option ${n===UI.logFilter?"selected":""}>${esc(n)}</option>`).join("")}</select>
+      <input type="text" name="text" maxlength="${max}" data-counter placeholder="What changed (${max} characters)" aria-label="Log entry, up to ${max} characters" required>
+      <span class="counter">0/${max}</span><button class="btn primary" type="submit">Log it</button></form>`;
+  }
+  function logHTML(limit, withFilter){
+    let list = logSorted();
+    if (withFilter && UI.logFilter) list = list.filter(l=>l.project===UI.logFilter);
+    const names = [...new Set(S.logs.map(l=>l.project))].sort();
+    const filter = withFilter ? `<div class="row"><label class="hint" for="log-filter">Show</label><select id="log-filter" data-act="log-filter-select"><option value="">All projects</option>${names.map(n=>`<option ${n===UI.logFilter?"selected":""}>${esc(n)}</option>`).join("")}</select>
+      ${UI.logFilter?`<button class="btn" data-act="log-filter" data-p="">Clear filter</button>`:""}</div>` : "";
+    const body = list.length ? `<ul class="list">${list.slice(0,limit).map(l=>`<li><span class="date">${esc(l.date)}</span><div class="grow"><button class="btn link tag" data-act="log-filter" data-p="${esc(l.project)}" title="Show only ${esc(l.project)}">${esc(l.project)}</button> ${esc(l.text)}${l.by==="golem"?` <span class="hint">· Golem</span>`:""}</div></li>`).join("")}</ul>`
+      : `<div class="empty">${UI.logFilter&&withFilter?"No entries for "+esc(UI.logFilter)+".":"No log entries yet."}</div>`;
+    return filter + body + (list.length>limit && withFilter ? `<button class="btn" data-act="log-more">Show older</button>` : "");
   }
   function plansHTML(only){
     const hz = {next:"Next", later:"Later", someday:"Someday"};
@@ -370,15 +440,9 @@ a.app:hover{border-color:var(--gold)}
   }
   function favoritesHTML(){
     const out = [];
-    for (const f of CFG.favorites){
-      const name = typeof f === "string" ? f : f && f.app;
-      const a = name && findApp(name);
-      if (a) out.push(`<li><span class="date">app</span><div class="grow">${isUrl(a.url)?`<a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.name)}</a>`:esc(a.name)} <span class="muted small">${esc(a.description)}</span></div></li>`);
-    }
-    for (const p of S.projects.filter(x=>x.fav)) out.push(`<li><span class="date">project</span><div class="grow"><a href="#projects">${esc(p.name)}</a> <span class="muted small">${esc(p.next||"")}</span></div>${star("projects",p)}</li>`);
     for (const n of S.notes.filter(x=>x.fav)) out.push(`<li><span class="date">note</span><div class="grow"><button class="btn link" data-act="open-note" data-id="${esc(n._id)}">${esc(n.title||"Untitled")}</button></div>${star("notes",n)}</li>`);
     for (const p of S.plans.filter(x=>x.fav&&!x.done)) out.push(`<li><span class="date">plan</span><div class="grow">${esc(p.text)}</div>${star("plans",p)}</li>`);
-    return out.length ? `<ul class="list">${out.join("")}</ul>` : `<div class="empty">Star a project, note or plan to keep it here. Add apps under favorites: in the Apps YAML.</div>`;
+    return out.length ? `<ul class="list">${out.join("")}</ul>` : `<div class="empty">Star a note or plan in Notes &amp; Plans to keep it here.</div>`;
   }
   function appsHTML(compact){
     if (!CFG.groups.length) return `<div class="empty">No apps yet. Add a group in the YAML below.</div>`;
@@ -395,44 +459,76 @@ a.app:hover{border-color:var(--gold)}
       <ol class="small"><li>In claude.ai, open Settings, then Connectors, and connect Gmail.</li><li>Ask Claude to wire the Mail room to it.</li></ol></div>`;
   }
 
+  function ideasCompact(){
+    const list = S.ideas.filter(i=>!i.promoted);
+    if (!list.length) return `<div class="empty">No ideas brewing. Add one in Ideas.</div>`;
+    return `<ul class="list">${STAGES.flatMap(st=>list.filter(i=>i.stage===st).map(i=>`<li><span class="date">${STAGE_LABEL[st]}</span><div class="grow">${esc(i.title)}</div></li>`)).join("")}</ul>`;
+  }
+  function golemHTML(){
+    const g = UI.golem, st = settings();
+    const msgs = g.msgs.length ? g.msgs.map(m=>`<div class="msg ${m.role==="user"?"user":"golem"}">${esc(m.content)}${m.did&&m.did.length?`<span class="did">${m.did.map(esc).join(" · ")}</span>`:""}</div>`).join("")
+      : `<div class="msg golem">Golem stands ready. Ask what to work on, or tell me what you did and I will log it.</div>`;
+    return `<div class="golem">
+      <div class="golem-head"><span class="golem-face ${g.busy?"busy":""}" aria-hidden="true"></span>
+        <div class="grow"><div class="small">Brain: ${st.golemBrain==="argos"?"Argos (not connected, using Claude)":"Claude"} · ${st.golemWrites?"can write logs, plans and ideas":"read only"}</div>
+        <div class="hint" id="golem-status">${esc(g.status)}</div></div>
+        ${g.msgs.length?`<button class="btn" data-act="golem-clear">Clear</button>`:""}<a class="btn" href="#config">Settings</a></div>
+      <div class="chat" id="chat" aria-live="polite">${msgs}<div class="msg golem" id="golem-live" ${g.busy?"":"hidden"}>${esc(g.live||"…")}</div></div>
+      ${g.msgs.length?"":`<div class="chips">${["What should I work on next?","Log: fixed the Argos watcher tests","What upkeep is overdue?","Summarize this week's logs"].map(q=>`<button data-act="golem-chip" data-q="${esc(q)}">${esc(q)}</button>`).join("")}</div>`}
+      <form data-form="golem"><textarea id="golem-in" name="q" rows="1" placeholder="Speak to the Golem" aria-label="Message to Golem">${esc(g.text)}</textarea><button class="btn primary" type="submit" ${g.busy?"disabled":""}>Send</button></form>
+    </div>`;
+  }
+
   const W = {
+    golem:()=>golemHTML(),
     favorites:()=>favoritesHTML(),
     week:()=>agendaHTML(7),
     upkeep:()=>upkeepHTML(5),
-    projects:()=>projectCards(true),
+    projects:()=>projectCards(),
+    ideas:()=>ideasCompact(),
     system:()=>hostsHTML(true),
-    log:()=>logHTML(6),
+    log:()=>logForm() + logHTML(6, false),
     plans:()=>plansHTML("next"),
     mail:()=>`<div class="empty">Gmail is not connected yet. <a href="#mail">See the Mail room</a>.</div>`,
-    apps:()=>appsHTML(true),
-    ask:()=>`<div class="hint">Ask from the <a href="#agents">Agents</a> room.</div>`
+    apps:()=>appsHTML(true)
   };
 
   // ---------- rooms ----------
   function roomHead(t, extra=""){ return `<div class="room-head"><div class="titles"><h2>${esc(t.title)}</h2><span class="flavor">${esc(t.flavor)}</span></div>${extra}</div>`; }
+  function arrangeHTML(){
+    const layout = mainLayout();
+    return `<ul class="cfg">${[...layout, ...Object.keys(WIDGETS).filter(k=>!layout.includes(k))].map(k=>{
+      const on = layout.includes(k);
+      return `<li><label><input type="checkbox" data-act="cfg-toggle" data-w="${k}" ${on?"checked":""}> ${esc(WIDGETS[k].label)}</label>
+        ${on?`<button class="btn" data-act="cfg-move" data-w="${k}" data-d="-1" aria-label="Move ${esc(WIDGETS[k].label)} up">↑</button><button class="btn" data-act="cfg-move" data-w="${k}" data-d="1" aria-label="Move ${esc(WIDGETS[k].label)} down">↓</button>`:""}</li>`;
+    }).join("")}</ul><div class="row"><button class="btn" data-act="cfg-reset">Reset to default</button></div>`;
+  }
 
   const ROOMS = {
     main(t){
       const layout = mainLayout();
-      const cfg = UI.configuring ? `<section class="panel"><h3>Arrange the table</h3>
-        <p class="hint" style="margin:0">Tick what to show and move it up or down. Saved for everyone who opens this page.</p>
-        <ul class="cfg">${[...layout, ...Object.keys(WIDGETS).filter(k=>!layout.includes(k))].map(k=>{
-          const on = layout.includes(k);
-          return `<li><label><input type="checkbox" data-act="cfg-toggle" data-w="${k}" ${on?"checked":""}> ${esc(WIDGETS[k].label)}</label>
-            ${on?`<button class="btn" data-act="cfg-move" data-w="${k}" data-d="-1" aria-label="Move ${esc(WIDGETS[k].label)} up">↑</button><button class="btn" data-act="cfg-move" data-w="${k}" data-d="1" aria-label="Move ${esc(WIDGETS[k].label)} down">↓</button>`:""}</li>`;
-        }).join("")}</ul><div class="row"><button class="btn" data-act="cfg-reset">Reset to default</button></div></section>` : "";
+      const cfg = UI.configuring ? `<section class="panel"><h3>Arrange the table</h3><p class="hint" style="margin:0">Tick what to show and move it up or down. Also in Settings.</p>${arrangeHTML()}</section>` : "";
       return roomHead(t, `<button class="btn" data-act="cfg-open">${UI.configuring?"Done arranging":"Arrange"}</button>`) + cfg +
-        (layout.length ? `<div class="grid">${layout.map(k=>`<section class="panel"><h3>${esc(WIDGETS[k].label)}</h3>${W[k]()}</section>`).join("")}</div>`
+        (layout.length ? `<div class="grid">${layout.map(k=>`<section class="panel" ${WIDGETS[k].wide?'style="grid-column:1/-1"':""}><h3>${esc(WIDGETS[k].label)}</h3>${W[k]()}</section>`).join("")}</div>`
           : `<div class="empty">The table is empty. Use Arrange to choose what to show.</div>`);
     },
     projects(t){
-      return roomHead(t) + `<div class="two">
-        <section class="panel"><h3>On the bench</h3>${projectCards(false)}
-          <form class="row" data-form="proj"><input type="text" name="name" placeholder="Project name" aria-label="Project name" required><input type="text" name="next" placeholder="Next step" aria-label="Next step"><button class="btn primary" type="submit">Add project</button></form></section>
-        <section class="panel"><h3>Project log</h3>
-          <form class="row" data-form="log"><select name="project" aria-label="Project"><option>General</option>${S.projects.map(p=>`<option>${esc(p.name)}</option>`).join("")}</select>
-          <input type="text" name="text" placeholder="What changed today" aria-label="Log entry" required><button class="btn primary" type="submit">Log it</button></form>
-          ${logHTML(UI.logLimit)}</section></div>`;
+      return roomHead(t) + `<section class="panel"><h3>Board</h3><p class="hint" style="margin:0">Drag a card to another column, or use its menu.</p>${kanbanHTML()}
+          <form class="row" data-form="proj"><input type="text" name="name" placeholder="Project name" aria-label="Project name" required><input type="text" name="next" placeholder="Next step" aria-label="Next step">
+          <select name="status" aria-label="Column">${STATUSES.map(s=>`<option value="${s}" ${s==="next"?"selected":""}>${STATUS_LABEL[s]}</option>`).join("")}</select><button class="btn primary" type="submit">Add project</button></form></section>
+        <section class="panel"><h3>Project log</h3>${logForm()}${logHTML(UI.logLimit, true)}</section>`;
+    },
+    ideas(t){
+      const live = S.ideas.filter(i=>!i.promoted), done = S.ideas.filter(i=>i.promoted);
+      return roomHead(t) + `<section class="panel"><h3>Brewing</h3><div class="kanban" style="grid-template-columns:repeat(3,minmax(220px,1fr))">${STAGES.map(st=>{
+          const cards = live.filter(i=>(STAGES.includes(i.stage)?i.stage:"thought")===st);
+          return `<div class="kcol" data-stage="${st}"><h4><span>${STAGE_LABEL[st]}</span><span class="n">${cards.length}</span></h4><div class="hint">${STAGE_HINT[st]}</div>
+            ${cards.map(i=>`<article class="kcard" draggable="true" data-idea="${esc(i._id)}"><div class="name">${esc(i.title)}</div>${i.pitch?`<div class="next">${esc(i.pitch)}</div>`:""}
+              <div class="foot"><select data-act="idea-stage" data-id="${esc(i._id)}" aria-label="Stage of ${esc(i.title)}">${STAGES.map(s=>`<option value="${s}" ${s===i.stage?"selected":""}>${STAGE_LABEL[s]}</option>`).join("")}</select>
+              <button class="btn" data-act="idea-promote" data-id="${esc(i._id)}">${UI.confirmDel===i._id?"Confirm promote":"Promote"}</button></div></article>`).join("") || `<div class="empty small">Nothing here.</div>`}</div>`;
+        }).join("")}</div>
+        <form class="row" data-form="idea"><input type="text" name="title" placeholder="Idea" aria-label="Idea" required><input type="text" name="pitch" placeholder="One line on why" aria-label="Why it matters"><button class="btn primary" type="submit">Add idea</button></form></section>
+        ${done.length?`<section class="panel"><h3>Promoted to projects</h3><ul class="list">${done.map(i=>`<li><span class="date">${esc(fmtDate(i.promoted))}</span><div class="grow">${esc(i.title)}</div></li>`).join("")}</ul></section>`:""}`;
     },
     notes(t){
       const notes = [...S.notes].sort((a,b)=>(b.fav?1:0)-(a.fav?1:0) || String(b.updated||"").localeCompare(String(a.updated||"")));
@@ -500,30 +596,34 @@ a.app:hover{border-color:var(--gold)}
         <li>Simplest path: an n8n workflow that collects stats (Glances, node_exporter or Proxmox API) and connects through the n8n connector.</li>
         <li>Until then, Claude can update the numbers on request.</li></ol></div></div>`;
     },
-    agents(t){
-      const argos = findApp("Argos"), ody = findApp("Odysseus");
-      const links = [];
-      if (argos && isUrl(argos.url)){ links.push(`<a class="btn" href="${esc(argos.url)}" target="_blank" rel="noopener">Argos assistant</a>`, `<a class="btn" href="${esc(argos.url.replace(/\/$/,""))}/v1/models" target="_blank" rel="noopener">Loaded models</a>`); }
-      if (ody && isUrl(ody.url)) links.push(`<a class="btn" href="${esc(ody.url)}" target="_blank" rel="noopener">Odysseus agents</a>`);
-      return roomHead(t) + `<div class="two">
-        <section class="panel"><h3>Ask the orb</h3>
-          <label class="hint" for="ask">Claude answers from this page's projects, log, notes, plans, upkeep and calendar.</label>
-          <textarea id="ask" rows="3" placeholder="What should I work on this weekend?">${esc(UI.ask.text)}</textarea>
-          <div class="row"><button class="btn primary" data-act="ask" ${UI.ask.busy?"disabled":""}>Ask</button><span class="hint" id="ask-status">${esc(UI.ask.status)}</span></div>
-          <div class="agent-out" id="ask-out" ${UI.ask.out?"":"hidden"}>${esc(UI.ask.out||"")}</div></section>
-        <section class="panel"><h3>Familiars</h3>
-          <div class="row">${links.join("") || `<span class="empty">Add Argos and Odysseus to the Apps YAML to link them here.</span>`}</div>
-          <p class="small muted" style="margin:0">Argos and Odysseus run on your network, so these open in a new tab. Talking to Argos from here needs a bridge, such as Argos exposed as a connector.</p></section></div>`;
-    },
-    apps(t){
-      const draft = UI.yamlDraft ?? S.yaml ?? "";
-      return roomHead(t) + `<section class="panel"><h3>Stack</h3>${appsHTML(false)}</section>
-        <section class="panel"><h3>orb.yaml</h3>
-          <p class="hint" style="margin:0">Groups hold apps. Each app takes name, url, description, rune (one or two letters), optional links, and an optional live: block for data a connector will feed later. favorites: lists app names for the Main tab.</p>
+    config(t){
+      const st = settings(), draft = UI.yamlDraft ?? S.yaml ?? "";
+      return roomHead(t) + `<div class="two"><div class="room" style="gap:16px">
+        <section class="panel"><h3>Golem</h3>
+          <div class="setting"><div><div>Brain</div><div class="d">Which model Golem thinks with.</div></div><span></span></div>
+          <div class="radio">
+            <label><input type="radio" name="brain" data-act="set-brain" value="claude" ${st.golemBrain!=="argos"?"checked":""}> <span><b>Claude</b> <span class="d">Works now, uses your claude.ai account.</span></span></label>
+            <label><input type="radio" name="brain" data-act="set-brain" value="argos" ${st.golemBrain==="argos"?"checked":""}> <span><b>Argos</b> <span class="d">Your local models. Needs the Argos connector (below); until then Golem falls back to Claude.</span></span></label>
+          </div>
+          <div class="setting"><div><div>Golem may write</div><div class="d">Add logs, plans and ideas, and move project cards, when you ask.</div></div><input type="checkbox" data-act="set-writes" ${st.golemWrites?"checked":""} aria-label="Golem may write"></div>
+          <div class="sealed"><h4>Connecting Argos</h4><ol class="small">
+            <li>Argos serves MCP at <span class="mono">/api/mcp</span> (pool_status, requests_in_flight, recent_requests, docs search).</li>
+            <li>Publish it through your Cloudflare tunnel behind auth, for example <span class="mono">https://argos.example.com/api/mcp</span>.</li>
+            <li>In claude.ai Settings, Connectors, add it as a custom connector named Argos.</li>
+            <li>Ask Claude to wire Golem to it. Golem can then read GPU and request status. Chatting with Argos models needs a chat tool added to that MCP server.</li></ol></div>
+        </section>
+        <section class="panel"><h3>Logs</h3>
+          <form class="setting" data-form="logmax"><div><label for="logmax">Log entry length</label><div class="d">Most characters in one entry, for you and Golem. 20 to 200.</div></div>
+          <div class="row"><input type="number" id="logmax" name="logmax" min="20" max="200" value="${logMax()}"><button class="btn" type="submit">Save</button></div></form>
+        </section>
+        <section class="panel"><h3>Main table</h3>${arrangeHTML()}</section></div>
+        <section class="panel"><h3>Apps (orb.yaml)</h3>
+          <p class="hint" style="margin:0">Groups hold apps. Each app takes name, url, description, rune (one or two letters), optional links, and an optional live: block for data a connector will feed later.</p>
           <textarea class="yaml" id="yaml" spellcheck="false" aria-label="Apps configuration in YAML">${esc(draft)}</textarea>
           <div class="row"><button class="btn primary" data-act="yaml-save">Save YAML</button><button class="btn" data-act="yaml-revert">Discard changes</button>
           ${UI.yamlMsg?`<span class="okmsg">${esc(UI.yamlMsg)}</span>`:""}</div>
-          ${cfgError?`<div class="err">${esc(cfgError)}</div>`:""}</section>`;
+          ${cfgError?`<div class="err">${esc(cfgError)}</div>`:""}
+          <h4 class="group-name">Preview</h4>${appsHTML(false)}</section></div>`;
     }
   };
 
@@ -549,7 +649,7 @@ a.app:hover{border-color:var(--gold)}
     const ti = $("note-title"), bo = $("note-body");
     if (ti && bo && UI.noteId) UI.noteDraft = {id:UI.noteId, title:ti.value, body:bo.value};
     const y = $("yaml"); if (y) UI.yamlDraft = y.value === (S.yaml ?? "") ? null : y.value;
-    const a = $("ask"); if (a) UI.ask.text = a.value;
+    const a = $("golem-in"); if (a) UI.golem.text = a.value;
   }
   function render(){
     captureDrafts();
@@ -557,7 +657,7 @@ a.app:hover{border-color:var(--gold)}
     renderSummary(); renderTabs();
     const t = TABS.find(x=>x.id===UI.tab) || TABS[0];
     $("main").innerHTML = `<div class="room">${ROOMS[t.id](t)}</div>`;
-    if (active && $(active) && /^(note-title|note-body|yaml|ask)$/.test(active)) $(active).focus();
+    if (active && $(active) && /^(note-title|note-body|yaml|golem-in|logmax)$/.test(active)) $(active).focus();
   }
   function route(){
     const h = location.hash.replace(/^#/,"");
@@ -577,15 +677,17 @@ a.app:hover{border-color:var(--gold)}
     try { db = await window.claude?.use?.("db"); } catch { db = null; }
     if (!db){ clearTimeout(timer); setStatus("Storage is not available in this view. Open the page signed in on claude.ai to save changes."); S.loaded = true; render(); return; }
     const err = e => setStatus("Lost connection to storage: " + (e.message||e.code));
-    for (const k of ["projects","logs","plans","upkeep","notes","events"]){
+    for (const k of ["ideas","projects","logs","plans","upkeep","notes","events"]){
       db.collection(k).onSnapshot(snap => { clearTimeout(timer); S[k] = snap.docs.map(d=>({...d.data(), _id:d.id})); S.loaded = true; setStatus("Changes save for everyone who opens this page."); schedule(); }, err);
     }
     db.doc("stats/current").onSnapshot(s => { S.stats = s.exists ? s.data() : null; schedule(); }, err);
     db.doc("config/orb").onSnapshot(s => { S.yaml = s.exists ? String(s.data().yaml||"") : ""; applyYaml(); schedule(); }, err);
     db.doc("config/layout").onSnapshot(s => { S.layout = s.exists ? s.data() : null; schedule(); }, err);
+    db.doc("config/settings").onSnapshot(s => { S.settings = s.exists ? s.data() : null; schedule(); }, err);
   })();
   const need = () => { if (!db){ setStatus("Storage is not available, so this change was not saved."); return false; } return true; };
 
+  async function saveSettings(patch){ if(!need()) return; const next = {...(S.settings||{}), ...patch}; S.settings = next; render(); try { await db.doc("config/settings").set(next); } catch(e){ fail(e); } }
   async function saveLayout(list){ if(!need()) return; S.layout = {main:list}; render(); try { await db.doc("config/layout").set({main:list}); } catch(e){ fail(e); } }
 
   // ---------- events ----------
@@ -593,7 +695,7 @@ a.app:hover{border-color:var(--gold)}
     const el = e.target.closest("[data-act]"); if (!el) return;
     const act = el.dataset.act, id = el.dataset.id;
     if (el.tagName === "INPUT" || el.tagName === "SELECT") return;
-    if (act !== "note-del") UI.confirmDel = null;
+    if (act !== "note-del" && act !== "idea-promote") UI.confirmDel = null;
     switch (act){
       case "fav": { if(!need())return; const item = S[el.dataset.coll].find(x=>x._id===id); if(item) db.doc(el.dataset.coll+"/"+id).update({fav:!item.fav}).catch(fail); break; }
       case "upkeep-done": if(!need())return; el.disabled = true; db.doc("upkeep/"+id).update({lastDone:todayISO()}).catch(fail); break;
@@ -616,13 +718,25 @@ a.app:hover{border-color:var(--gold)}
         render(); break;
       }
       case "yaml-revert": UI.yamlDraft = null; UI.yamlMsg = ""; applyYaml(); render(); break;
-      case "ask": ask(); break;
+      case "log-filter": UI.logFilter = el.dataset.p || ""; if (UI.tab!=="projects") location.hash = "projects"; else render(); break;
+      case "golem-chip": golemSend(el.dataset.q); break;
+      case "golem-clear": UI.golem.msgs = []; persistChat(); render(); break;
+      case "idea-promote": {
+        if (UI.confirmDel !== id){ UI.confirmDel = id; render(); break; }
+        UI.confirmDel = null; if(!need()) return; const i = S.ideas.find(x=>x._id===id); if (!i) break;
+        try { await db.collection("projects").add({name:i.title, next:i.pitch||"", status:"next", repo:"", updated:todayISO()}); await db.doc("ideas/"+id).update({promoted:todayISO()}); setStatus("Promoted to Up next on the Projects board."); } catch(err){ fail(err); }
+        break;
+      }
     }
   });
   document.addEventListener("change", e => {
     const el = e.target, act = el.dataset && el.dataset.act; if (!act) return;
     if (act === "proj-status"){ if(!need())return; db.doc("projects/"+el.dataset.id).update({status:el.value, updated:todayISO()}).catch(fail); }
     if (act === "plan-toggle"){ if(!need())return; db.doc("plans/"+el.dataset.id).update({done:el.checked}).catch(fail); }
+    if (act === "log-filter-select"){ UI.logFilter = el.value; render(); }
+    if (act === "idea-stage"){ if(!need())return; db.doc("ideas/"+el.dataset.id).update({stage:el.value, updated:todayISO()}).catch(fail); }
+    if (act === "set-brain"){ saveSettings({golemBrain:el.value}); }
+    if (act === "set-writes"){ saveSettings({golemWrites:el.checked}); }
     if (act === "cfg-toggle"){ const l = mainLayout().filter(w=>w!==el.dataset.w); if (el.checked) l.push(el.dataset.w); saveLayout(l); }
   });
   document.addEventListener("submit", async e => {
@@ -631,8 +745,11 @@ a.app:hover{border-color:var(--gold)}
     const v = Object.fromEntries(new FormData(f).entries());
     try {
       switch (f.dataset.form){
-        case "proj": if(!v.name.trim()) return; await db.collection("projects").add({name:v.name.trim(), next:(v.next||"").trim(), status:"active", repo:"", updated:todayISO(), fav:false}); break;
-        case "log": if(!v.text.trim()) return; await db.collection("logs").add({date:todayISO(), project:v.project||"General", text:v.text.trim(), created:Date.now()}); break;
+        case "proj": if(!v.name.trim()) return; await db.collection("projects").add({name:v.name.trim(), next:(v.next||"").trim(), status:STATUSES.includes(v.status)?v.status:"next", repo:"", updated:todayISO()}); break;
+        case "log": if(!v.text.trim()) return; await db.collection("logs").add({date:todayISO(), project:v.project||"General", text:v.text.trim().slice(0,logMax()), created:Date.now()}); f.reset(); const c = f.querySelector(".counter"); if (c) c.textContent = "0/"+logMax(); return;
+        case "idea": if(!v.title.trim()) return; await db.collection("ideas").add({title:v.title.trim(), pitch:(v.pitch||"").trim(), stage:"thought", updated:todayISO()}); break;
+        case "logmax": await saveSettings({logMax:Math.max(20, Math.min(200, Number(v.logmax)||50))}); setStatus("Log length saved."); return;
+        case "golem": golemSend(v.q); return;
         case "plan": if(!v.text.trim()) return; await db.collection("plans").add({text:v.text.trim(), horizon:v.horizon||"next", done:false, fav:false}); break;
         case "upkeep": if(!v.name.trim()) return; await db.collection("upkeep").add({name:v.name.trim(), everyDays:Number(v.every)||7, lastDone:""}); break;
         case "event": if(!v.title.trim()||!v.date) return; await db.collection("events").add({title:v.title.trim(), date:v.date, time:v.time||""}); break;
@@ -647,26 +764,85 @@ a.app:hover{border-color:var(--gold)}
     } catch(err){ fail(err); }
   });
 
-  // ---------- ask ----------
-  async function ask(){
-    const q = ($("ask")?.value || "").trim(); if (!q || UI.ask.busy) return;
-    UI.ask = {busy:true, text:q, status:"The orb clouds over…", out:""}; render();
+  // ---------- golem ----------
+  function persistChat(){ try { localStorage.setItem("orb.golem", JSON.stringify(UI.golem.msgs.slice(-30))); } catch {} }
+  const clip = (t, n) => { t = String(t||"").replace(/\s+/g," ").trim(); return t.length>n ? t.slice(0,n-1).trimEnd()+"…" : t; };
+  function golemTools(did){
+    const st = settings(), max = logMax();
+    const findProject = n => S.projects.find(p=>p.name.toLowerCase()===String(n||"").toLowerCase());
+    const tools = [
+      { name:"list_logs", description:"Returns log entries newest first as {date, project, text}. Optional project filters to one project name; limit defaults to 20.",
+        inputSchema:{type:"object", properties:{project:{type:"string"}, limit:{type:"number"}}},
+        execute:({project, limit}) => logSorted().filter(l=>!project || l.project.toLowerCase()===String(project).toLowerCase()).slice(0, Math.min(Number(limit)||20, 60)).map(l=>({date:l.date, project:l.project, text:l.text})) },
+      { name:"list_projects", description:"Returns every project as {name, status, next, repo}. Status is one of next, active, blocked, paused, shipped.",
+        execute:() => S.projects.map(p=>({name:p.name, status:p.status, next:p.next||"", repo:p.repo||""})) },
+      { name:"list_ideas", description:"Returns ideas not yet promoted as {title, stage, pitch}. Stage is thought, design or code.",
+        execute:() => S.ideas.filter(i=>!i.promoted).map(i=>({title:i.title, stage:i.stage, pitch:i.pitch||""})) },
+      { name:"list_upkeep", description:"Returns upkeep checks as {name, everyDays, lastDone, daysLeft}; negative daysLeft means overdue.",
+        execute:() => S.upkeep.map(u=>({name:u.name, everyDays:u.everyDays, lastDone:u.lastDone||"never", daysLeft:upkeepState(u).left})) }
+    ];
+    if (st.golemWrites && db) tools.push(
+      { name:"add_log", description:`Adds one log entry for today. text must be at most ${max} characters: short, past tense, no project name in it. project must be an existing project name or "General". Returns the saved entry.`,
+        inputSchema:{type:"object", properties:{project:{type:"string"}, text:{type:"string"}}, required:["project","text"]},
+        execute: async ({project, text}) => {
+          const p = findProject(project); const name = p ? p.name : "General";
+          const t = clip(text, max); if (!t) throw new Error("text is empty");
+          await db.collection("logs").add({date:todayISO(), project:name, text:t, created:Date.now(), by:"golem"});
+          did.push(`logged: ${name}`); return {date:todayISO(), project:name, text:t};
+        } },
+      { name:"move_project", description:"Moves a project card to a column: next, active, blocked, paused or shipped. Returns the new status.",
+        inputSchema:{type:"object", properties:{name:{type:"string"}, status:{type:"string", enum:STATUSES}}, required:["name","status"]},
+        execute: async ({name, status}) => {
+          const p = findProject(name); if (!p) throw new Error("No project named " + name);
+          if (!STATUSES.includes(status)) throw new Error("Unknown status " + status);
+          await db.doc("projects/"+p._id).update({status, updated:todayISO()}); did.push(`moved: ${p.name} → ${STATUS_LABEL[status]}`); return {name:p.name, status};
+        } },
+      { name:"add_plan", description:"Adds a plan. horizon is next, later or someday. Returns the plan.",
+        inputSchema:{type:"object", properties:{text:{type:"string"}, horizon:{type:"string", enum:["next","later","someday"]}}, required:["text"]},
+        execute: async ({text, horizon}) => { const t = clip(text, 140); const h = ["next","later","someday"].includes(horizon)?horizon:"next";
+          await db.collection("plans").add({text:t, horizon:h, done:false, fav:false}); did.push(`plan added`); return {text:t, horizon:h}; } },
+      { name:"add_idea", description:"Adds an idea at the thought stage with an optional one-line pitch. Returns the idea.",
+        inputSchema:{type:"object", properties:{title:{type:"string"}, pitch:{type:"string"}}, required:["title"]},
+        execute: async ({title, pitch}) => { const t = clip(title, 80);
+          await db.collection("ideas").add({title:t, pitch:clip(pitch||"",140), stage:"thought", updated:todayISO()}); did.push(`idea added`); return {title:t}; } }
+    );
+    return tools;
+  }
+  async function golemSend(q){
+    q = String(q||"").trim(); if (!q || UI.golem.busy) return;
+    const g = UI.golem; g.msgs.push({role:"user", content:q}); g.text = ""; const box = $("golem-in"); if (box) box.value = ""; g.busy = true; g.live = ""; g.status = "The Golem stirs…"; persistChat(); render(); scrollChat();
+    const did = [];
     try {
       const sample = await window.claude?.use?.("sample");
-      if (!sample){ UI.ask.status = "Asking is not available in this view."; return; }
-      const strip = ({_id,...r}) => r;
-      const ctx = { today:todayISO(), projects:S.projects.map(strip),
-        recentLog:[...S.logs].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,40).map(({_id,created,...l})=>l),
-        notes:S.notes.map(n=>({title:n.title, body:String(n.body||"").slice(0,1500)})), plans:S.plans.map(strip),
-        upkeep:S.upkeep.map(u=>({name:u.name, everyDays:u.everyDays, lastDone:u.lastDone, daysLeft:upkeepState(u).left})),
-        upcoming:agendaBetween(todayISO(), isoOf(new Date(Date.now()+30*DAY))), stats:S.stats, apps:allApps().map(a=>({name:a.name, description:a.description})) };
-      await sample(`You help someone run their homelab. Answer using only the dashboard data below. Be brief and concrete; plain text, short lists are fine. If the data does not cover it, say so.\n\nDashboard data (JSON):\n${JSON.stringify(ctx)}\n\nQuestion: ${q}`,
-        { modelTier:"default", onText:({text}) => { UI.ask.out = text; const o = $("ask-out"); if (o){ o.hidden=false; o.textContent = text; } } });
-      UI.ask.status = "";
+      if (!sample){ g.msgs.push({role:"assistant", content:"I cannot speak in this view. Open the page signed in on claude.ai."}); return; }
+      const st = settings();
+      const intro = `You are Golem, the stone servant of the Pondering Orb, a homelab dashboard. Speak plainly with only a light touch of wizard flavour; be brief and concrete (a few sentences or a short list). Use the tools to read the dashboard before answering questions about it. ${st.golemWrites?`When the user says they did something or asks you to log it, call add_log with a short entry (at most ${logMax()} characters). Only write when asked or clearly told about finished work.`:"You are read-only: say so if asked to change anything."} Today is ${todayISO()}. Context: plans=${JSON.stringify(S.plans.filter(p=>!p.done).map(p=>p.text))}; next 14 days=${JSON.stringify(agendaBetween(todayISO(), isoOf(new Date(Date.now()+14*DAY))).map(i=>i.date+" "+i.title))}; apps=${JSON.stringify(allApps().map(a=>a.name))}.`;
+      const history = g.msgs.slice(-12).map(m=>({role:m.role==="user"?"user":"assistant", content:m.content}));
+      history[0] = history[0].role==="user" ? {role:"user", content:intro+"\n\n"+history[0].content} : history[0];
+      if (history[0].role!=="user") history.unshift({role:"user", content:intro});
+      const onText = ({text}) => { g.live = text; const el = $("golem-live"); if (el){ el.hidden = false; el.textContent = text; scrollChat(); } };
+      let res;
+      try { res = await sample(history, {modelTier:"default", cache:false, tools:golemTools(did), onText}); }
+      catch(e){ if (e && e.code==="tools_unavailable") res = await sample(history.map((m,i)=>i===history.length-1?{...m, content:m.content+"\n\nDashboard data: "+JSON.stringify({projects:S.projects.map(p=>({name:p.name,status:p.status,next:p.next})), logs:logSorted().slice(0,30).map(l=>l.date+" "+l.project+": "+l.text), upkeep:S.upkeep.map(u=>({name:u.name, daysLeft:upkeepState(u).left}))})}:m), {modelTier:"default", cache:false, onText}); else throw e; }
+      g.msgs.push({role:"assistant", content:(res && res.text || g.live || "…").trim(), did});
     } catch(e){
-      UI.ask.status = e && e.code==="rate_limited" ? "Too many questions. Wait a minute and try again." : e && e.code==="not_granted" ? "Asking was not allowed for this page." : "Could not get an answer: " + (e && (e.message||e.code) || "unknown error");
-    } finally { UI.ask.busy = false; render(); }
+      g.msgs.push({role:"assistant", content: e && e.code==="rate_limited" ? "I must rest a moment. Try again in a minute." : e && e.code==="not_granted" ? "I was not allowed to speak on this page." : "Something cracked: " + (e && (e.message||e.code) || "unknown error"), did});
+    } finally { g.busy = false; g.live = ""; g.status = ""; persistChat(); render(); scrollChat(); }
   }
+  function scrollChat(){ const c = $("chat"); if (c) c.scrollTop = c.scrollHeight; }
+
+  // ---------- drag and drop ----------
+  document.addEventListener("dragstart", e => { const c = e.target.closest && e.target.closest("[data-card],[data-idea]"); if (!c) return; UI.dragId = c.dataset.card ? {coll:"projects", id:c.dataset.card} : {coll:"ideas", id:c.dataset.idea}; c.classList.add("dragging"); try { e.dataTransfer.setData("text/plain", UI.dragId.id); e.dataTransfer.effectAllowed = "move"; } catch {} });
+  document.addEventListener("dragend", e => { document.querySelectorAll(".dragging,.drop").forEach(n=>n.classList.remove("dragging","drop")); });
+  document.addEventListener("dragover", e => { const col = e.target.closest && e.target.closest(".kcol"); if (!col || !UI.dragId) return; e.preventDefault(); document.querySelectorAll(".drop").forEach(n=>n!==col&&n.classList.remove("drop")); col.classList.add("drop"); });
+  document.addEventListener("drop", e => {
+    const col = e.target.closest && e.target.closest(".kcol"); if (!col || !UI.dragId) return; e.preventDefault();
+    const d = UI.dragId; UI.dragId = null; if (!need()) return;
+    if (d.coll==="projects" && col.dataset.col){ const p = S.projects.find(x=>x._id===d.id); if (p && p.status!==col.dataset.col){ p.status = col.dataset.col; render(); db.doc("projects/"+d.id).update({status:col.dataset.col, updated:todayISO()}).catch(fail); } }
+    if (d.coll==="ideas" && col.dataset.stage){ const i = S.ideas.find(x=>x._id===d.id); if (i && i.stage!==col.dataset.stage){ i.stage = col.dataset.stage; render(); db.doc("ideas/"+d.id).update({stage:col.dataset.stage, updated:todayISO()}).catch(fail); } }
+  });
+  document.addEventListener("input", e => { if (e.target.matches && e.target.matches("[data-counter]")){ const c = e.target.parentElement.querySelector(".counter"); if (c){ const n = e.target.value.length, m = Number(e.target.maxLength); c.textContent = n+"/"+m; c.classList.toggle("full", n>=m); } } });
+  document.addEventListener("keydown", e => { if (e.target.id==="golem-in" && e.key==="Enter" && !e.shiftKey){ e.preventDefault(); golemSend(e.target.value); } });
 
   // ---------- the orb ----------
   (() => {
