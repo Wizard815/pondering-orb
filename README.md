@@ -5,30 +5,31 @@ upkeep checks, system stats, and links into the rest of the stack.
 
 Tabs (each one a room of the tower):
 
-- **Main**: the scrying table; pick and order its panels (Golem, Favorites,
-  Apps, Recent log, Next 7 days, Upkeep due and more)
-- **Projects**: kanban board (Up next, Active, Blocked, Paused, Shipped) and
-  the project log, filterable by project
-- **Ideas**: a free-form board (a preview of Miladash); where a card sits
-  sets its stage (Thought, Design, Code); Promote puts it on the board
-- **Notes & Plans**: notes editor and next / later / someday plans
-- **Calendar**: month view of your events and upkeep due dates
-- **Mail**: waiting for the Gmail connector
-- **Upkeep**: recurring checks, amber when due, red when overdue
-- **System**: per-host CPU, memory, disk and GPU
-- **Settings**: Golem, log length, Main layout and the apps YAML
+- **Main**: modular panels; Golem, favorite projects, open tasks, uptime,
+  the log, and one panel per app or app group, with live views for Plex,
+  SABnzbd and UpstreamManager
+- **Projects**: kanban board and log; each project has a page with its
+  tasks, log and wiki note
+- **Ideas**: ideas by stage; the board itself becomes Miladash
+  ([docs/miladash.md](docs/miladash.md))
+- **To-do**: CalDAV-style task lists; pick which lists to show
+- **Wiki**: preview of the LLMWIKI vault (PARA folders, section edits)
+- **Calendar**, **Mail**, **Upkeep**
+- **Uptime**: monitors as Uptime Kuma reports them
+- **System**: btop-style cores, memory, disks and containers
+- **Settings**: Golem's model endpoint, task lists on Main, log length,
+  Main layout, apps YAML
 
-Star a project to put it in Favorites on the Main tab; each project has its
-own page with its tasks and recent log entries. Log entries are
-short: 50 characters by default, set in Settings.
+Star a project to put it in Favorites on Main. Log entries are short: 50
+characters by default.
 
 ## Golem
 
 The dashboard assistant on the Main tab. It reads projects, logs, ideas and
 upkeep, and when allowed it adds logs, plans and ideas and moves project
-cards. It thinks with Claude today. Argos already serves MCP at `/api/mcp`;
-once that is added as a claude.ai connector, Golem can read GPU and request
-status from it.
+cards. In the demo it thinks with Claude. In the container it uses a local
+OpenAI-compatible endpoint (such as Argos) or a frontier API (OpenRouter or
+the Claude API), chosen in Settings.
 
 ## orb.yaml
 
