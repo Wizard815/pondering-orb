@@ -11,11 +11,13 @@ Tabs (each one a room of the tower):
   SABnzbd and UpstreamManager
 - **Projects**: kanban board and log; each project has a page with its
   tasks, log and wiki note
-- **Ideas**: ideas by stage; the board itself becomes Miladash
-  ([docs/miladash.md](docs/miladash.md))
+- **Ideas**: a Milaclone-style board with cards, columns, nested boards and
+  arrows (a preview of Miladash)
 - **To-do**: CalDAV-style task lists; pick which lists to show
 - **Wiki**: preview of the LLMWIKI vault (PARA folders, section edits)
-- **Calendar**, **Mail**, **Upkeep**
+- **Upkeep**: UpstreamManager's repos, approval requests and daily check,
+  plus your chores
+- **Calendar**, **Mail**
 - **Uptime**: monitors as Uptime Kuma reports them
 - **System**: btop-style cores, memory, disks and containers
 - **Settings**: Golem's model endpoint, task lists on Main, log length,
@@ -49,6 +51,12 @@ groups:
           source: n8n
           workflow: argos-status
 ```
+
+## Running it
+
+`docker-compose.example.yml` sketches the planned stack: Orb, Uptime Kuma and
+a read-only Docker socket proxy in one file. UpstreamManager runs on another
+computer and is reached by URL.
 
 ## Container backend
 

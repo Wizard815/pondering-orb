@@ -312,10 +312,14 @@ nav.tabs a.linked{color:var(--arcane)}
 nav.tabs a.linked[aria-current="page"]{color:var(--gold)}
 nav.tabs a.tab-drop{outline:2px dashed var(--gold);outline-offset:-2px}
 .split-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
-.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
-.half{display:flex;flex-direction:column;gap:16px;min-width:0;border-left:1px solid var(--line);padding-left:20px}
-.half:first-child{border-left:0;padding-left:0}
-@media (max-width:980px){.split{grid-template-columns:minmax(0,1fr)}.half{border-left:0;padding-left:0}}
+.split{--r:.5;display:grid;grid-template-columns:minmax(0,calc((100% - 18px) * var(--r))) 18px minmax(0,1fr);align-items:stretch}
+.half{display:flex;flex-direction:column;gap:16px;min-width:0}
+.divider{cursor:col-resize;touch-action:none;display:flex;justify-content:center;position:relative}
+.divider::before{content:"";width:1px;background:var(--line);height:100%}
+.divider span{position:sticky;top:45vh;margin-left:-5px;width:8px;height:44px;border-radius:4px;background:var(--line-hi);align-self:flex-start;position:absolute;top:120px}
+.divider:hover span,.divider:focus-visible span{background:var(--gold)}
+.divider:hover::before{background:var(--gold)}
+@media (max-width:980px){.split{grid-template-columns:minmax(0,1fr);gap:24px}.divider{display:none}}
 /* appearance + connections */
 .presets{display:flex;flex-wrap:wrap;gap:8px}
 .preset{display:flex;flex-direction:column;align-items:flex-start;gap:6px;border:1px solid var(--line);background:var(--inset);border-radius:7px;padding:8px 10px;font-size:.84rem}
@@ -330,6 +334,58 @@ nav.tabs a.tab-drop{outline:2px dashed var(--gold);outline-offset:-2px}
 .conn label{display:flex;flex-direction:column;gap:2px}
 .chips button[aria-pressed="true"]{border-color:var(--gold);color:var(--gold)}
 input[type=search]{background:var(--inset);border:1px solid var(--line);border-radius:5px;padding:5px 9px;width:100%}
+
+/* ideas board */
+.mc{display:flex;gap:0;height:100%;min-height:560px;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--inset)}
+.mc-rail{display:flex;flex-direction:column;gap:2px;padding:6px;background:var(--panel);border-right:1px solid var(--line)}
+.mc-rail .tool{width:36px;height:34px;border:1px solid transparent;border-radius:6px;background:none;font-size:1rem;color:var(--muted)}
+.mc-rail .tool:hover{color:var(--ink);background:var(--inset)}
+.mc-rail .tool.on{color:var(--gold);border-color:var(--gold);background:var(--gold-soft)}
+.mc-main{flex:1;min-width:0;display:flex;flex-direction:column}
+.mc-bar{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--line);background:var(--panel)}
+.mc-crumbs{font-family:var(--f-display);font-size:.9rem}
+.mc-bar .hint{flex:1;min-width:180px}
+.mc-zoom{display:flex;gap:4px;align-items:center}
+.mc-zoom .btn{padding:1px 8px}
+.mc-view{position:relative;flex:1;overflow:hidden;cursor:grab;background-image:radial-gradient(var(--line) 1.2px,transparent 1.2px);background-size:24px 24px;touch-action:none;min-height:480px}
+.mc-view.panning{cursor:grabbing}
+.mc-view:not(.tool-select):not(.tool-connect){cursor:crosshair}
+.mc-world{position:absolute;left:0;top:0;transform-origin:0 0}
+.mc-edges{position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible}
+.mc-edge{cursor:pointer}
+.mc-edge:hover line:last-of-type{stroke:var(--gold)}
+.mc-elab{font:12px var(--f-body);fill:var(--muted);paint-order:stroke;stroke:var(--inset);stroke-width:4px}
+.mc-card{position:absolute;background:var(--panel);border:1px solid var(--line);border-top:4px solid var(--c);border-radius:6px;padding:9px 11px;box-shadow:0 6px 16px -10px rgba(0,0,0,.55);display:flex;flex-direction:column;gap:5px;cursor:default;user-select:none}
+.tool-select .mc-card{cursor:move}
+.mc-card.lifted{box-shadow:0 18px 30px -12px rgba(0,0,0,.7);opacity:.92;z-index:30}
+.mc-card.linking{outline:2px solid var(--gold);outline-offset:2px}
+.mc-card.in-col{position:relative;left:auto;top:auto;width:auto}
+.mc-title{font-family:var(--f-display);font-weight:600;line-height:1.2}
+.mc-text{font-size:.88rem;color:var(--ink);white-space:pre-wrap;overflow-wrap:anywhere}
+.mc-text.md{white-space:normal}
+.mc-top{display:flex;gap:4px;flex-wrap:wrap}
+.chip{display:inline-block;font-size:.7rem;border:1px solid var(--line-hi);border-radius:999px;padding:0 7px;color:var(--muted)}
+.chip.ok{color:var(--ok);border-color:var(--ok)} .chip.warn{color:var(--warn);border-color:var(--warn)} .chip.bad{color:var(--bad);border-color:var(--bad)}
+.chip.st-thought{color:var(--arcane);border-color:var(--arcane)} .chip.st-design{color:var(--gold);border-color:var(--gold)} .chip.st-code{color:var(--ok);border-color:var(--ok)}
+.mc-todo{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px;font-size:.88rem}
+.mc-todo li{display:flex;gap:6px;align-items:flex-start}
+.mc-todo .done{text-decoration:line-through;color:var(--muted)}
+.mc-url{font-family:var(--f-mono);font-size:.74rem;overflow-wrap:anywhere}
+.t-board{align-items:center;text-align:center;background:var(--inset)}
+.mc-bicon{font-size:1.8rem;color:var(--c)}
+.t-comment{background:var(--gold-soft);border-top-width:1px}
+.t-column{background:var(--inset)}
+.mc-colhead{padding-bottom:4px;border-bottom:1px solid var(--line)}
+.mc-col{display:flex;flex-direction:column;gap:8px;min-height:60px;padding:4px 0;border-radius:5px}
+.mc-col.drop{background:var(--gold-soft);outline:1px dashed var(--gold)}
+.mc-empty{padding:14px 0;text-align:center}
+.mc-rz{position:absolute;right:0;bottom:0;width:12px;height:12px;cursor:ew-resize;border-right:2px solid var(--line-hi);border-bottom:2px solid var(--line-hi);border-radius:0 0 5px 0}
+.mc-blank{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--muted);pointer-events:none;text-align:center;padding:16px}
+.mp.fixed .mc{min-height:0}
+/* UpstreamManager */
+.req{display:flex;flex-direction:column;gap:4px;background:var(--inset);border-radius:6px;padding:9px 11px;margin-bottom:8px;border-left:3px solid var(--warn)}
+.req.approved{border-left-color:var(--ok)} .req.denied{border-left-color:var(--line-hi)} .req.failed{border-left-color:var(--bad)}
+.rtab td{vertical-align:top;padding:6px 10px 6px 0}
 
 /* golem */
 .golem{display:flex;flex-direction:column;gap:10px}
@@ -391,22 +447,22 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
   $("today").textContent = new Date().toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric",year:"numeric"});
 
   // ---------- state ----------
-  const S = { layouts:null, wiki:[], live:[], uptime:null, tasks:[], ideas:[], projects:[], logs:[], plans:[], upkeep:[], notes:[], events:[], stats:null, yaml:null, layout:null, settings:null, loaded:false };
+  const S = { canvas:[], edges:[], upstream:{repos:null, requests:null, daily:null}, layouts:null, wiki:[], live:[], uptime:null, tasks:[], ideas:[], projects:[], logs:[], plans:[], upkeep:[], notes:[], events:[], stats:null, yaml:null, layout:null, settings:null, loaded:false };
   let db = null;
   let savedChat = [];
   try { savedChat = JSON.parse(localStorage.getItem("orb.golem") || "[]"); if (!Array.isArray(savedChat)) savedChat = []; } catch { savedChat = []; }
-  const UI = { tab:"main", noteId:null, noteDraft:null, calMonth:new Date(new Date().getFullYear(), new Date().getMonth(), 1), logLimit:15, logFilter:"", configuring:false, yamlDraft:null, yamlMsg:"", confirmDel:null, dragId:null, projectId:null, moving:null, todoLists:[], wikiPath:null, wikiEdit:null, editing:false, room:null, items:[], rooms:{}, split:null, dragTab:null, pendingLog:"", lastLogProject:"", showArchived:false, wikiQ:"", wikiTag:"", connTest:{},
+  const UI = { tab:"main", noteId:null, noteDraft:null, calMonth:new Date(new Date().getFullYear(), new Date().getMonth(), 1), logLimit:15, logFilter:"", configuring:false, yamlDraft:null, yamlMsg:"", confirmDel:null, dragId:null, projectId:null, moving:null, todoLists:[], wikiPath:null, wikiEdit:null, editing:false, room:null, items:[], rooms:{}, split:null, dragTab:null, pendingLog:"", lastLogProject:"", showArchived:false, wikiQ:"", wikiTag:"", connTest:{}, mcBoard:"root", mcTool:"select", mcFrom:null, mcEditNext:null,
     golem:{busy:false, text:"", status:"", msgs:savedChat.slice(-30)} };
 
   const TABS = [
     {id:"main", label:"Main", title:"Scrying Table", flavor:"Everything you chose to keep in view."},
     {id:"projects", label:"Projects", title:"Workshop", flavor:"What is on the bench, and the log of how it got there."},
-    {id:"ideas", label:"Ideas", title:"Alchemy Bench", flavor:"Ideas by stage. The full board moves to Miladash."},
+    {id:"ideas", label:"Ideas", title:"Alchemy Bench", flavor:"A free board for ideas: cards, columns, boards inside boards, and arrows between them."},
     {id:"todo", label:"To-do", title:"Task Ledger", flavor:"CalDAV task lists. Pick the lists you want to see."},
     {id:"wiki", label:"Wiki", title:"Library", flavor:"Your LLMWIKI vault, sorted by PARA."},
     {id:"calendar", label:"Calendar", title:"Star Chart", flavor:"Events, task due dates and upkeep by day."},
     {id:"mail", label:"Mail", title:"Raven Post", flavor:"Your inbox, once the ravens are allowed in."},
-    {id:"upkeep", label:"Upkeep", title:"Wards", flavor:"Recurring checks that keep the tower standing."},
+    {id:"upkeep", label:"Upkeep", title:"Wards", flavor:"UpstreamManager: repos, upstream syncs and approval requests, plus your own chores."},
     {id:"uptime", label:"Uptime", title:"Watchtower", flavor:"Every service, as Uptime Kuma sees it."},
     {id:"system", label:"System", title:"Engine Room", flavor:"Cores, memory, disks and containers, btop style."},
     {id:"config", label:"Settings", title:"Sanctum", flavor:"Golem, task lists, logs, the Main table and the apps YAML."}
@@ -526,7 +582,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
           <div class="name" style="display:flex;justify-content:space-between;gap:6px"><a href="${projHref(p)}" draggable="false">${esc(p.name)}</a>${star("projects",p)}</div>
           ${p.repo?`<div class="repo">${esc(p.repo)}</div>`:""}
           ${p.next?`<div class="next">${esc(p.next)}</div>`:""}
-          <div class="foot">${statusSelect(p)}<span class="small muted">${logCount[p.name]||0} log${logCount[p.name]===1?"":"s"} · ${openTasks(p.name).length} task${openTasks(p.name).length===1?"":"s"}</span></div>
+          <div class="foot">${statusSelect(p)}${(()=>{ const r = p.upstreamRepo && umRepos().find(x=>x.id===p.upstreamRepo); return r&&r.behind?`<span class="chip warn" title="Upstream has ${r.behind} new commits">↓${r.behind}</span>`:""; })()}<span class="small muted">${logCount[p.name]||0} log${logCount[p.name]===1?"":"s"} · ${openTasks(p.name).length} task${openTasks(p.name).length===1?"":"s"}</span></div>
         </article>`).join("") || `<div class="empty small">Drop a card here.</div>`}</div>`;
     }).join("")}</div>${archivedHTML()}`;
   }
@@ -543,7 +599,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     const names = [...new Set(S.logs.map(l=>l.project))].sort();
     const filter = withFilter ? `<div class="row"><label class="hint" for="log-filter">Show</label><select id="log-filter" data-act="log-filter-select"><option value="">All projects</option>${names.map(n=>`<option ${n===UI.logFilter?"selected":""}>${esc(n)}</option>`).join("")}</select>
       ${UI.logFilter?`<button class="btn" data-act="log-filter" data-p="">Clear filter</button>`:""}</div>` : "";
-    const body = list.length ? `<ul class="list">${list.slice(0,limit).map(l=>`<li><span class="date">${esc(l.date)}</span><div class="grow"><button class="btn link tag" data-act="log-filter" data-p="${esc(l.project)}" title="Show only ${esc(l.project)}">${esc(l.project)}</button> ${esc(l.text)}${l.by==="golem"?` <span class="hint">· Golem</span>`:""}</div></li>`).join("")}</ul>`
+    const body = list.length ? `<ul class="list">${list.slice(0,limit).map(l=>`<li><span class="date">${esc(l.date)}</span><div class="grow"><button class="btn link tag" data-act="log-filter" data-p="${esc(l.project)}" title="Show only ${esc(l.project)}">${esc(l.project)}</button> ${esc(l.text)}${l.by?` <span class="hint">· ${esc(l.by==="golem"?"Golem":l.by)}</span>`:""}</div></li>`).join("")}</ul>`
       : `<div class="empty">${UI.logFilter&&withFilter?"No entries for "+esc(UI.logFilter)+".":"No log entries yet."}</div>`;
     return filter + body + (list.length>limit && more ? `<button class="btn" data-act="log-more">Show older</button>` : "");
   }
@@ -772,10 +828,11 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
   }
 
   function ideasCompact(){
-    const list = S.ideas.filter(i=>!i.promoted);
-    if (!list.length) return `<div class="empty">No ideas brewing. Add one in Ideas.</div>`;
-    return `<ul class="list">${STAGES.flatMap(st=>list.filter(i=>i.stage===st).map(i=>`<li><span class="date">${STAGE_LABEL[st]}</span><div class="grow">${esc(i.title)}</div></li>`)).join("")}</ul>`;
+    const list = S.canvas.filter(i=>i.type==="idea" && !i.promoted);
+    if (!list.length) return `<div class="empty">No ideas yet. Add one on the Ideas board.</div>`;
+    return `<ul class="list">${STAGES.flatMap(st=>list.filter(i=>(i.stage||"thought")===st).map(i=>`<li><span class="date">${STAGE_LABEL[st]}</span><div class="grow"><a href="#ideas">${esc(i.title)}</a></div></li>`)).join("")}</ul>`;
   }
+
   function golemHTML(){
     const g = UI.golem, st = settings();
     const msgs = g.msgs.length ? g.msgs.map(m=>`<div class="msg ${m.role==="user"?"user":"golem"}">${esc(m.content)}${m.did&&m.did.length?`<span class="did">${m.did.map(esc).join(" · ")}</span>`:""}</div>`).join("")
@@ -848,7 +905,8 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
               <input type="text" name="title" placeholder="New task" aria-label="New task for ${esc(p.name)}" required><input type="date" name="due" aria-label="Due date">
               <button class="btn primary" type="submit">Add task</button></form>
             <form class="row" data-form="next"><input type="hidden" name="id" value="${esc(p._id)}"><input type="text" name="next" value="${esc(p.next||"")}" placeholder="Next step" aria-label="Next step"><button class="btn" type="submit">Save next step</button></form>`, {w:5}),
-          P("wiki","Wiki note", wikiCard(p), {w:12})
+          P("repo","Repository", repoPanel(p), {w:7}),
+          P("wiki","Wiki note", wikiCard(p), {w:5})
         ]};
     },
     calendar(){
@@ -874,26 +932,27 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     },
     mail(){ return { extra:`<span class="pill warn"><i></i>Gmail not connected</span>`, panels:[P("mail","Mail", sealedMail(), {w:12})] }; },
     upkeep(){
-      return { panels: [
-        P("checks","All checks", `${upkeepHTML(0)}<form class="row" data-form="upkeep"><input type="text" name="name" placeholder="Check (e.g. test a restore)" aria-label="Check name" required>
+      const base = umBase();
+      return { extra:`${isUrl(base)?`<a class="btn" href="${esc(base)}" target="_blank" rel="noopener">Open UpstreamManager</a>`:""}<a class="btn" href="#config">Connection settings</a>`, panels: [
+        P("requests","Approval requests", requestsHTML(), {w:7}),
+        P("daily","Daily check", dailyHTML(), {w:5}),
+        P("repos","Repositories", reposHTML(), {w:12}),
+        P("chores","Chores", `${upkeepHTML(0)}<form class="row" data-form="upkeep"><input type="text" name="name" placeholder="Chore (e.g. test a restore)" aria-label="Chore" required>
           <select name="every" aria-label="How often"><option value="1">Daily</option><option value="7" selected>Weekly</option><option value="30">Monthly</option><option value="90">Quarterly</option></select>
-          <button class="btn primary" type="submit">Add check</button></form>`, {w:8}),
-        P("how","How the wards work", `<p class="small" style="margin:0">Each check has a period. It turns amber a day before it is due and red once it is overdue. Done stamps today's date. The overdue count shows in the header on every tab.</p>`, {w:4})
+          <button class="btn primary" type="submit">Add chore</button></form>`, {w:7}),
+        P("how","How this connects", `<ul class="small" style="margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px">
+          <li>Repos: <span class="mono">GET /api/repos</span> (behind, ahead, conflicts, components, last commit).</li>
+          <li>Requests: <span class="mono">GET /api/requests</span>; Approve or Deny sends <span class="mono">POST /api/request/&lt;id&gt;/decide</span>.</li>
+          <li>Daily check: <span class="mono">POST /api/run-daily</span>. Fetch: <span class="mono">POST /api/repo/&lt;id&gt;/fetch</span>.</li>
+          <li>Project commits: <span class="mono">GET /api/repo/&lt;id&gt;/commits</span>.</li>
+          <li>Chores are Orb's own list; UpstreamManager doesn't keep them.</li></ul>`, {w:5})
       ]};
     },
     ideas(){
-      const live = S.ideas.filter(i=>!i.promoted), done = S.ideas.filter(i=>i.promoted);
-      return { extra:`<span class="pill info"><i></i>Board redesign: docs/miladash.md</span>`, panels: [
-        P("stages","By stage", `<p class="hint" style="margin:0">A plain pipeline for now. Sketching with boxes and arrows happens in Miladash.</p>
-          <div class="kanban" style="grid-template-columns:repeat(3,minmax(220px,1fr))">${STAGES.map(st=>{
-            const cards = live.filter(i=>(STAGES.includes(i.stage)?i.stage:"thought")===st);
-            return `<div class="kcol"><h4><span>${STAGE_LABEL[st]}</span><span class="n">${cards.length}</span></h4><div class="hint">${STAGE_HINT[st]}</div>
-              ${cards.map(i=>`<article class="kcard"><div class="name">${esc(i.title)}</div>${i.pitch?`<div class="next">${esc(i.pitch)}</div>`:""}
-                <div class="foot"><select data-act="idea-stage" data-id="${esc(i._id)}" aria-label="Stage of ${esc(i.title)}">${STAGES.map(s=>`<option value="${s}" ${s===i.stage?"selected":""}>${STAGE_LABEL[s]}</option>`).join("")}</select>
-                <button class="btn" data-act="idea-promote" data-id="${esc(i._id)}">${UI.confirmDel===i._id?"Confirm":"Promote"}</button></div></article>`).join("") || `<div class="empty small">Nothing here.</div>`}</div>`;
-          }).join("")}</div>`, {w:12}),
-        P("add","Add an idea", `<form class="row" data-form="idea"><input type="text" name="title" placeholder="Idea" aria-label="Idea" required><input type="text" name="pitch" placeholder="One line on why" aria-label="Why it matters"><button class="btn primary" type="submit">Add idea</button></form>`, {w:6}),
-        P("promoted","Promoted to projects", done.length?`<ul class="list">${done.map(i=>`<li><span class="date">${esc(fmtDate(i.promoted))}</span><div class="grow">${esc(i.title)}</div></li>`).join("")}</ul>`:`<div class="empty">Nothing promoted yet.</div>`, {w:6})
+      const done = S.canvas.filter(i=>i.type==="idea" && i.promoted);
+      return { extra:`<span class="pill info"><i></i>Preview of Miladash</span>`, panels: [
+        P("board","Board", boardHTML(), {w:12, h:680}),
+        P("promoted","Promoted to projects", done.length?`<ul class="list">${done.map(i=>`<li><span class="date">${esc(fmtDate(i.promoted))}</span><div class="grow">${esc(i.title)}</div></li>`).join("")}</ul>`:`<div class="empty">Nothing promoted yet. Right-click an idea card and choose Promote.</div>`, {w:6})
       ]};
     },
     todo(){
@@ -980,10 +1039,10 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     if (saved && Array.isArray(saved.items)){
       items = saved.items.filter(i=>avail.has(i.k)).map(i=>({...i}));
       known = new Set(saved.known||[]);
-      for (const p of room.panels) if (!known.has(p.k) && !items.some(i=>i.k===p.k) && (!room.defaults || room.defaults.includes(p.k))) items.push({k:p.k, w:p.w||6, h:0});
+      for (const p of room.panels) if (!known.has(p.k) && !items.some(i=>i.k===p.k) && (!room.defaults || room.defaults.includes(p.k))) items.push({k:p.k, w:p.w||6, h:p.h||0});
     } else {
       const order = room.defaults || room.panels.map(p=>p.k);
-      items = order.filter(k=>avail.has(k)).map(k=>({k, w:avail.get(k).w||6, h:0}));
+      items = order.filter(k=>avail.has(k)).map(k=>({k, w:avail.get(k).w||6, h:avail.get(k).h||0}));
       known = null;
     }
     const removed = room.panels.filter(p=>!items.some(i=>i.k===p.k));
@@ -1038,7 +1097,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     const {removed} = resolveLayout(page, room);
     openMenu(x, y, [
       {label: removed.length ? "Add a panel" : "Every panel is on this page", heading:true},
-      ...removed.map(p=>({label:"+ "+p.label, run:()=>layoutEdit(page, items=>{ items.push({k:p.k, w:p.w||6, h:0}); })})),
+      ...removed.map(p=>({label:"+ "+p.label, run:()=>layoutEdit(page, items=>{ items.push({k:p.k, w:p.w||6, h:p.h||0}); })})),
       "-",
       {label: "Reset this page", run:()=>{ const pages = {...layoutStore()}; delete pages[page]; S.layouts = {pages}; clearTimeout(layoutTimer); if (db) db.doc("config/layouts").set({pages}).catch(fail); render(); }}
     ]);
@@ -1081,6 +1140,11 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
   function contextAt(target, x, y){
     const tab = target.closest && target.closest("#tabs a");
     if (tab){ tabMenu(tab, x, y); return true; }
+    if (!UI.editing){
+      const edge = target.closest && target.closest(".mc-edge"); if (edge){ mcEdgeMenu(edge.dataset.edge, x, y); return true; }
+      const mc = target.closest && target.closest(".mc-card"); if (mc){ mcMenu(mc.dataset.mc, x, y); return true; }
+      if (target.closest && target.closest("#mc-view")){ mcSpaceMenu(x, y); return true; }
+    }
     const card = target.closest && target.closest("[data-card]");
     if (card && !UI.editing){ projectMenu(card.dataset.card, x, y); return true; }
     if (!UI.editing) return false;
@@ -1255,6 +1319,290 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
   async function setArchived(p, on){ if(!need()) return; try { await db.doc("projects/"+p._id).update({archived:on, updated:todayISO()}); setStatus(on?`${p.name} archived. Its wiki note is unchanged.`:`${p.name} restored.`); } catch(e){ fail(e); } }
   async function deleteProject(p){ if(!need()) return; try { await db.doc("projects/"+p._id).delete(); setStatus(`${p.name} deleted from Orb. Its wiki note is unchanged.`); if (UI.projectId) location.hash = "projects"; } catch(e){ fail(e); } }
 
+  // ---------- ideas board (Miladash / Milaclone style) ----------
+  const MC_TYPES = {
+    note:{label:"Note", icon:"✎", w:220}, idea:{label:"Idea", icon:"✧", w:240}, todo:{label:"To-do", icon:"☑", w:220},
+    link:{label:"Link", icon:"↗", w:220}, column:{label:"Column", icon:"▥", w:250}, board:{label:"Board", icon:"▣", w:190}, comment:{label:"Comment", icon:"❝", w:200}
+  };
+  const MC_COLORS = [["","Plain"],["gold","Gold"],["arcane","Teal"],["ok","Green"],["warn","Amber"],["bad","Red"],["muted","Grey"]];
+  const mcBoardId = () => UI.mcBoard || "root";
+  const mcItems = b => S.canvas.filter(i=>(i.board||"root")===b);
+  let mcCams = {}; try { mcCams = JSON.parse(localStorage.getItem("orb.mccam")||"{}") || {}; } catch {}
+  const mcCam = b => mcCams[b] || {x:40, y:30, z:1};
+  const saveCam = () => { try { localStorage.setItem("orb.mccam", JSON.stringify(mcCams)); } catch {} };
+  function mcCrumbs(){
+    const chain = []; let b = mcBoardId();
+    while (b !== "root"){ const it = S.canvas.find(i=>i._id===b); if (!it) break; chain.unshift(it); b = it.board || "root"; }
+    return `<nav class="mc-crumbs" aria-label="Boards"><button class="btn link" data-act="mc-open" data-id="root">Ideas</button>${chain.map(c=>` <span class="muted">/</span> <button class="btn link" data-act="mc-open" data-id="${esc(c._id)}">${esc(c.title||"Board")}</button>`).join("")}</nav>`;
+  }
+  function mcInner(i){
+    const t = i.type;
+    if (t==="idea") return `<div class="mc-top"><span class="chip st-${esc(i.stage||"thought")}">${esc(STAGE_LABEL[i.stage]||"Thought")}</span>${i.promoted?`<span class="chip ok">Promoted</span>`:""}</div><div class="mc-title">${esc(i.title||"Untitled idea")}</div>${i.text?`<div class="mc-text">${esc(i.text)}</div>`:""}`;
+    if (t==="todo") return `<div class="mc-title">${esc(i.title||"To-do")}</div><ul class="mc-todo">${(i.items||[]).map((x,k)=>`<li><input type="checkbox" data-act="mc-todo" data-id="${esc(i._id)}" data-i="${k}" ${x.done?"checked":""} aria-label="${esc(x.t)}"><span class="${x.done?"done":""}">${esc(x.t)}</span></li>`).join("")}</ul>`;
+    if (t==="link") return `<div class="mc-title">${esc(i.title||i.url||"Link")}</div>${isUrl(i.url)?`<a href="${esc(i.url)}" target="_blank" rel="noopener" class="mc-url">${esc(i.url)}</a>`:""}`;
+    if (t==="board"){ const n = mcItems(i._id).length; return `<div class="mc-bicon">▣</div><div class="mc-title">${esc(i.title||"Board")}</div><div class="hint">${n} card${n===1?"":"s"} · double-click to open</div>`; }
+    if (t==="comment") return `<div class="mc-text">${esc(i.text||"")}</div>`;
+    return `${i.title?`<div class="mc-title">${esc(i.title)}</div>`:""}<div class="mc-text md">${md(i.text||"")}</div>`;
+  }
+  function mcCard(i, inCol){
+    const c = i.color ? `var(--${i.color})` : "var(--line-hi)";
+    const pos = inCol ? "" : `left:${Math.round(i.x||0)}px;top:${Math.round(i.y||0)}px;width:${Math.round(i.w||MC_TYPES[i.type]?.w||220)}px;`;
+    const kids = i.type==="column" ? S.canvas.filter(k=>k.parent===i._id).sort((a,b)=>(a.order||0)-(b.order||0)) : [];
+    const body = i.type==="column" ? `<div class="mc-title mc-colhead">${esc(i.title||"Column")}</div><div class="mc-col" data-col="${esc(i._id)}">${kids.map(k=>mcCard(k,true)).join("") || `<div class="hint mc-empty">Drop cards here</div>`}</div>` : mcInner(i);
+    return `<article class="mc-card t-${esc(i.type)} ${inCol?"in-col":""} ${UI.mcFrom===i._id?"linking":""}" data-mc="${esc(i._id)}" style="${pos}--c:${c}">${body}${inCol?"":`<span class="mc-rz" data-mcrz aria-hidden="true"></span>`}</article>`;
+  }
+  function boardHTML(){
+    const b = mcBoardId(), items = mcItems(b), cam = mcCam(b), tool = UI.mcTool || "select";
+    const loose = items.filter(i=>!i.parent || !S.canvas.some(c=>c._id===i.parent));
+    const rail = [["select","Select and move (V)","⬚"],...["note","idea","todo","link","column","board","comment"].map(k=>[k, MC_TYPES[k].label, MC_TYPES[k].icon]),["connect","Connect two cards","⟶"]];
+    return `<div class="mc">
+      <aside class="mc-rail" role="toolbar" aria-label="Board tools">${rail.map(([k,l,ic])=>`<button class="tool ${tool===k?"on":""}" data-act="mc-tool" data-t="${k}" title="${esc(l)}" aria-label="${esc(l)}" aria-pressed="${tool===k}">${ic}</button>`).join("")}</aside>
+      <div class="mc-main">
+        <div class="mc-bar">${mcCrumbs()}<span class="hint">${tool==="select"?"Drag cards, drag empty space to pan, Ctrl + scroll to zoom. Double-click to edit; right-click for more.":tool==="connect"?(UI.mcFrom?"Now click the card to connect to. Esc cancels.":"Click the card the arrow starts from."):`Click the board to place a ${MC_TYPES[tool].label.toLowerCase()}.`}</span>
+          <span class="mc-zoom"><button class="btn" data-act="mc-zoom" data-d="-1" aria-label="Zoom out">−</button><span class="mono small">${Math.round(cam.z*100)}%</span><button class="btn" data-act="mc-zoom" data-d="1" aria-label="Zoom in">+</button><button class="btn" data-act="mc-fit">Fit</button></span></div>
+        <div class="mc-view tool-${tool}" id="mc-view" data-board="${esc(b)}">
+          <div class="mc-world" id="mc-world" style="transform:translate(${cam.x}px,${cam.y}px) scale(${cam.z})">
+            <svg class="mc-edges" id="mc-edges" aria-hidden="true"><defs><marker id="mc-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--muted)"/></marker></defs></svg>
+            ${loose.map(i=>mcCard(i,false)).join("")}
+          </div>
+          ${items.length?"":`<div class="mc-blank"><b>An empty board.</b><span>Pick a card type on the left and click to place it, or right-click anywhere.</span></div>`}
+        </div>
+      </div></div>`;
+  }
+  function mcDrawEdges(){
+    const svg = $("mc-edges"), world = $("mc-world"); if (!svg || !world) return;
+    const b = mcBoardId(), z = mcCam(b).z, wr = world.getBoundingClientRect();
+    const box = id => { const el = world.querySelector(`[data-mc="${CSS.escape(id)}"]`); if (!el) return null; const r = el.getBoundingClientRect(); return {x:(r.left-wr.left)/z, y:(r.top-wr.top)/z, w:r.width/z, h:r.height/z}; };
+    const edgePt = (a, tx, ty) => { const cx = a.x+a.w/2, cy = a.y+a.h/2, dx = tx-cx, dy = ty-cy; if (!dx && !dy) return [cx,cy]; const s = Math.min(Math.abs((a.w/2)/(dx||1e-9)), Math.abs((a.h/2)/(dy||1e-9))); return [cx+dx*s, cy+dy*s]; };
+    const parts = S.edges.filter(e=>(e.board||"root")===b).map(e=>{
+      const A = box(e.from), B = box(e.to); if (!A || !B) return "";
+      const [x1,y1] = edgePt(A, B.x+B.w/2, B.y+B.h/2), [x2,y2] = edgePt(B, A.x+A.w/2, A.y+A.h/2), mx = (x1+x2)/2, my = (y1+y2)/2;
+      const dash = e.kind==="depends" ? 'stroke-dasharray="6 5"' : "";
+      const lab = e.label || (e.kind==="depends"?"depends on":e.kind==="became"?"became":"");
+      return `<g class="mc-edge" data-edge="${esc(e._id)}"><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="transparent" stroke-width="14"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--muted)" stroke-width="1.6" ${dash} marker-end="url(#mc-arrow)" fill="none"/>
+        ${lab?`<text x="${mx}" y="${my-6}" text-anchor="middle" class="mc-elab">${esc(lab)}</text>`:""}</g>`;
+    });
+    svg.querySelectorAll("g.mc-edge").forEach(n=>n.remove());
+    svg.insertAdjacentHTML("beforeend", parts.join(""));
+  }
+  const mcAt = (cx, cy) => { const v = $("mc-view"), cam = mcCam(mcBoardId()); const r = v.getBoundingClientRect(); return {x:(cx - r.left - cam.x)/cam.z, y:(cy - r.top - cam.y)/cam.z}; };
+  async function mcCreate(type, at){
+    if (!need()) return;
+    const b = mcBoardId(), base = {board:b, type, x:Math.round(at.x), y:Math.round(at.y), w:MC_TYPES[type].w, color:"", updated:todayISO()};
+    const extra = type==="idea" ? {title:"New idea", text:"", stage:"thought"} : type==="todo" ? {title:"To-do", items:[{t:"First thing", done:false}]} : type==="link" ? {title:"", url:"https://"} : type==="column" ? {title:"Column"} : type==="board" ? {title:"New board"} : type==="comment" ? {text:"Comment"} : {title:"", text:"New note"};
+    try { const ref = await db.collection("canvas").add({...base, ...extra}); UI.mcTool = "select"; UI.mcEditNext = ref.id; } catch(e){ fail(e); }
+  }
+  function mcEdit(id, anchor){
+    const i = S.canvas.find(x=>x._id===id); if (!i) return;
+    const f = [];
+    if (i.type!=="comment") f.push(`<label class="small">Title<input type="text" name="title" value="${esc(i.title||"")}"></label>`);
+    if (["note","idea","comment"].includes(i.type)) f.push(`<label class="small">${i.type==="idea"?"Why it matters":"Text"}<textarea name="text" rows="4">${esc(i.text||"")}</textarea></label>`);
+    if (i.type==="link") f.push(`<label class="small">URL<input type="url" name="url" value="${esc(i.url||"")}"></label>`);
+    if (i.type==="todo") f.push(`<label class="small">Items, one per line (start with [x] when done)<textarea name="items" rows="5">${esc((i.items||[]).map(x=>(x.done?"[x] ":"")+x.t).join("\n"))}</textarea></label>`);
+    if (i.type==="idea") f.push(`<label class="small">Stage<select name="stage">${STAGES.map(s=>`<option value="${s}" ${s===i.stage?"selected":""}>${STAGE_LABEL[s]}</option>`).join("")}</select></label>`);
+    openPop(anchor, `<form data-form="mc-edit" class="pop-form" style="min-width:min(320px,86vw)"><input type="hidden" name="id" value="${esc(id)}"><div class="mh" style="padding:0">${esc(MC_TYPES[i.type].label)}</div>${f.join("")}
+      <div class="row"><button class="btn primary" type="submit">Save</button><button class="btn" type="button" data-act="pop-close">Cancel</button></div></form>`);
+  }
+  async function mcDelete(i){
+    if (!need()) return;
+    const kids = S.canvas.filter(k=>k.parent===i._id);
+    for (const k of kids) await db.doc("canvas/"+k._id).update({parent:"", x:(i.x||0)+20, y:(i.y||0)+40+(k.order||0)*30});
+    for (const e of S.edges.filter(e=>e.from===i._id||e.to===i._id)) await db.doc("edges/"+e._id).delete();
+    await db.doc("canvas/"+i._id).delete();
+  }
+  function mcMenu(id, x, y){
+    const i = S.canvas.find(z=>z._id===id); if (!i) return;
+    const items = [{label:"Edit…", run:()=>mcEdit(id, document.querySelector(`[data-mc="${CSS.escape(id)}"]`)||document.body)}];
+    if (i.type==="board") items.push({label:"Open board", run:()=>{ UI.mcBoard = id; render(); }});
+    if (i.type==="idea"){
+      STAGES.forEach(s=>items.push({label:`Stage: ${STAGE_LABEL[s]}${i.stage===s?" ✓":""}`, run:()=>db.doc("canvas/"+id).update({stage:s, updated:todayISO()}).catch(fail)}));
+      if (!i.promoted) items.push({label:"Promote to a project", run:()=>mcPromote(i)});
+    }
+    items.push("-", {label:"Colour", heading:true}, ...MC_COLORS.map(([c,l])=>({label:`${l}${(i.color||"")===c?" ✓":""}`, run:()=>db.doc("canvas/"+id).update({color:c}).catch(fail)})));
+    items.push("-", {label:"Connect from here", run:()=>{ UI.mcTool = "connect"; UI.mcFrom = id; render(); }},
+      {label:"Duplicate", run:()=>{ const {_id, ...rest} = i; db.collection("canvas").add({...rest, x:(i.x||0)+30, y:(i.y||0)+30, parent:i.parent||""}).catch(fail); }},
+      {label: i.parent ? "Take out of column" : "Bring to front", run:()=>{ const at = i.parent ? {x:(S.canvas.find(c=>c._id===i.parent)?.x||0)+280, y:(S.canvas.find(c=>c._id===i.parent)?.y||0)} : null; const max = Math.max(0, ...S.canvas.map(c=>c.z||0)); db.doc("canvas/"+id).update(at?{parent:"", x:at.x, y:at.y}:{z:max+1}).catch(fail); }},
+      {label: i.type==="board"||i.type==="column" ? "Delete (cards inside are kept)" : "Delete", danger:true, run:()=>mcDelete(i).catch(fail)});
+    openMenu(x, y, items);
+  }
+  function mcSpaceMenu(x, y){
+    const at = mcAt(x, y);
+    openMenu(x, y, [{label:"Add here", heading:true}, ...["note","idea","todo","link","column","board","comment"].map(t=>({label:`${MC_TYPES[t].icon}  ${MC_TYPES[t].label}`, run:()=>mcCreate(t, at)})), "-", {label:"Fit board to view", run:()=>mcFit()}]);
+  }
+  function mcEdgeMenu(id, x, y){
+    const e = S.edges.find(z=>z._id===id); if (!e) return;
+    openMenu(x, y, [
+      ...[["relates","Relates to"],["depends","Depends on"],["became","Became"]].map(([k,l])=>({label:`${l}${(e.kind||"relates")===k?" ✓":""}`, run:()=>db.doc("edges/"+id).update({kind:k}).catch(fail)})),
+      {label:"Edit label…", run:()=>openPop(document.querySelector(`[data-edge="${CSS.escape(id)}"]`)||document.body, `<form data-form="edge-label" class="pop-form"><input type="hidden" name="id" value="${esc(id)}"><label class="small">Label<input type="text" name="label" value="${esc(e.label||"")}"></label><div class="row"><button class="btn primary" type="submit">Save</button><button class="btn" type="button" data-act="pop-close">Cancel</button></div></form>`)},
+      "-", {label:"Delete arrow", danger:true, run:()=>db.doc("edges/"+id).delete().catch(fail)}
+    ]);
+  }
+  async function mcPromote(i){
+    if (!need()) return;
+    try {
+      await db.collection("projects").add({name:i.title||"New project", next:i.text||"", status:"next", repo:"", updated:todayISO()});
+      await db.doc("canvas/"+i._id).update({promoted:todayISO(), stage:"code"});
+      setStatus(`${i.title} is now a project in Up next.`);
+    } catch(e){ fail(e); }
+  }
+  function mcFit(){
+    const b = mcBoardId(), items = mcItems(b).filter(i=>!i.parent), v = $("mc-view"); if (!v || !items.length) return;
+    const minX = Math.min(...items.map(i=>i.x||0)), minY = Math.min(...items.map(i=>i.y||0)), maxX = Math.max(...items.map(i=>(i.x||0)+(i.w||220))), maxY = Math.max(...items.map(i=>(i.y||0)+260));
+    const z = Math.max(.35, Math.min(1.4, Math.min(v.clientWidth/(maxX-minX+80), v.clientHeight/(maxY-minY+80))));
+    mcCams[b] = {z, x: -minX*z + 40, y: -minY*z + 30}; saveCam(); render();
+  }
+  // pointer: drag cards, pan, resize, place, connect
+  document.addEventListener("pointerdown", e => {
+    const view = e.target.closest && e.target.closest("#mc-view"); if (!view || UI.editing || e.button > 0) return;
+    if (e.target.closest("input,button,a,select,textarea")) return;
+    const b = mcBoardId(), cam = mcCam(b), tool = UI.mcTool || "select", card = e.target.closest(".mc-card"), rz = e.target.closest("[data-mcrz]");
+    if (tool==="connect"){
+      if (!card) { UI.mcFrom = null; render(); return; }
+      const id = card.dataset.mc;
+      if (!UI.mcFrom){ UI.mcFrom = id; render(); return; }
+      if (UI.mcFrom !== id && need()) db.collection("edges").add({board:b, from:UI.mcFrom, to:id, kind:"relates", label:""}).catch(fail);
+      UI.mcFrom = null; UI.mcTool = "select"; render(); return;
+    }
+    if (tool!=="select" && !card){ mcCreate(tool, mcAt(e.clientX, e.clientY)); return; }
+    e.preventDefault();
+    const sx = e.clientX, sy = e.clientY; let moved = false;
+    if (rz && card){
+      const it = S.canvas.find(x=>x._id===card.dataset.mc), w0 = it.w || 220; UI.moving = "mc";
+      const mv = ev => { const w = Math.max(150, Math.min(560, w0 + (ev.clientX-sx)/cam.z)); card.style.width = w+"px"; };
+      const up = () => { removeEventListener("pointermove", mv); removeEventListener("pointerup", up); UI.moving = null; const w = Math.round(parseFloat(card.style.width)); if (w!==w0 && need()) db.doc("canvas/"+it._id).update({w}).catch(fail); else render(); };
+      addEventListener("pointermove", mv); addEventListener("pointerup", up); return;
+    }
+    if (!card){
+      const x0 = cam.x, y0 = cam.y, world = $("mc-world"); UI.moving = "mc"; view.classList.add("panning");
+      const mv = ev => { cam.x = x0 + ev.clientX - sx; cam.y = y0 + ev.clientY - sy; world.style.transform = `translate(${cam.x}px,${cam.y}px) scale(${cam.z})`; };
+      const up = () => { removeEventListener("pointermove", mv); removeEventListener("pointerup", up); view.classList.remove("panning"); UI.moving = null; mcCams[b] = cam; saveCam(); };
+      addEventListener("pointermove", mv); addEventListener("pointerup", up); return;
+    }
+    const id = card.dataset.mc, it = S.canvas.find(x=>x._id===id); if (!it) return;
+    const r0 = card.getBoundingClientRect(), offX = (sx - r0.left)/cam.z, offY = (sy - r0.top)/cam.z;
+    UI.moving = "mc";
+    const mv = ev => {
+      if (!moved && Math.hypot(ev.clientX-sx, ev.clientY-sy) < 4) return;
+      if (!moved){ moved = true; card.classList.add("lifted"); card.style.pointerEvents = "none"; if (card.classList.contains("in-col")){ card.style.width = r0.width/cam.z+"px"; card.style.position = "fixed"; card.style.zIndex = 40; } }
+      if (card.style.position === "fixed"){ card.style.left = (ev.clientX - offX*cam.z)+"px"; card.style.top = (ev.clientY - offY*cam.z)+"px"; card.style.transform = `scale(${cam.z})`; card.style.transformOrigin = "0 0"; }
+      else { const p = mcAt(ev.clientX, ev.clientY); card.style.left = (p.x-offX)+"px"; card.style.top = (p.y-offY)+"px"; mcDrawEdges(); }
+      document.querySelectorAll(".mc-col.drop").forEach(n=>n.classList.remove("drop"));
+      const under = document.elementFromPoint(ev.clientX, ev.clientY), col = it.type!=="column" && it.type!=="board" && under && under.closest(".mc-col");
+      if (col && col.dataset.col !== id) col.classList.add("drop");
+    };
+    const up = async ev => {
+      removeEventListener("pointermove", mv); removeEventListener("pointerup", up); UI.moving = null;
+      if (!moved){ render(); return; }
+      const under = document.elementFromPoint(ev.clientX, ev.clientY), col = it.type!=="column" && it.type!=="board" && under && under.closest(".mc-col");
+      if (!need()){ render(); return; }
+      try {
+        if (col && col.dataset.col !== id){
+          const kids = [...col.querySelectorAll(":scope > .mc-card")].filter(n=>n.dataset.mc!==id);
+          let order = kids.length; kids.forEach((n,k)=>{ const r = n.getBoundingClientRect(); if (order===kids.length && ev.clientY < r.top + r.height/2) order = k; });
+          const sib = S.canvas.filter(c=>c.parent===col.dataset.col && c._id!==id).sort((a,b)=>(a.order||0)-(b.order||0));
+          sib.splice(order, 0, it);
+          for (let k=0;k<sib.length;k++){ const c = sib[k]; if (c._id===id) await db.doc("canvas/"+id).update({parent:col.dataset.col, order:k}); else if ((c.order||0)!==k) await db.doc("canvas/"+c._id).update({order:k}); }
+        } else {
+          const p = mcAt(ev.clientX, ev.clientY);
+          await db.doc("canvas/"+id).update({parent:"", x:Math.round(p.x-offX), y:Math.round(p.y-offY)});
+        }
+      } catch(err){ fail(err); }
+      render();
+    };
+    addEventListener("pointermove", mv); addEventListener("pointerup", up);
+  });
+  document.addEventListener("dblclick", e => {
+    const view = e.target.closest && e.target.closest("#mc-view"); if (!view || UI.editing) return;
+    const card = e.target.closest(".mc-card");
+    if (card){ const i = S.canvas.find(x=>x._id===card.dataset.mc); if (!i) return; if (i.type==="board"){ UI.mcBoard = i._id; render(); } else mcEdit(i._id, card); return; }
+    mcCreate("note", mcAt(e.clientX, e.clientY));
+  });
+  document.addEventListener("wheel", e => {
+    const view = e.target.closest && e.target.closest("#mc-view"); if (!view) return;
+    e.preventDefault();
+    const b = mcBoardId(), cam = mcCam(b), r = view.getBoundingClientRect();
+    if (e.ctrlKey || e.metaKey){
+      const z = Math.max(.3, Math.min(2.2, cam.z * Math.exp(-e.deltaY*0.0015)));
+      const px = e.clientX - r.left, py = e.clientY - r.top;
+      cam.x = px - (px - cam.x) * z/cam.z; cam.y = py - (py - cam.y) * z/cam.z; cam.z = z;
+    } else { cam.x -= e.deltaX; cam.y -= e.deltaY; }
+    mcCams[b] = cam; const w = $("mc-world"); if (w) w.style.transform = `translate(${cam.x}px,${cam.y}px) scale(${cam.z})`;
+    clearTimeout(UI.camTimer); UI.camTimer = setTimeout(()=>{ saveCam(); const zl = document.querySelector(".mc-zoom .mono"); if (zl) zl.textContent = Math.round(cam.z*100)+"%"; }, 200);
+  }, {passive:false});
+  document.addEventListener("keydown", e => {
+    if (!$("mc-view") || /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName||"")) return;
+    const map = {v:"select", n:"note", i:"idea", t:"todo", l:"link", c:"column", b:"board", m:"comment"};
+    if (e.key==="Escape" && (UI.mcFrom || UI.mcTool!=="select")){ UI.mcFrom = null; UI.mcTool = "select"; render(); }
+    else if (map[e.key] && !e.ctrlKey && !e.metaKey){ UI.mcTool = map[e.key]; render(); }
+  });
+
+  // ---------- UpstreamManager (Upkeep) ----------
+  const UM = () => S.upstream || {repos:null, requests:null, daily:null};
+  const umRepos = () => (UM().repos && UM().repos.items) || [];
+  const umRequests = () => (UM().requests && UM().requests.items) || [];
+  const umExample = () => [UM().repos, UM().requests, UM().daily].some(d=>d && d.example);
+  const umBase = () => (conn().upstream.baseUrl||"").replace(/\/$/,"");
+  const umDemo = call => setStatus(`Demo: nothing was sent. In the container Orb calls ${call} on UpstreamManager.`);
+  const reqType = r => r.type==="actions" ? "Actions change" : r.type==="push" ? "Push / pull request" : r.type==="components" ? "Component update" : "Merge from upstream";
+  function requestsHTML(){
+    const all = umRequests(), pend = all.filter(r=>r.status==="pending"), done = all.filter(r=>r.status!=="pending").sort((a,b)=>String(b.decided_at||"").localeCompare(String(a.decided_at||""))).slice(0,6);
+    const one = r => `<div class="req ${r.status}">
+      <div class="row" style="justify-content:space-between"><b>${esc(r.repo_name)}</b><span class="small mono muted">${esc(r.focus_branch||"")}</span></div>
+      <div class="row small"><span class="pill ${r.status==="pending"?(r.safe?"ok":"warn"):r.status==="approved"?"ok":r.status==="failed"?"bad":""}"><i></i>${r.status==="pending"?(r.safe?"safe to merge":"has conflicts"):esc(r.status)}</span><span class="muted">${esc(reqType(r))} · ${esc(ago(r.created_at))}</span></div>
+      ${(r.upstreams||[]).map(u=>`<div class="small">↓ ${esc(u.behind)} from <span class="mono">${esc(u.name)}/${esc(u.branch||r.focus_branch)}</span>${u.ahead?` · ${esc(u.ahead)} of yours`:""}${u.reason?` · ${esc(u.reason)}`:""}</div>`).join("")}
+      ${(r.conflicts||[]).length?`<div class="small st-blocked">Conflicts: ${r.conflicts.map(esc).join(", ")}</div>`:""}
+      ${r.status==="pending" ? `<form class="row" data-form="req-decide" data-id="${esc(r.id)}"><input type="text" name="comment" placeholder="Comment (optional)" aria-label="Comment"><button class="btn primary" type="submit" name="d" value="approve">Approve</button><button class="btn" type="submit" name="d" value="deny">Deny</button></form>`
+        : `<div class="hint">${esc(r.decided_at?ago(r.decided_at):"")}${r.comment?` · “${esc(r.comment)}”`:""}</div>`}</div>`;
+    return (umExample()?`<div class="banner">Example data shaped like UpstreamManager's /api/requests.</div>`:"") +
+      (pend.length ? pend.map(one).join("") : `<div class="empty">No requests waiting.</div>`) +
+      (done.length ? `<h4 class="group-name">Decided</h4>${done.map(one).join("")}` : "");
+  }
+  function dailyHTML(){
+    const d = UM().daily, res = (d && d.results) || [];
+    const line = r => r.status==="merged" ? `<span class="st-active">merged</span> ${esc(r.behind)} commit${r.behind===1?"":"s"} from ${esc(r.upstream)}` :
+      r.status==="request_raised" ? `<span class="st-paused">request raised</span> · ${esc((r.reasons||[]).join("; "))}` :
+      r.status==="error" ? `<span class="st-blocked">error</span> · ${esc(r.error)}` : `<span class="muted">${esc(String(r.status||"").replace(/_/g," "))}</span>`;
+    return `<div class="row" style="justify-content:space-between"><span class="small">${d&&d.ranAt?`Last run ${esc(ago(d.ranAt))}`:"Not run yet"}</span><button class="btn primary" data-act="um-daily">Run daily check</button></div>
+      <p class="hint" style="margin:0">Fetches every watched repo. Fast-forwards happen by themselves; anything else raises a request here. Nothing is pushed.</p>
+      ${res.length?`<ul class="list">${res.map(r=>`<li><div class="grow"><b>${esc(r.repo_name||r.repo_id)}</b> ${line(r)}</div></li>`).join("")}</ul>`:""}`;
+  }
+  function reposHTML(){
+    const rs = umRepos(); if (!rs.length) return `<div class="empty">No repos yet. Add them in UpstreamManager.</div>`;
+    const linked = id => S.projects.filter(p=>p.upstreamRepo===id).map(p=>`<a href="${projHref(p)}">${esc(p.name)}</a>`).join(", ");
+    return `<div style="overflow-x:auto"><table class="ctab rtab"><thead><tr><th>repo</th><th>branch</th><th>upstream</th><th>components</th><th>last commit</th><th>project</th><th></th></tr></thead><tbody>
+      ${rs.map(r=>{ const comps = r.components||[], cb = comps.filter(c=>c.behind>0).length;
+        return `<tr><td><b>${isUrl(umBase())?`<a href="${esc(umBase())}/repo/${esc(r.id)}" target="_blank" rel="noopener">${esc(r.name)}</a>`:esc(r.name)}</b>${r.dirty?` <span class="chip warn">${esc(r.dirty)} changed</span>`:""}${r.error?` <span class="chip bad" title="${esc(r.error)}">error</span>`:""}</td>
+          <td class="mono">${esc(r.focus_branch||"")}</td>
+          <td>${r.behind?`<span class="st-paused">↓${esc(r.behind)}</span>`:`<span class="muted">up to date</span>`}${r.ahead?` <span class="muted">↑${esc(r.ahead)}</span>`:""}${(r.conflicts||[]).length?` <span class="chip bad">conflict</span>`:""}<div class="hint">${(r.upstreams||[]).map(esc).join(", ")}</div></td>
+          <td>${comps.length?`${cb?`<span class="st-paused">${cb} of ${comps.length} behind</span>`:`${comps.length} pinned`}`:`<span class="muted">none</span>`}</td>
+          <td class="small">${r.last_commit?`${esc(r.last_commit.subject)}<div class="hint mono">${esc(r.last_commit.sha)} · ${esc(ago(r.last_commit.date))}</div>`:""}</td>
+          <td class="small">${linked(r.id)||`<span class="muted">—</span>`}</td>
+          <td><button class="btn" data-act="um-fetch" data-id="${esc(r.id)}">Fetch</button></td></tr>`; }).join("")}</tbody></table></div>`;
+  }
+  function repoPanel(p){
+    const rs = umRepos(), r = p.upstreamRepo && rs.find(x=>x.id===p.upstreamRepo);
+    const pick = `<select data-act="proj-repo" data-id="${esc(p._id)}" aria-label="UpstreamManager repo for ${esc(p.name)}"><option value="">${rs.length?"Link a repo…":"No repos loaded"}</option>${rs.map(x=>`<option value="${esc(x.id)}" ${x.id===p.upstreamRepo?"selected":""}>${esc(x.name)}</option>`).join("")}</select>`;
+    if (!r) return `<p class="small" style="margin:0">Link this project to a repo tracked by UpstreamManager to see its upstream status here and log new commits to the project.</p><div class="row">${pick}</div>`;
+    const commits = r.commits || [], lastIdx = p.lastLoggedSha ? commits.findIndex(c=>c.full===p.lastLoggedSha) : commits.length;
+    const fresh = lastIdx < 0 ? commits.length : lastIdx;
+    return `<div class="row"><b>${esc(r.name)}</b><span class="mono small">${esc(r.focus_branch||"")}</span>${r.behind?`<span class="pill warn"><i></i>${esc(r.behind)} behind upstream</span>`:`<span class="pill ok"><i></i>up to date</span>`}${r.ahead?`<span class="pill"><i></i>${esc(r.ahead)} ahead</span>`:""}</div>
+      <h4 class="group-name">Recent commits</h4>
+      ${commits.length?`<ul class="list">${commits.slice(0,8).map((c,k)=>`<li><span class="date">${esc(c.sha)}</span><div class="grow">${esc(c.subject)}<div class="hint">${esc(c.author)} · ${esc(ago(c.date))}${k<fresh?" · not logged yet":""}</div></div></li>`).join("")}</ul>`:`<div class="empty">No commits loaded.</div>`}
+      <div class="setting"><div><div>Log new commits to this project</div><div class="d">Each new commit on ${esc(r.focus_branch||"the focus branch")} becomes a log entry (its subject, cut to ${logMax()} characters), marked “git”.</div></div><input type="checkbox" data-act="proj-logcommits" data-id="${esc(p._id)}" ${p.logCommits?"checked":""} aria-label="Log new commits"></div>
+      <div class="row">${fresh?`<button class="btn" data-act="proj-logcommits-now" data-id="${esc(p._id)}">Log ${fresh} new commit${fresh===1?"":"s"} now</button>`:`<span class="hint">All shown commits are logged.</span>`}${pick}<button class="btn" data-act="proj-repo-unlink" data-id="${esc(p._id)}">Unlink</button></div>
+      ${umExample()?`<div class="hint">Example commits. In the container they come from GET /api/repo/${esc(r.id)}/commits.</div>`:""}`;
+  }
+  async function logCommitsNow(p){
+    const r = umRepos().find(x=>x.id===p.upstreamRepo); if (!r || !need()) return;
+    const commits = r.commits || [], idx = p.lastLoggedSha ? commits.findIndex(c=>c.full===p.lastLoggedSha) : commits.length;
+    const fresh = commits.slice(0, idx<0?commits.length:idx).reverse();
+    try {
+      for (const c of fresh) await db.collection("logs").add({date:String(c.date).slice(0,10), project:p.name, text:clip(c.subject, logMax()), by:"git", sha:c.sha, created:Date.parse(c.date)||Date.now()});
+      if (commits[0]) await db.doc("projects/"+p._id).update({lastLoggedSha:commits[0].full});
+      setStatus(`Logged ${fresh.length} commit${fresh.length===1?"":"s"} to ${p.name}.`);
+    } catch(e){ fail(e); }
+  }
+
   // ---------- render ----------
   function renderSummary(){
     if (!S.loaded) return;
@@ -1270,6 +1618,17 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     if (hosts.length) p.push(hot ? `<span class="pill warn"><i></i>${hot} host${hot>1?"s":""} running hot</span>` : `<span class="pill ok"><i></i>Hosts normal</span>`);
     $("summary").innerHTML = p.join("");
   }
+  const splitRatio = () => { const r = (settings().splitRatio||{})[UI.split ? UI.split.join("--") : ""]; return typeof r === "number" ? Math.max(.2, Math.min(.8, r)) : .5; };
+  function saveSplit(r){ const id = UI.split.join("--"); saveSettings({splitRatio:{...(settings().splitRatio||{}), [id]: Math.round(Math.max(.2, Math.min(.8, r))*1000)/1000}}); }
+  document.addEventListener("pointerdown", e => {
+    const d = e.target.closest && e.target.closest("[data-divider]"); if (!d || !UI.split) return;
+    e.preventDefault(); d.setPointerCapture(e.pointerId); const sp = $("split"), rect = sp.getBoundingClientRect(); UI.moving = "split"; let r = splitRatio();
+    const mv = ev => { r = Math.max(.2, Math.min(.8, (ev.clientX - rect.left)/rect.width)); sp.style.setProperty("--r", r); d.setAttribute("aria-valuenow", Math.round(r*100)); };
+    const up = () => { d.removeEventListener("pointermove", mv); d.removeEventListener("pointerup", up); UI.moving = null; saveSplit(r); };
+    d.addEventListener("pointermove", mv); d.addEventListener("pointerup", up);
+  });
+  document.addEventListener("dblclick", e => { if (e.target.closest && e.target.closest("[data-divider]") && UI.split) saveSplit(.5); });
+  document.addEventListener("keydown", e => { if (e.target.matches && e.target.matches("[data-divider]") && UI.split && (e.key==="ArrowLeft"||e.key==="ArrowRight")){ e.preventDefault(); saveSplit(splitRatio() + (e.key==="ArrowLeft"?-.05:.05)); } });
   function renderTabs(){
     const links = tabLinks(), seen = new Set(), cur = UI.split ? UI.split.join("--") : UI.tab;
     const out = [];
@@ -1298,12 +1657,14 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
       const [a,b] = UI.split.map(id=>TABS.find(t=>t.id===id));
       html = `<div class="split-bar"><span class="small muted">${esc(a.label)} and ${esc(b.label)} are linked. Right-click the tab to unlink.</span>${editBtn()}</div>
         ${UI.editing?`<div class="tray"><span class="small">Editing both halves. Drag panels by their title, drag the corner to resize, right-click for options.</span></div>`:""}
-        <div class="split"><div class="half">${renderPage(a, true)}</div><div class="half">${renderPage(b, true)}</div></div>`;
+        <div class="split" id="split" style="--r:${splitRatio()}"><div class="half">${renderPage(a, true)}</div><div class="divider" data-divider role="separator" tabindex="0" aria-orientation="vertical" aria-valuemin="20" aria-valuemax="80" aria-valuenow="${Math.round(splitRatio()*100)}" aria-label="Resize ${esc(a.label)} and ${esc(b.label)}" title="Drag to resize. Double-click to reset."><span></span></div><div class="half">${renderPage(b, true)}</div></div>`;
     } else {
       const t = TABS.find(x=>x.id===UI.tab) || TABS[0];
       html = renderPage(t, false);
     }
     $("main").innerHTML = `<div class="room">${html}</div>`;
+    if ($("mc-edges")) requestAnimationFrame(mcDrawEdges);
+    if (UI.mcEditNext){ const el = document.querySelector(`[data-mc="${CSS.escape(UI.mcEditNext)}"]`); if (el){ const id = UI.mcEditNext; UI.mcEditNext = null; setTimeout(()=>mcEdit(id, el), 0); } }
     if (active && $(active) && /^(yaml|golem-in|logmax|wiki-sec|wiki-q)$/.test(active)){ const el = $(active); el.focus(); try { if (caret!=null) el.setSelectionRange(caret, caret); } catch {} }
   }
   function route(){
@@ -1332,12 +1693,13 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     try { db = await window.claude?.use?.("db"); } catch { db = null; }
     if (!db){ clearTimeout(timer); setStatus("Storage is not available in this view. Open the page signed in on claude.ai to save changes."); S.loaded = true; render(); return; }
     const err = e => setStatus("Lost connection to storage: " + (e.message||e.code));
-    for (const k of ["wiki","live","tasks","ideas","projects","logs","upkeep","events"]){
+    for (const k of ["canvas","edges","wiki","live","tasks","ideas","projects","logs","upkeep","events"]){
       db.collection(k).onSnapshot(snap => { clearTimeout(timer); S[k] = snap.docs.map(d=>({...d.data(), _id:d.id})); S.loaded = true; setStatus("Changes save for everyone who opens this page."); schedule(); }, err);
     }
     db.doc("stats/current").onSnapshot(s => { S.stats = s.exists ? s.data() : null; schedule(); }, err);
     db.doc("config/orb").onSnapshot(s => { S.yaml = s.exists ? String(s.data().yaml||"") : ""; applyYaml(); schedule(); }, err);
     db.doc("config/layout").onSnapshot(s => { S.layout = s.exists ? s.data() : null; schedule(); }, err);
+    for (const d of ["repos","requests","daily"]) db.doc("upstream/"+d).onSnapshot(sn => { S.upstream = {...S.upstream, [d]: sn.exists ? sn.data() : null}; schedule(); }, err);
     db.doc("config/layouts").onSnapshot(s => { if (!layoutTimer) { S.layouts = s.exists ? s.data() : null; schedule(); } }, err);
     db.doc("uptime/current").onSnapshot(s => { S.uptime = s.exists ? s.data() : null; schedule(); }, err);
     db.doc("config/settings").onSnapshot(s => { S.settings = s.exists ? s.data() : null; schedule(); }, err);
@@ -1378,6 +1740,14 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
       case "log-filter": UI.logFilter = el.dataset.p || ""; if (UI.tab!=="projects") location.hash = "projects"; else render(); break;
       case "edit-layout": UI.editing = !UI.editing; render(); break;
       case "pop-close": closeMenu(); break;
+      case "mc-tool": UI.mcTool = el.dataset.t; UI.mcFrom = null; render(); break;
+      case "mc-open": UI.mcBoard = id; UI.mcFrom = null; render(); break;
+      case "mc-zoom": { const b = mcBoardId(), cam = mcCam(b), v = $("mc-view"); const z = Math.max(.3, Math.min(2.2, cam.z * (Number(el.dataset.d)>0?1.2:1/1.2))); if (v){ const px = v.clientWidth/2, py = v.clientHeight/2; cam.x = px-(px-cam.x)*z/cam.z; cam.y = py-(py-cam.y)*z/cam.z; } cam.z = z; mcCams[b] = cam; saveCam(); render(); break; }
+      case "mc-fit": mcFit(); break;
+      case "um-daily": umDemo("POST /api/run-daily"); break;
+      case "um-fetch": umDemo(`POST /api/repo/${id}/fetch`); break;
+      case "proj-logcommits-now": { const pr = S.projects.find(z=>z._id===id); if (pr) logCommitsNow(pr); break; }
+      case "proj-repo-unlink": if(!need())return; db.doc("projects/"+id).update({upstreamRepo:"", logCommits:false}).catch(fail); break;
       case "proj-new": newProjectPop(el); break;
       case "proj-restore": { const pr = S.projects.find(z=>z._id===id); if (pr) setArchived(pr, false); break; }
       case "proj-menu": { const r = el.getBoundingClientRect(); projectMenu(id, r.left, r.bottom+4); break; }
@@ -1405,6 +1775,9 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     const el = e.target, act = el.dataset && el.dataset.act; if (!act) return;
     if (act === "proj-status"){ if(!need())return; const id = el.dataset.id, val = el.value; db.doc("projects/"+id).update({status:val, updated:todayISO()}).then(()=>syncWikiStatus(id, val)).catch(fail); }
     if (act === "plan-toggle"){ if(!need())return; db.doc("plans/"+el.dataset.id).update({done:el.checked}).catch(fail); }
+    if (act === "mc-todo"){ if(!need())return; const it = S.canvas.find(z=>z._id===el.dataset.id); if (it){ const items = (it.items||[]).map((x,k)=>k===Number(el.dataset.i)?{...x, done:el.checked}:x); db.doc("canvas/"+it._id).update({items}).catch(fail); } }
+    if (act === "proj-repo"){ if(!need())return; db.doc("projects/"+el.dataset.id).update({upstreamRepo:el.value, lastLoggedSha:""}).catch(fail); }
+    if (act === "proj-logcommits"){ if(!need())return; db.doc("projects/"+el.dataset.id).update({logCommits:el.checked}).catch(fail); }
     if (act === "show-archived"){ UI.showArchived = el.checked; render(); }
     if (act === "pick-project"){ const n = $("pick-new"); if (n){ n.hidden = el.value!=="__new"; if (!n.hidden) n.focus(); } }
     if (act === "np-wiki"){ const a = $("np-area"); if (a) a.hidden = !el.checked; }
@@ -1425,6 +1798,19 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     const v = Object.fromEntries(new FormData(f).entries());
     try {
       switch (f.dataset.form){
+        case "mc-edit": {
+          const it = S.canvas.find(z=>z._id===v.id); if (!it) return; const up = {updated:todayISO()};
+          if ("title" in v) up.title = v.title.trim(); if ("text" in v) up.text = v.text; if ("url" in v) up.url = v.url.trim(); if ("stage" in v) up.stage = v.stage;
+          if ("items" in v) up.items = v.items.split("\n").map(l=>l.trim()).filter(Boolean).map(l=>({t:l.replace(/^\[x\]\s*/i,""), done:/^\[x\]/i.test(l)}));
+          closeMenu(); await db.doc("canvas/"+it._id).update(up); return;
+        }
+        case "edge-label": closeMenu(); await db.doc("edges/"+v.id).update({label:(v.label||"").trim()}); return;
+        case "req-decide": {
+          const d = e.submitter && e.submitter.value === "deny" ? "deny" : "approve", rid = f.dataset.id, doc = UM().requests; if (!doc) return;
+          const items = (doc.items||[]).map(r=>r.id===rid ? {...r, status: d==="approve"?"approved":"denied", decided_at:new Date().toISOString(), comment:(v.comment||"").trim()||null} : r);
+          await db.doc("upstream/requests").update({items});
+          umDemo(`POST /api/request/${rid}/decide with {"decision":"${d}"}`); return;
+        }
         case "logq": { const text = (v.text||"").trim().slice(0,logMax()); if (!text) return; logPick(e.submitter || f.querySelector("button[type=submit]"), text); f.reset(); const c = f.querySelector(".counter"); if (c) c.textContent = "0/"+logMax(); return; }
         case "log-pick": {
           let name = v.project;
@@ -1493,7 +1879,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
       { name:"list_projects", description:"Returns every project as {name, status, next, repo}. Status is one of next, active, blocked, paused, shipped.",
         execute:() => S.projects.map(p=>({name:p.name, status:p.status, next:p.next||"", repo:p.repo||"", archived:!!p.archived})) },
       { name:"list_ideas", description:"Returns ideas not yet promoted as {title, stage, pitch}. Stage is thought, design or code.",
-        execute:() => S.ideas.filter(i=>!i.promoted).map(i=>({title:i.title, stage:i.stage, pitch:i.pitch||""})) },
+        execute:() => S.canvas.filter(i=>i.type==="idea" && !i.promoted).map(i=>({title:i.title, stage:i.stage, pitch:i.text||""})) },
       { name:"list_tasks", description:"Returns tasks as {title, list, due, done}. Optional list filters to one task list (projects use their own name); openOnly defaults to true.",
         inputSchema:{type:"object", properties:{list:{type:"string"}, openOnly:{type:"boolean"}}},
         execute:({list:project, openOnly}) => S.tasks.filter(t=>(!project || listOf(t).toLowerCase()===String(project).toLowerCase()) && (openOnly===false || !t.done)).map(t=>({title:t.title, list:listOf(t), due:t.due||"", done:!!t.done})) },
@@ -1530,7 +1916,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
       { name:"add_idea", description:"Adds an idea at the thought stage with an optional one-line pitch. Returns the idea.",
         inputSchema:{type:"object", properties:{title:{type:"string"}, pitch:{type:"string"}}, required:["title"]},
         execute: async ({title, pitch}) => { const t = clip(title, 80);
-          await db.collection("ideas").add({title:t, pitch:clip(pitch||"",140), stage:"thought", updated:todayISO()}); did.push(`idea added`); return {title:t}; } }
+          const ys = S.canvas.filter(i=>(i.board||"root")==="root" && !i.parent).map(i=>(i.y||0)); await db.collection("canvas").add({board:"root", type:"idea", x:40, y:(ys.length?Math.max(...ys)+200:40), w:240, title:t, text:clip(pitch||"",140), stage:"thought", color:"", updated:todayISO()}); did.push(`idea added`); return {title:t}; } }
     );
     return tools;
   }

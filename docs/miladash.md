@@ -45,6 +45,17 @@ Heptabase, Miro, tldraw, Excalidraw, Kinopio.
 | Excalidraw | MIT | hand-drawn drawing first; good for sketches inside an idea, weak for card boards |
 | tldraw | tldraw license | strong, but production use needs a license key; avoid for a self-hosted MIT project |
 
+## The demo board
+
+The Ideas tab in the demo is now a working sketch of Miladash in Milaclone's
+style: a tool rail (select, note, idea, to-do, link, column, board, comment,
+connect), breadcrumbs for boards inside boards, a dotted infinite canvas with
+pan and zoom, columns you drag cards into and out of, resizable cards, and
+arrows with three kinds (relates to, depends on, became) and labels.
+Right-click a card for stage, colour, promote, duplicate and delete;
+right-click empty space to add a card there. The stage pipeline is gone from
+Ideas; a kanban belongs to Projects.
+
 ## Design for Miladash
 
 - **Root board "Ideas"** for free arrangement, with groups (boxes) you draw
