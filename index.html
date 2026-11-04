@@ -1,0 +1,480 @@
+<title>Pondering Orb</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a work bench. Summary strip, then a wide "work" column (projects, log, plans) beside a narrow "machine" column (upkeep, stats, calendar, agents). Stack of services at the foot. */
+:root{
+  --bg:#eef0ec; --panel:#f8f9f6; --ink:#1c2326; --muted:#5d686b; --line:#d5d9d2;
+  --accent:#2c5d86; --accent-soft:#dbe6ef; --orb-hi:#ffffff; --orb-mid:#6f9fc8; --orb-deep:#1f3d5c; --bronze:#9a6a2f;
+  --ok:#2f7a4d; --warn:#b07a12; --bad:#b33a2e; --ok-bg:#e1efe5; --warn-bg:#f5ebd3; --bad-bg:#f6dfdb;
+  --f-display:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#141a1d; --panel:#1b2327; --ink:#e3e8e6; --muted:#97a3a4; --line:#2c373b;
+  --accent:#7fb0d9; --accent-soft:#223543; --orb-hi:#eaf4ff; --orb-mid:#5d93c4; --orb-deep:#152a3d; --bronze:#d3a464;
+  --ok:#6cc08c; --warn:#e2b450; --bad:#ec7d70; --ok-bg:#1d3326; --warn-bg:#3a3020; --bad-bg:#3d2422; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141a1d; --panel:#1b2327; --ink:#e3e8e6; --muted:#97a3a4; --line:#2c373b;
+  --accent:#7fb0d9; --accent-soft:#223543; --orb-hi:#eaf4ff; --orb-mid:#5d93c4; --orb-deep:#152a3d; --bronze:#d3a464;
+  --ok:#6cc08c; --warn:#e2b450; --bad:#ec7d70; --ok-bg:#1d3326; --warn-bg:#3a3020; --bad-bg:#3d2422; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--f-body)}
+.wrap{max-width:1240px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:20px}
+h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance;letter-spacing:.01em}
+h1{font-size:2.1rem;font-weight:700;line-height:1}
+h2{font-size:1.15rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.small{font-size:.82rem}
+button,select,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;border-bottom:2px solid var(--ink);padding-bottom:14px}
+.brand{display:flex;flex-direction:column;gap:4px}
+.title-row{display:flex;align-items:center;gap:12px}
+.orb{width:38px;height:38px;border-radius:50%;flex:none;background:radial-gradient(circle at 34% 30%,var(--orb-hi) 0 8%,var(--orb-mid) 30%,var(--orb-deep) 72%);box-shadow:0 0 0 1px var(--line),0 4px 14px -4px var(--orb-mid);animation:glow 6s ease-in-out infinite}
+@keyframes glow{50%{box-shadow:0 0 0 1px var(--line),0 4px 22px -2px var(--orb-mid)}}
+@media (prefers-reduced-motion:reduce){.orb{animation:none}}
+.brand .sub{font-family:var(--f-mono);font-size:.78rem;color:var(--muted);letter-spacing:.04em}
+.summary{display:flex;flex-wrap:wrap;gap:8px}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px;font-size:.8rem;font-weight:500;background:var(--panel);border:1px solid var(--line);white-space:nowrap}
+.pill i{width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block}
+.pill.ok{color:var(--ok);background:var(--ok-bg);border-color:transparent}
+.pill.warn{color:var(--warn);background:var(--warn-bg);border-color:transparent}
+.pill.bad{color:var(--bad);background:var(--bad-bg);border-color:transparent}
+.pill.info{color:var(--accent);background:var(--accent-soft);border-color:transparent}
+
+.grid{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:20px;align-items:start}
+.col{display:flex;flex-direction:column;gap:20px;min-width:0}
+@media (max-width:880px){.grid{grid-template-columns:minmax(0,1fr)}}
+
+section.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.phead{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.phead .hint{font-size:.78rem;color:var(--muted)}
+
+.btn{border:1px solid var(--line);background:transparent;border-radius:4px;padding:4px 10px;font-size:.82rem}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--panel)}
+.btn.primary:hover{opacity:.9;color:var(--panel)}
+.btn:disabled{opacity:.5;cursor:default}
+input[type=text],input[type=url],select,textarea{background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:5px 8px;min-width:0}
+textarea{resize:vertical;width:100%}
+form.row{display:flex;flex-wrap:wrap;gap:8px}
+form.row input[type=text]{flex:1 1 180px}
+
+/* projects */
+.projects{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.proj{border:1px solid var(--line);border-radius:5px;padding:12px;display:flex;flex-direction:column;gap:6px;background:var(--bg);min-width:0}
+.proj .name{font-family:var(--f-display);font-weight:600;font-size:1.15rem;line-height:1.1}
+.proj .repo{font-family:var(--f-mono);font-size:.75rem;color:var(--muted);overflow-wrap:anywhere}
+.proj .next{font-size:.87rem}
+.proj .next b{font-weight:600;color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;display:block}
+.proj .foot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:auto}
+.proj select{font-size:.78rem;padding:2px 4px}
+.st-active{color:var(--ok)} .st-blocked{color:var(--bad)} .st-paused{color:var(--warn)} .st-shipped{color:var(--accent)} .st-idea{color:var(--bronze)}
+
+/* log */
+.log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.log li{display:grid;grid-template-columns:86px 120px minmax(0,1fr);gap:10px;padding:7px 0;border-top:1px solid var(--line);font-size:.88rem}
+.log li:first-child{border-top:0}
+.log .d{font-family:var(--f-mono);font-size:.78rem;color:var(--muted)}
+.log .p{font-weight:600;font-size:.8rem;color:var(--accent);overflow-wrap:anywhere}
+.log .t{overflow-wrap:anywhere}
+@media (max-width:520px){.log li{grid-template-columns:1fr;gap:0}}
+.more{align-self:flex-start}
+
+/* plans */
+.horizons{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:640px){.horizons{grid-template-columns:minmax(0,1fr)}}
+.hz h3{font-size:.85rem;text-transform:uppercase;letter-spacing:.08em;color:var(--bronze);margin-bottom:6px}
+.hz ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.hz li{display:flex;gap:8px;align-items:flex-start;font-size:.88rem}
+.hz li.done span{text-decoration:line-through;color:var(--muted)}
+.hz input[type=checkbox]{margin-top:4px;accent-color:var(--accent)}
+
+/* upkeep */
+.upkeep{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.uk{display:grid;grid-template-columns:4px minmax(0,1fr) auto;gap:10px;align-items:center;background:var(--bg);border-radius:4px;padding:8px 10px 8px 0}
+.uk .stripe{align-self:stretch;border-radius:4px 0 0 4px}
+.uk.ok .stripe{background:var(--ok)} .uk.soon .stripe{background:var(--warn)} .uk.over .stripe{background:var(--bad)}
+.uk .n{font-weight:500;font-size:.9rem}
+.uk .m{font-size:.76rem;color:var(--muted);font-family:var(--f-mono)}
+.uk.over .m{color:var(--bad)} .uk.soon .m{color:var(--warn)}
+
+/* stats */
+.hosts{display:flex;flex-direction:column;gap:12px}
+.host{border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:8px}
+.host:first-child{border-top:0;padding-top:0}
+.host .hn{display:flex;justify-content:space-between;gap:8px;font-weight:600}
+.meters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px}
+.meter .lab{display:flex;justify-content:space-between;font-size:.76rem;color:var(--muted)}
+.meter .lab b{color:var(--ink);font-family:var(--f-mono);font-weight:500}
+.bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden}
+.bar span{display:block;height:100%;background:var(--accent);border-radius:3px}
+.bar span.hot{background:var(--warn)} .bar span.crit{background:var(--bad)}
+svg.spark{width:100%;height:36px;display:block}
+.banner{font-size:.78rem;background:var(--warn-bg);color:var(--warn);border-radius:4px;padding:6px 10px}
+
+/* calendar */
+.cal{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.cal li{display:grid;grid-template-columns:74px minmax(0,1fr);gap:8px;font-size:.86rem}
+.cal .d{font-family:var(--f-mono);font-size:.78rem;color:var(--muted)}
+.note{font-size:.8rem;color:var(--muted);border-left:3px solid var(--line);padding-left:10px}
+
+/* agents */
+.agent-out{white-space:pre-wrap;font-size:.88rem;background:var(--bg);border-radius:4px;padding:10px;min-height:2.5em;overflow-wrap:anywhere}
+.links{display:flex;flex-wrap:wrap;gap:6px}
+a{color:var(--accent)}
+
+/* stack */
+.stack{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.svc{display:flex;flex-direction:column;gap:4px;border:1px solid var(--line);border-radius:5px;padding:12px;background:var(--bg);min-width:0}
+.svc .sn{font-family:var(--f-display);font-weight:600;font-size:1.1rem}
+.svc .role{font-size:.8rem;color:var(--muted)}
+.svc .url{font-family:var(--f-mono);font-size:.76rem;overflow-wrap:anywhere}
+.svc .acts{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.svc .acts a{font-size:.82rem}
+
+.empty{font-size:.86rem;color:var(--muted);padding:6px 0}
+.status-line{font-size:.78rem;color:var(--muted);font-family:var(--f-mono)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="title-row"><span class="orb" aria-hidden="true"></span><h1>Pondering Orb</h1></div>
+      <div class="sub" id="today">Homelab command center</div>
+    </div>
+    <div class="summary" id="summary">
+      <span class="pill"><i></i>Loading…</span>
+    </div>
+  </header>
+
+  <div class="grid">
+    <div class="col">
+      <section class="panel" aria-labelledby="h-proj">
+        <div class="phead"><h2 id="h-proj">Working on</h2><span class="hint">Change status from each card</span></div>
+        <div class="projects" id="projects"><div class="empty">Projects you add appear here.</div></div>
+        <form class="row" id="f-proj">
+          <input type="text" id="np-name" placeholder="Project name" aria-label="Project name" required>
+          <input type="text" id="np-next" placeholder="Next step" aria-label="Next step">
+          <button class="btn primary" type="submit">Add project</button>
+        </form>
+      </section>
+
+      <section class="panel" aria-labelledby="h-log">
+        <div class="phead"><h2 id="h-log">Project log</h2><span class="hint">Newest first</span></div>
+        <form class="row" id="f-log">
+          <select id="nl-proj" aria-label="Project"></select>
+          <input type="text" id="nl-text" placeholder="What changed, what you learned" aria-label="Log entry" required>
+          <button class="btn primary" type="submit">Log it</button>
+        </form>
+        <ul class="log" id="log"><li class="empty">Log entries appear here.</li></ul>
+        <button class="btn more" id="log-more" hidden>Show older</button>
+      </section>
+
+      <section class="panel" aria-labelledby="h-plan">
+        <div class="phead"><h2 id="h-plan">Plans</h2><span class="hint">Tick when done</span></div>
+        <div class="horizons" id="plans"></div>
+        <form class="row" id="f-plan">
+          <input type="text" id="pl-text" placeholder="An idea or plan" aria-label="Plan" required>
+          <select id="pl-hz" aria-label="When">
+            <option value="next">Next</option><option value="later">Later</option><option value="someday">Someday</option>
+          </select>
+          <button class="btn primary" type="submit">Add plan</button>
+        </form>
+      </section>
+    </div>
+
+    <div class="col">
+      <section class="panel" aria-labelledby="h-up">
+        <div class="phead"><h2 id="h-up">Upkeep</h2><span class="hint">Most overdue first</span></div>
+        <ul class="upkeep" id="upkeep"><li class="empty">Recurring checks appear here.</li></ul>
+        <form class="row" id="f-up">
+          <input type="text" id="uk-name" placeholder="Check (e.g. test restore)" aria-label="Check name" required>
+          <select id="uk-every" aria-label="Every">
+            <option value="1">Daily</option><option value="7" selected>Weekly</option><option value="30">Monthly</option><option value="90">Quarterly</option>
+          </select>
+          <button class="btn primary" type="submit">Add</button>
+        </form>
+      </section>
+
+      <section class="panel" aria-labelledby="h-stats">
+        <div class="phead"><h2 id="h-stats">System</h2><span class="hint" id="stats-when"></span></div>
+        <div id="stats-banner" class="banner" hidden>Example numbers. Nothing on your network reports here yet.</div>
+        <div class="hosts" id="hosts"><div class="empty">Host stats appear here once a host reports.</div></div>
+      </section>
+
+      <section class="panel" aria-labelledby="h-cal">
+        <div class="phead"><h2 id="h-cal">Next 14 days</h2><span class="pill warn" id="cal-pill"><i></i>CalDAV not linked</span></div>
+        <ul class="cal" id="cal"></ul>
+        <p class="note">Showing upkeep due dates for now. Calendar events from Odysseus (CalDAV) can join this list once Odysseus is reachable as a connector.</p>
+      </section>
+
+      <section class="panel" aria-labelledby="h-agent">
+        <div class="phead"><h2 id="h-agent">Agents</h2></div>
+        <div class="links" id="agent-links"></div>
+        <label class="small muted" for="ask">Ask about the lab. Claude answers from this page's projects, log, plans and upkeep.</label>
+        <textarea id="ask" rows="2" placeholder="What should I work on this weekend?"></textarea>
+        <div class="row" style="display:flex;gap:8px;align-items:center">
+          <button class="btn primary" id="ask-go">Ask</button>
+          <span class="status-line" id="ask-status"></span>
+        </div>
+        <div class="agent-out" id="ask-out" hidden></div>
+      </section>
+    </div>
+  </div>
+
+  <section class="panel" aria-labelledby="h-stack">
+    <div class="phead"><h2 id="h-stack">Stack</h2><span class="hint">Links open on your network. Edit a link to match your host.</span></div>
+    <div class="stack" id="stack"><div class="empty">Services appear here.</div></div>
+  </section>
+
+  <div class="status-line" id="dbstatus">Connecting to storage…</div>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const DAY = 864e5;
+  const todayISO = () => new Date().toISOString().slice(0,10);
+  const fmtDate = iso => { const d = new Date(iso + (iso.length===10?"T12:00:00":"")); return isNaN(d) ? iso : d.toLocaleDateString(undefined,{month:"short",day:"numeric"}); };
+  const ago = iso => { const ms = Date.now() - new Date(iso).getTime(); if (isNaN(ms)) return ""; const m = Math.round(ms/6e4); if (m<60) return m+" min ago"; const h=Math.round(m/60); if (h<48) return h+" h ago"; return Math.round(h/24)+" days ago"; };
+
+  $("today").textContent = new Date().toLocaleDateString(undefined,{weekday:"long",year:"numeric",month:"long",day:"numeric"});
+
+  const S = { projects:[], logs:[], plans:[], upkeep:[], services:[], stats:null, loaded:false };
+  let db = null, logLimit = 12;
+
+  const STATUSES = ["active","blocked","paused","shipped","idea"];
+
+  function upkeepState(u){
+    const last = u.lastDone ? new Date(u.lastDone+"T12:00:00").getTime() : 0;
+    const due = last + (Number(u.everyDays)||7)*DAY;
+    const left = Math.floor((due - Date.now())/DAY);
+    return { due, left, cls: left < 0 ? "over" : left <= 1 ? "soon" : "ok" };
+  }
+
+  function renderSummary(){
+    const el = $("summary");
+    if (!S.loaded){ return; }
+    const st = S.upkeep.map(upkeepState);
+    const over = st.filter(s=>s.cls==="over").length, soon = st.filter(s=>s.cls==="soon").length;
+    const active = S.projects.filter(p=>p.status==="active").length;
+    const blocked = S.projects.filter(p=>p.status==="blocked").length;
+    const hosts = (S.stats && S.stats.hosts) || [];
+    const hot = hosts.filter(h => (h.disk||0)>=85 || (h.mem||0)>=90).length;
+    const pills = [];
+    pills.push(`<span class="pill info"><i></i>${active} active</span>`);
+    if (blocked) pills.push(`<span class="pill bad"><i></i>${blocked} blocked</span>`);
+    pills.push(over ? `<span class="pill bad"><i></i>${over} upkeep overdue</span>` : `<span class="pill ok"><i></i>Upkeep on track</span>`);
+    if (soon) pills.push(`<span class="pill warn"><i></i>${soon} due soon</span>`);
+    if (hosts.length) pills.push(hot ? `<span class="pill warn"><i></i>${hot} host${hot>1?"s":""} running hot</span>` : `<span class="pill ok"><i></i>${hosts.length} hosts normal</span>`);
+    el.innerHTML = pills.join("");
+  }
+
+  function renderProjects(){
+    const el = $("projects");
+    const order = s => STATUSES.indexOf(s);
+    const list = [...S.projects].sort((a,b)=> order(a.status)-order(b.status) || String(a.name).localeCompare(b.name));
+    el.innerHTML = list.length ? list.map(p => `
+      <article class="proj">
+        <div class="name">${esc(p.name)}</div>
+        ${p.repo?`<div class="repo">${esc(p.repo)}</div>`:""}
+        ${p.next?`<div class="next"><b>Next</b>${esc(p.next)}</div>`:""}
+        <div class="foot">
+          <select data-id="${esc(p._id)}" class="st-${esc(p.status)}" aria-label="Status of ${esc(p.name)}">
+            ${STATUSES.map(s=>`<option value="${s}" ${s===p.status?"selected":""}>${s}</option>`).join("")}
+          </select>
+          <span class="small muted mono">${p.updated?fmtDate(p.updated):""}</span>
+        </div>
+      </article>`).join("") : `<div class="empty">No projects yet. Add your first one below.</div>`;
+    const sel = $("nl-proj"), cur = sel.value;
+    sel.innerHTML = `<option value="General">General</option>` + list.map(p=>`<option>${esc(p.name)}</option>`).join("");
+    if (cur) sel.value = cur;
+  }
+
+  function renderLog(){
+    const list = [...S.logs].sort((a,b)=> String(b.date).localeCompare(String(a.date)) || (b.created||0)-(a.created||0));
+    $("log").innerHTML = list.length ? list.slice(0,logLimit).map(l=>`
+      <li><span class="d">${esc(l.date)}</span><span class="p">${esc(l.project)}</span><span class="t">${esc(l.text)}</span></li>`).join("")
+      : `<li class="empty">No log entries yet. Write what you changed today.</li>`;
+    $("log-more").hidden = list.length <= logLimit;
+  }
+
+  function renderPlans(){
+    const hz = {next:"Next", later:"Later", someday:"Someday"};
+    $("plans").innerHTML = Object.entries(hz).map(([k,label]) => {
+      const items = S.plans.filter(p=>(p.horizon||"later")===k).sort((a,b)=>(a.done?1:0)-(b.done?1:0));
+      return `<div class="hz"><h3>${label}</h3><ul>${items.length ? items.map(p=>`
+        <li class="${p.done?"done":""}"><input type="checkbox" data-id="${esc(p._id)}" ${p.done?"checked":""} aria-label="Done: ${esc(p.text)}"><span>${esc(p.text)}</span></li>`).join("")
+        : `<li class="empty">Nothing here.</li>`}</ul></div>`;
+    }).join("");
+  }
+
+  function renderUpkeep(){
+    const list = S.upkeep.map(u=>({u, s:upkeepState(u)})).sort((a,b)=>a.s.due-b.s.due);
+    $("upkeep").innerHTML = list.length ? list.map(({u,s}) => {
+      const msg = s.left < 0 ? `${-s.left} day${s.left===-1?"":"s"} overdue` : s.left===0 ? "due today" : `due in ${s.left} day${s.left===1?"":"s"}`;
+      return `<li class="uk ${s.cls}"><span class="stripe"></span>
+        <div><div class="n">${esc(u.name)}</div><div class="m">${msg} · every ${esc(u.everyDays)}d · last ${u.lastDone?esc(fmtDate(u.lastDone)):"never"}</div></div>
+        <button class="btn" data-done="${esc(u._id)}">Done</button></li>`;
+    }).join("") : `<li class="empty">No checks yet. Add backups, updates, disk scrubs.</li>`;
+
+    const horizon = Date.now() + 14*DAY;
+    const cal = list.filter(({s})=> s.due <= horizon).map(({u,s})=>({d: new Date(Math.max(s.due, Date.now())), t: u.name, over: s.left<0}));
+    $("cal").innerHTML = cal.length ? cal.map(c=>`<li><span class="d">${c.over?"overdue":c.d.toLocaleDateString(undefined,{weekday:"short",day:"numeric"})}</span><span>${esc(c.t)}</span></li>`).join("")
+      : `<li class="empty">Nothing due in the next two weeks.</li>`;
+  }
+
+  function spark(vals){
+    if (!Array.isArray(vals) || vals.length < 2) return "";
+    const w=200,h=36,p=3, max=100;
+    const pts = vals.map((v,i)=>[p+i*(w-2*p)/(vals.length-1), h-p-(Math.min(v,max)/max)*(h-2*p)]);
+    const line = pts.map(q=>q.map(n=>n.toFixed(1)).join(",")).join(" ");
+    const area = `${p},${h-p} ${line} ${w-p},${h-p}`;
+    const [ex,ey] = pts[pts.length-1];
+    return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="CPU over the last hours">
+      <line x1="${p}" x2="${w-p}" y1="${h/2}" y2="${h/2}" stroke="var(--line)" stroke-width="1" fill="none"/>
+      <polygon points="${area}" fill="var(--accent-soft)"/>
+      <polyline points="${line}" fill="none" stroke="var(--accent)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+      <circle cx="${ex}" cy="${ey}" r="2.5" fill="var(--accent)"/></svg>`;
+  }
+  const meter = (label, v, unit="%", warnAt=80, critAt=90) => {
+    const n = Number(v); if (isNaN(n)) return "";
+    const cls = n>=critAt?"crit":n>=warnAt?"hot":"";
+    return `<div class="meter"><div class="lab"><span>${label}</span><b>${n}${unit}</b></div><div class="bar"><span class="${cls}" style="width:${Math.min(n,100)}%"></span></div></div>`;
+  };
+  function renderStats(){
+    const st = S.stats;
+    $("stats-banner").hidden = !(st && st.example);
+    $("stats-when").textContent = st && st.reportedAt ? "Reported " + ago(st.reportedAt) : "";
+    const hosts = (st && st.hosts) || [];
+    $("hosts").innerHTML = hosts.length ? hosts.map(h=>`
+      <div class="host">
+        <div class="hn"><span>${esc(h.name)}</span><span class="small muted mono">${h.uptimeDays!=null?"up "+esc(h.uptimeDays)+"d":""}${h.tempC!=null?" · "+esc(h.tempC)+"°C":""}</span></div>
+        <div class="meters">${meter("CPU",h.cpu,"%",75,90)}${meter("Memory",h.mem)}${meter("Disk",h.disk,"%",80,90)}${h.gpu!=null?meter("GPU VRAM",h.gpu,"%",85,95):""}</div>
+        ${spark(h.cpuHistory)}
+      </div>`).join("") : `<div class="empty">No host has reported yet.</div>`;
+  }
+
+  function renderStack(){
+    const list = [...S.services].sort((a,b)=>(a.order||0)-(b.order||0));
+    $("stack").innerHTML = list.length ? list.map(s=>`
+      <div class="svc">
+        <div class="sn">${esc(s.name)}</div>
+        <div class="role">${esc(s.role)}</div>
+        <div class="url" data-url-for="${esc(s._id)}">${esc(s.url)}</div>
+        <div class="acts">
+          ${/^https?:\/\//.test(s.url||"")?`<a href="${esc(s.url)}" target="_blank" rel="noopener">Open</a>`:""}
+          ${(s.extra||[]).map(x=>/^https?:\/\//.test(x.url)?`<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.label)}</a>`:"").join("")}
+          <button class="btn" data-edit="${esc(s._id)}">Edit link</button>
+        </div>
+      </div>`).join("") : `<div class="empty">No services yet.</div>`;
+
+    const argos = list.find(s=>/argos/i.test(s.name));
+    const links = [];
+    if (argos && /^https?:\/\//.test(argos.url)){
+      links.push(`<a class="btn" href="${esc(argos.url)}" target="_blank" rel="noopener">Argos assistant</a>`);
+      links.push(`<a class="btn" href="${esc(argos.url.replace(/\/$/,""))}/v1/models" target="_blank" rel="noopener">Loaded models</a>`);
+    }
+    const ody = list.find(s=>/odysseus/i.test(s.name));
+    if (ody && /^https?:\/\//.test(ody.url)) links.push(`<a class="btn" href="${esc(ody.url)}" target="_blank" rel="noopener">Odysseus agents</a>`);
+    $("agent-links").innerHTML = links.join("") || `<span class="small muted">Add Argos to the stack to link its assistant here.</span>`;
+  }
+
+  function renderAll(){ renderSummary(); renderProjects(); renderLog(); renderPlans(); renderUpkeep(); renderStats(); renderStack(); }
+  renderAll();
+
+  const setStatus = t => { $("dbstatus").textContent = t; };
+  const fail = e => setStatus("Could not save: " + (e && (e.message||e.code) || "unknown error"));
+
+  // ---- storage ----
+  (async () => {
+    const timer = setTimeout(()=> setStatus("Storage is slow to answer. Changes may not save yet."), 10000);
+    try { db = await window.claude?.use?.("db"); } catch { db = null; }
+    if (!db){ clearTimeout(timer); setStatus("Storage is not available in this view. Open the page signed in on claude.ai to save changes."); S.loaded = true; renderAll(); return; }
+    const coll = (name, key) => db.collection(name).onSnapshot(snap => {
+      clearTimeout(timer);
+      S[key] = snap.docs.map(d => ({...d.data(), _id:d.id}));
+      S.loaded = true; setStatus("Saved changes sync to everyone who opens this page.");
+      renderAll();
+    }, e => setStatus("Lost connection to storage: " + (e.message||e.code)));
+    coll("projects","projects"); coll("logs","logs"); coll("plans","plans"); coll("upkeep","upkeep"); coll("services","services");
+    db.doc("stats/current").onSnapshot(snap => { S.stats = snap.exists ? snap.data() : null; renderStats(); renderSummary(); }, ()=>{});
+  })();
+
+  const need = () => { if (!db){ setStatus("Storage is not available, so this change was not saved."); return false; } return true; };
+
+  $("f-proj").addEventListener("submit", e => { e.preventDefault(); if(!need())return;
+    const name = $("np-name").value.trim(); if(!name) return;
+    db.collection("projects").add({name, next:$("np-next").value.trim(), status:"active", repo:"", updated:todayISO()}).then(()=>{ $("np-name").value=""; $("np-next").value=""; }).catch(fail);
+  });
+  $("projects").addEventListener("change", e => { const id = e.target.dataset.id; if(!id||!need()) return;
+    db.doc("projects/"+id).update({status:e.target.value, updated:todayISO()}).catch(fail);
+  });
+  $("f-log").addEventListener("submit", e => { e.preventDefault(); if(!need())return;
+    const text = $("nl-text").value.trim(); if(!text) return;
+    db.collection("logs").add({date:todayISO(), project:$("nl-proj").value||"General", text, created:Date.now()}).then(()=>{ $("nl-text").value=""; }).catch(fail);
+  });
+  $("log-more").addEventListener("click", ()=>{ logLimit += 20; renderLog(); });
+  $("f-plan").addEventListener("submit", e => { e.preventDefault(); if(!need())return;
+    const text = $("pl-text").value.trim(); if(!text) return;
+    db.collection("plans").add({text, horizon:$("pl-hz").value, done:false}).then(()=>{ $("pl-text").value=""; }).catch(fail);
+  });
+  $("plans").addEventListener("change", e => { const id = e.target.dataset.id; if(!id||!need()) return;
+    db.doc("plans/"+id).update({done:e.target.checked}).catch(fail);
+  });
+  $("f-up").addEventListener("submit", e => { e.preventDefault(); if(!need())return;
+    const name = $("uk-name").value.trim(); if(!name) return;
+    db.collection("upkeep").add({name, everyDays:Number($("uk-every").value), lastDone:""}).then(()=>{ $("uk-name").value=""; }).catch(fail);
+  });
+  $("upkeep").addEventListener("click", e => { const id = e.target.dataset.done; if(!id||!need()) return;
+    e.target.disabled = true;
+    db.doc("upkeep/"+id).update({lastDone:todayISO()}).catch(fail);
+  });
+  $("stack").addEventListener("click", e => {
+    const id = e.target.dataset.edit; if(!id) return;
+    const holder = document.querySelector(`[data-url-for="${CSS.escape(id)}"]`);
+    if (holder.querySelector("input")) return;
+    const svc = S.services.find(s=>s._id===id);
+    holder.innerHTML = `<form class="row"><input type="url" id="url-${esc(id)}" value="${esc(svc.url)}" aria-label="Link for ${esc(svc.name)}" style="flex:1 1 140px"><button class="btn primary" type="submit">Save</button></form>`;
+    const input = holder.querySelector("input"); input.focus();
+    holder.querySelector("form").addEventListener("submit", ev => { ev.preventDefault(); if(!need())return;
+      db.doc("services/"+id).update({url: input.value.trim()}).catch(fail);
+    });
+  });
+
+  // ---- ask ----
+  let busy = false;
+  $("ask-go").addEventListener("click", async () => {
+    const q = $("ask").value.trim(); if (!q || busy) return;
+    const out = $("ask-out"); busy = true; $("ask-go").disabled = true; $("ask-status").textContent = "Thinking…";
+    try {
+      const sample = await window.claude?.use?.("sample");
+      if (!sample){ $("ask-status").textContent = "Asking is not available in this view."; return; }
+      const ctx = {
+        today: todayISO(),
+        projects: S.projects.map(({_id,...p})=>p),
+        recentLog: [...S.logs].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,40).map(({_id,created,...l})=>l),
+        plans: S.plans.map(({_id,...p})=>p),
+        upkeep: S.upkeep.map(u=>{const s=upkeepState(u); return {name:u.name, everyDays:u.everyDays, lastDone:u.lastDone, daysLeft:s.left};}),
+        stats: S.stats
+      };
+      out.hidden = false; out.textContent = "";
+      await sample(`You help someone run their homelab. Answer their question using only the dashboard data below. Be brief and concrete; plain text, short lists are fine. If the data does not cover it, say so.\n\nDashboard data (JSON):\n${JSON.stringify(ctx)}\n\nQuestion: ${q}`,
+        { modelTier:"default", onText: ({text}) => { out.textContent = text; } });
+      $("ask-status").textContent = "";
+    } catch (e) {
+      $("ask-status").textContent = e && e.code === "rate_limited" ? "Too many questions. Wait a minute and try again." : e && e.code === "not_granted" ? "Asking was not allowed for this page." : "Could not get an answer: " + (e && (e.message||e.code) || "unknown error");
+    } finally { busy = false; $("ask-go").disabled = false; }
+  });
+})();
+</script>
