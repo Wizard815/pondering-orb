@@ -1,480 +1,701 @@
 <title>Pondering Orb</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
 <style>
-/* Layout: a work bench. Summary strip, then a wide "work" column (projects, log, plans) beside a narrow "machine" column (upkeep, stats, calendar, agents). Stack of services at the foot. */
+/* Layout: a wizard's tower. The orb and the floor plaques (tabs) sit on a sticky header; each tab is one room, laid out as a grid of stone panels. Dark-first night tower, parchment by day. */
 :root{
-  --bg:#eef0ec; --panel:#f8f9f6; --ink:#1c2326; --muted:#5d686b; --line:#d5d9d2;
-  --accent:#2c5d86; --accent-soft:#dbe6ef; --orb-hi:#ffffff; --orb-mid:#6f9fc8; --orb-deep:#1f3d5c; --bronze:#9a6a2f;
-  --ok:#2f7a4d; --warn:#b07a12; --bad:#b33a2e; --ok-bg:#e1efe5; --warn-bg:#f5ebd3; --bad-bg:#f6dfdb;
-  --f-display:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
-  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
-  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --bg:#0f1119; --panel:#161a28; --inset:#1d2133; --line:#2d3352; --line-hi:#4a4568;
+  --ink:#ebe3cf; --muted:#9d99ad; --gold:#d9a94f; --gold-soft:#3a2f1b;
+  --arcane:#7ccac2; --arcane-soft:#183236; --star:rgba(235,227,207,.55);
+  --ok:#7cc48f; --warn:#e2b553; --bad:#e8796c; --ok-bg:#1a3123; --warn-bg:#3a301b; --bad-bg:#3e2121;
+  --orb-hi:#e8fffb; --orb-mid:#5fb6ad; --orb-deep:#141c3a;
+  --f-display:"Cinzel","Trajan Pro",Georgia,serif;
+  --f-body:"Alegreya Sans","Gill Sans",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  color-scheme:dark;
 }
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --bg:#141a1d; --panel:#1b2327; --ink:#e3e8e6; --muted:#97a3a4; --line:#2c373b;
-  --accent:#7fb0d9; --accent-soft:#223543; --orb-hi:#eaf4ff; --orb-mid:#5d93c4; --orb-deep:#152a3d; --bronze:#d3a464;
-  --ok:#6cc08c; --warn:#e2b450; --bad:#ec7d70; --ok-bg:#1d3326; --warn-bg:#3a3020; --bad-bg:#3d2422; color-scheme:dark}}
-:root[data-theme="dark"]{
-  --bg:#141a1d; --panel:#1b2327; --ink:#e3e8e6; --muted:#97a3a4; --line:#2c373b;
-  --accent:#7fb0d9; --accent-soft:#223543; --orb-hi:#eaf4ff; --orb-mid:#5d93c4; --orb-deep:#152a3d; --bronze:#d3a464;
-  --ok:#6cc08c; --warn:#e2b450; --bad:#ec7d70; --ok-bg:#1d3326; --warn-bg:#3a3020; --bad-bg:#3d2422; color-scheme:dark}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){
+  --bg:#ebe2cd; --panel:#f6efdf; --inset:#ede3cc; --line:#cfbf9c; --line-hi:#b39c6e;
+  --ink:#2a2217; --muted:#6d604b; --gold:#8b5b12; --gold-soft:#efdbb1;
+  --arcane:#1f6d67; --arcane-soft:#d3e7e1; --star:rgba(0,0,0,0);
+  --ok:#2e7a4c; --warn:#9a6a0c; --bad:#b03a2d; --ok-bg:#dcecdf; --warn-bg:#f3e4c3; --bad-bg:#f4dbd5;
+  --orb-hi:#ffffff; --orb-mid:#4aa39a; --orb-deep:#1d3159; color-scheme:light}}
+:root[data-theme="light"]{
+  --bg:#ebe2cd; --panel:#f6efdf; --inset:#ede3cc; --line:#cfbf9c; --line-hi:#b39c6e;
+  --ink:#2a2217; --muted:#6d604b; --gold:#8b5b12; --gold-soft:#efdbb1;
+  --arcane:#1f6d67; --arcane-soft:#d3e7e1; --star:rgba(0,0,0,0);
+  --ok:#2e7a4c; --warn:#9a6a0c; --bad:#b03a2d; --ok-bg:#dcecdf; --warn-bg:#f3e4c3; --bad-bg:#f4dbd5;
+  --orb-hi:#ffffff; --orb-mid:#4aa39a; --orb-deep:#1d3159; color-scheme:light}
 
 *{box-sizing:border-box}
-body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--f-body)}
-.wrap{max-width:1240px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:20px}
-h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance;letter-spacing:.01em}
-h1{font-size:2.1rem;font-weight:700;line-height:1}
-h2{font-size:1.15rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 var(--f-body);min-height:100%;
+  background-image:radial-gradient(1px 1px at 12% 18%,var(--star),transparent),radial-gradient(1px 1px at 78% 9%,var(--star),transparent),radial-gradient(1.5px 1.5px at 46% 31%,var(--star),transparent),radial-gradient(1px 1px at 88% 52%,var(--star),transparent),radial-gradient(1px 1px at 23% 71%,var(--star),transparent),radial-gradient(1px 1px at 63% 84%,var(--star),transparent);
+  background-attachment:fixed}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance;font-weight:600}
 .mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
-.muted{color:var(--muted)}
-.small{font-size:.82rem}
+.muted{color:var(--muted)} .small{font-size:.85rem}
 button,select,input,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+a{color:var(--arcane)}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 
-header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;border-bottom:2px solid var(--ink);padding-bottom:14px}
-.brand{display:flex;flex-direction:column;gap:4px}
-.title-row{display:flex;align-items:center;gap:12px}
-.orb{width:38px;height:38px;border-radius:50%;flex:none;background:radial-gradient(circle at 34% 30%,var(--orb-hi) 0 8%,var(--orb-mid) 30%,var(--orb-deep) 72%);box-shadow:0 0 0 1px var(--line),0 4px 14px -4px var(--orb-mid);animation:glow 6s ease-in-out infinite}
-@keyframes glow{50%{box-shadow:0 0 0 1px var(--line),0 4px 22px -2px var(--orb-mid)}}
-@media (prefers-reduced-motion:reduce){.orb{animation:none}}
-.brand .sub{font-family:var(--f-mono);font-size:.78rem;color:var(--muted);letter-spacing:.04em}
-.summary{display:flex;flex-wrap:wrap;gap:8px}
-.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px;font-size:.8rem;font-weight:500;background:var(--panel);border:1px solid var(--line);white-space:nowrap}
-.pill i{width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block}
+/* header */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+.top-in{max-width:1240px;margin:0 auto;padding-block:12px 0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:10px}
+.brand-row{display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:14px}
+.orb-wrap{width:54px;height:54px;flex:none;position:relative}
+.orb-wrap canvas{width:54px;height:54px;border-radius:50%;display:block;box-shadow:0 0 0 1px var(--line-hi),0 0 24px -4px var(--orb-mid)}
+.orb-wrap::after{content:"";position:absolute;left:8px;right:8px;bottom:-6px;height:7px;border-radius:0 0 8px 8px;background:var(--gold);opacity:.75}
+h1{font-size:1.75rem;letter-spacing:.06em;line-height:1}
+.brand .sub{font-size:.85rem;color:var(--muted);font-style:italic}
+.summary{display:flex;flex-wrap:wrap;gap:6px}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:2px 10px;font-size:.82rem;font-weight:500;background:var(--inset);border:1px solid var(--line);white-space:nowrap}
+.pill i{width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block}
 .pill.ok{color:var(--ok);background:var(--ok-bg);border-color:transparent}
 .pill.warn{color:var(--warn);background:var(--warn-bg);border-color:transparent}
 .pill.bad{color:var(--bad);background:var(--bad-bg);border-color:transparent}
-.pill.info{color:var(--accent);background:var(--accent-soft);border-color:transparent}
+.pill.info{color:var(--arcane);background:var(--arcane-soft);border-color:transparent}
 
-.grid{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:20px;align-items:start}
-.col{display:flex;flex-direction:column;gap:20px;min-width:0}
-@media (max-width:880px){.grid{grid-template-columns:minmax(0,1fr)}}
+nav.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:thin;margin-bottom:-1px}
+nav.tabs a{flex:none;text-decoration:none;color:var(--muted);font-family:var(--f-display);font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;padding:8px 12px;border:1px solid transparent;border-bottom:0;border-radius:6px 6px 0 0}
+nav.tabs a:hover{color:var(--ink)}
+nav.tabs a[aria-current="page"]{color:var(--gold);background:var(--panel);border-color:var(--line)}
 
-section.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
-.phead{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
-.phead .hint{font-size:.78rem;color:var(--muted)}
+main{max-width:1240px;margin:0 auto;padding-block:20px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.room{display:flex;flex-direction:column;gap:16px}
+.room-head{display:flex;align-items:flex-end;justify-content:space-between;gap:10px 16px;flex-wrap:wrap}
+.room-head h2{font-size:1.4rem;letter-spacing:.05em}
+.room-head .flavor{font-style:italic;color:var(--muted);font-size:.92rem}
+.room-head .titles{display:flex;flex-direction:column;gap:2px}
 
-.btn{border:1px solid var(--line);background:transparent;border-radius:4px;padding:4px 10px;font-size:.82rem}
-.btn:hover{border-color:var(--accent);color:var(--accent)}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--panel)}
-.btn.primary:hover{opacity:.9;color:var(--panel)}
+.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));align-items:start}
+.two{display:grid;gap:16px;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);align-items:start}
+@media (max-width:880px){.two{grid-template-columns:minmax(0,1fr)}}
+
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.panel > h3{font-size:.95rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);display:flex;align-items:center;gap:10px}
+.panel > h3::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--line-hi),transparent)}
+.panel > h3 .act{margin-left:auto;order:2}
+.hint{font-size:.82rem;color:var(--muted)}
+
+.btn{border:1px solid var(--line-hi);background:transparent;border-radius:5px;padding:4px 11px;font-size:.88rem}
+.btn:hover{border-color:var(--gold);color:var(--gold)}
+.btn.primary{background:var(--gold);border-color:var(--gold);color:var(--bg);font-weight:500}
+.btn.primary:hover{color:var(--bg);filter:brightness(1.08)}
+.btn.link{border:0;padding:0;color:var(--arcane);text-decoration:underline;background:none}
 .btn:disabled{opacity:.5;cursor:default}
-input[type=text],input[type=url],select,textarea{background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:5px 8px;min-width:0}
+.star{border:0;background:none;padding:0 2px;font-size:1.05rem;line-height:1;color:var(--line-hi)}
+.star[aria-pressed="true"]{color:var(--gold)}
+.star:hover{color:var(--gold)}
+input[type=text],input[type=url],input[type=date],input[type=time],select,textarea{background:var(--inset);border:1px solid var(--line);border-radius:5px;padding:5px 9px;min-width:0}
 textarea{resize:vertical;width:100%}
-form.row{display:flex;flex-wrap:wrap;gap:8px}
+form.row,.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 form.row input[type=text]{flex:1 1 180px}
+.empty{font-size:.9rem;color:var(--muted);font-style:italic}
+
+/* lists */
+.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.list > li{padding:8px 0;border-top:1px solid var(--line);display:flex;gap:10px;align-items:flex-start;min-width:0}
+.list > li:first-child{border-top:0}
+.grow{flex:1;min-width:0;overflow-wrap:anywhere}
+.date{font-family:var(--f-mono);font-size:.78rem;color:var(--muted);white-space:nowrap;padding-top:2px;min-width:5.5em}
+.tag{font-size:.78rem;font-weight:700;color:var(--arcane)}
 
 /* projects */
-.projects{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
-.proj{border:1px solid var(--line);border-radius:5px;padding:12px;display:flex;flex-direction:column;gap:6px;background:var(--bg);min-width:0}
-.proj .name{font-family:var(--f-display);font-weight:600;font-size:1.15rem;line-height:1.1}
-.proj .repo{font-family:var(--f-mono);font-size:.75rem;color:var(--muted);overflow-wrap:anywhere}
-.proj .next{font-size:.87rem}
-.proj .next b{font-weight:600;color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;display:block}
+.projects{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr));gap:10px}
+.proj{border:1px solid var(--line);border-radius:6px;padding:12px;display:flex;flex-direction:column;gap:6px;background:var(--inset);min-width:0}
+.proj .name{font-family:var(--f-display);font-weight:600;font-size:1.05rem;display:flex;justify-content:space-between;gap:8px}
+.proj .repo{font-family:var(--f-mono);font-size:.74rem;color:var(--muted);overflow-wrap:anywhere}
+.proj .next{font-size:.92rem}
+.proj .next b{font-weight:700;color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;display:block}
 .proj .foot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:auto}
-.proj select{font-size:.78rem;padding:2px 4px}
-.st-active{color:var(--ok)} .st-blocked{color:var(--bad)} .st-paused{color:var(--warn)} .st-shipped{color:var(--accent)} .st-idea{color:var(--bronze)}
-
-/* log */
-.log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
-.log li{display:grid;grid-template-columns:86px 120px minmax(0,1fr);gap:10px;padding:7px 0;border-top:1px solid var(--line);font-size:.88rem}
-.log li:first-child{border-top:0}
-.log .d{font-family:var(--f-mono);font-size:.78rem;color:var(--muted)}
-.log .p{font-weight:600;font-size:.8rem;color:var(--accent);overflow-wrap:anywhere}
-.log .t{overflow-wrap:anywhere}
-@media (max-width:520px){.log li{grid-template-columns:1fr;gap:0}}
-.more{align-self:flex-start}
-
-/* plans */
-.horizons{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
-@media (max-width:640px){.horizons{grid-template-columns:minmax(0,1fr)}}
-.hz h3{font-size:.85rem;text-transform:uppercase;letter-spacing:.08em;color:var(--bronze);margin-bottom:6px}
-.hz ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
-.hz li{display:flex;gap:8px;align-items:flex-start;font-size:.88rem}
-.hz li.done span{text-decoration:line-through;color:var(--muted)}
-.hz input[type=checkbox]{margin-top:4px;accent-color:var(--accent)}
+.proj select{font-size:.8rem;padding:2px 4px}
+.st-active{color:var(--ok)} .st-blocked{color:var(--bad)} .st-paused{color:var(--warn)} .st-shipped{color:var(--arcane)} .st-idea{color:var(--gold)}
 
 /* upkeep */
-.upkeep{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
-.uk{display:grid;grid-template-columns:4px minmax(0,1fr) auto;gap:10px;align-items:center;background:var(--bg);border-radius:4px;padding:8px 10px 8px 0}
-.uk .stripe{align-self:stretch;border-radius:4px 0 0 4px}
+.uk{display:grid;grid-template-columns:4px minmax(0,1fr) auto;gap:10px;align-items:center;background:var(--inset);border-radius:5px;padding:8px 10px 8px 0;margin-bottom:6px}
+.uk .stripe{align-self:stretch;border-radius:5px 0 0 5px}
 .uk.ok .stripe{background:var(--ok)} .uk.soon .stripe{background:var(--warn)} .uk.over .stripe{background:var(--bad)}
-.uk .n{font-weight:500;font-size:.9rem}
+.uk .n{font-weight:500}
 .uk .m{font-size:.76rem;color:var(--muted);font-family:var(--f-mono)}
 .uk.over .m{color:var(--bad)} .uk.soon .m{color:var(--warn)}
 
 /* stats */
-.hosts{display:flex;flex-direction:column;gap:12px}
-.host{border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:8px}
-.host:first-child{border-top:0;padding-top:0}
-.host .hn{display:flex;justify-content:space-between;gap:8px;font-weight:600}
+.host{display:flex;flex-direction:column;gap:8px}
+.host + .host{border-top:1px solid var(--line);padding-top:12px}
+.host .hn{display:flex;justify-content:space-between;gap:8px;font-weight:700}
 .meters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px}
-.meter .lab{display:flex;justify-content:space-between;font-size:.76rem;color:var(--muted)}
+.meter .lab{display:flex;justify-content:space-between;font-size:.8rem;color:var(--muted)}
 .meter .lab b{color:var(--ink);font-family:var(--f-mono);font-weight:500}
-.bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden}
-.bar span{display:block;height:100%;background:var(--accent);border-radius:3px}
+.bar{height:6px;background:var(--inset);border:1px solid var(--line);border-radius:3px;overflow:hidden}
+.bar span{display:block;height:100%;background:var(--arcane)}
 .bar span.hot{background:var(--warn)} .bar span.crit{background:var(--bad)}
-svg.spark{width:100%;height:36px;display:block}
-.banner{font-size:.78rem;background:var(--warn-bg);color:var(--warn);border-radius:4px;padding:6px 10px}
+svg.spark{width:100%;height:38px;display:block}
+.banner{font-size:.84rem;background:var(--warn-bg);color:var(--warn);border-radius:5px;padding:6px 10px}
+
+/* plans */
+.horizons{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:640px){.horizons{grid-template-columns:minmax(0,1fr)}}
+.hz h4{margin:0 0 6px;font-family:var(--f-display);font-size:.8rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.hz ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.hz li{display:flex;gap:8px;align-items:flex-start}
+.hz li.done span.t{text-decoration:line-through;color:var(--muted)}
+input[type=checkbox]{accent-color:var(--gold);margin-top:5px}
+
+/* notes */
+.notes{display:grid;grid-template-columns:minmax(0,220px) minmax(0,1fr);gap:14px}
+@media (max-width:640px){.notes{grid-template-columns:minmax(0,1fr)}}
+.note-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.note-list button{width:100%;text-align:left;border:0;background:none;padding:6px 8px;border-radius:5px;display:flex;justify-content:space-between;gap:6px}
+.note-list button[aria-current="true"]{background:var(--inset);color:var(--gold)}
+.note-list button:hover{background:var(--inset)}
+.editor{display:flex;flex-direction:column;gap:8px}
+.editor input[type=text]{font-family:var(--f-display);font-size:1.05rem}
+.editor textarea{min-height:240px;font-family:var(--f-body);line-height:1.55}
 
 /* calendar */
-.cal{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
-.cal li{display:grid;grid-template-columns:74px minmax(0,1fr);gap:8px;font-size:.86rem}
-.cal .d{font-family:var(--f-mono);font-size:.78rem;color:var(--muted)}
-.note{font-size:.8rem;color:var(--muted);border-left:3px solid var(--line);padding-left:10px}
+.month{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.month .dow{font-family:var(--f-display);font-size:.72rem;letter-spacing:.08em;color:var(--muted);text-align:center;padding:2px 0}
+.cell{min-height:78px;background:var(--inset);border:1px solid transparent;border-radius:5px;padding:4px 5px;display:flex;flex-direction:column;gap:2px;min-width:0;overflow:hidden}
+.cell.out{opacity:.4}
+.cell.today{border-color:var(--gold)}
+.cell .dn{font-family:var(--f-mono);font-size:.74rem;color:var(--muted)}
+.cell .ev{font-size:.74rem;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:3px;padding:1px 4px;background:var(--arcane-soft);color:var(--arcane)}
+.cell .ev.uk{background:var(--warn-bg);color:var(--warn)}
+@media (max-width:560px){.cell{min-height:52px}.cell .ev{font-size:0;height:5px;padding:0}}
+.cal-nav{display:flex;align-items:center;gap:8px}
+.cal-nav b{font-family:var(--f-display);min-width:9em;text-align:center}
 
-/* agents */
-.agent-out{white-space:pre-wrap;font-size:.88rem;background:var(--bg);border-radius:4px;padding:10px;min-height:2.5em;overflow-wrap:anywhere}
-.links{display:flex;flex-wrap:wrap;gap:6px}
-a{color:var(--accent)}
+/* connect states */
+.sealed{border:1px dashed var(--line-hi);border-radius:8px;padding:18px;display:flex;flex-direction:column;gap:8px;background:var(--inset)}
+.sealed h4{margin:0;font-family:var(--f-display);color:var(--gold);letter-spacing:.06em}
+.sealed ol{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:4px}
 
-/* stack */
-.stack{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
-.svc{display:flex;flex-direction:column;gap:4px;border:1px solid var(--line);border-radius:5px;padding:12px;background:var(--bg);min-width:0}
-.svc .sn{font-family:var(--f-display);font-weight:600;font-size:1.1rem}
-.svc .role{font-size:.8rem;color:var(--muted)}
-.svc .url{font-family:var(--f-mono);font-size:.76rem;overflow-wrap:anywhere}
-.svc .acts{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
-.svc .acts a{font-size:.82rem}
+/* apps */
+.apps{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,220px),1fr));gap:10px}
+.app{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:6px;padding:12px;background:var(--inset);min-width:0;text-decoration:none;color:inherit}
+a.app:hover{border-color:var(--gold)}
+.app .rune{width:34px;height:34px;flex:none;border-radius:50%;display:grid;place-items:center;font-family:var(--f-display);font-weight:700;color:var(--gold);border:1px solid var(--line-hi);background:var(--panel)}
+.app .an{font-family:var(--f-display);font-weight:600}
+.app .ad{font-size:.85rem;color:var(--muted)}
+.app .au{font-family:var(--f-mono);font-size:.72rem;color:var(--muted);overflow-wrap:anywhere}
+.app .live{font-size:.74rem;margin-top:4px}
+.group-name{font-family:var(--f-display);font-size:.85rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:4px 0 0}
+.yaml{font-family:var(--f-mono);font-size:.84rem;min-height:340px;line-height:1.5;tab-size:2;white-space:pre}
+.err{color:var(--bad);font-size:.86rem;font-family:var(--f-mono);white-space:pre-wrap}
+.okmsg{color:var(--ok);font-size:.86rem}
 
-.empty{font-size:.86rem;color:var(--muted);padding:6px 0}
-.status-line{font-size:.78rem;color:var(--muted);font-family:var(--f-mono)}
-@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+/* configure main */
+.cfg{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.cfg li{display:flex;align-items:center;gap:8px;background:var(--inset);border-radius:5px;padding:5px 8px}
+.cfg li label{flex:1;display:flex;gap:8px;align-items:center}
+.cfg input[type=checkbox]{margin-top:0}
+
+.agent-out{white-space:pre-wrap;background:var(--inset);border-radius:5px;padding:10px;overflow-wrap:anywhere}
+.status-line{font-size:.8rem;color:var(--muted);font-family:var(--f-mono);margin-top:24px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 
-<div class="wrap">
-  <header class="top">
-    <div class="brand">
-      <div class="title-row"><span class="orb" aria-hidden="true"></span><h1>Pondering Orb</h1></div>
-      <div class="sub" id="today">Homelab command center</div>
-    </div>
-    <div class="summary" id="summary">
-      <span class="pill"><i></i>Loading…</span>
-    </div>
-  </header>
-
-  <div class="grid">
-    <div class="col">
-      <section class="panel" aria-labelledby="h-proj">
-        <div class="phead"><h2 id="h-proj">Working on</h2><span class="hint">Change status from each card</span></div>
-        <div class="projects" id="projects"><div class="empty">Projects you add appear here.</div></div>
-        <form class="row" id="f-proj">
-          <input type="text" id="np-name" placeholder="Project name" aria-label="Project name" required>
-          <input type="text" id="np-next" placeholder="Next step" aria-label="Next step">
-          <button class="btn primary" type="submit">Add project</button>
-        </form>
-      </section>
-
-      <section class="panel" aria-labelledby="h-log">
-        <div class="phead"><h2 id="h-log">Project log</h2><span class="hint">Newest first</span></div>
-        <form class="row" id="f-log">
-          <select id="nl-proj" aria-label="Project"></select>
-          <input type="text" id="nl-text" placeholder="What changed, what you learned" aria-label="Log entry" required>
-          <button class="btn primary" type="submit">Log it</button>
-        </form>
-        <ul class="log" id="log"><li class="empty">Log entries appear here.</li></ul>
-        <button class="btn more" id="log-more" hidden>Show older</button>
-      </section>
-
-      <section class="panel" aria-labelledby="h-plan">
-        <div class="phead"><h2 id="h-plan">Plans</h2><span class="hint">Tick when done</span></div>
-        <div class="horizons" id="plans"></div>
-        <form class="row" id="f-plan">
-          <input type="text" id="pl-text" placeholder="An idea or plan" aria-label="Plan" required>
-          <select id="pl-hz" aria-label="When">
-            <option value="next">Next</option><option value="later">Later</option><option value="someday">Someday</option>
-          </select>
-          <button class="btn primary" type="submit">Add plan</button>
-        </form>
-      </section>
-    </div>
-
-    <div class="col">
-      <section class="panel" aria-labelledby="h-up">
-        <div class="phead"><h2 id="h-up">Upkeep</h2><span class="hint">Most overdue first</span></div>
-        <ul class="upkeep" id="upkeep"><li class="empty">Recurring checks appear here.</li></ul>
-        <form class="row" id="f-up">
-          <input type="text" id="uk-name" placeholder="Check (e.g. test restore)" aria-label="Check name" required>
-          <select id="uk-every" aria-label="Every">
-            <option value="1">Daily</option><option value="7" selected>Weekly</option><option value="30">Monthly</option><option value="90">Quarterly</option>
-          </select>
-          <button class="btn primary" type="submit">Add</button>
-        </form>
-      </section>
-
-      <section class="panel" aria-labelledby="h-stats">
-        <div class="phead"><h2 id="h-stats">System</h2><span class="hint" id="stats-when"></span></div>
-        <div id="stats-banner" class="banner" hidden>Example numbers. Nothing on your network reports here yet.</div>
-        <div class="hosts" id="hosts"><div class="empty">Host stats appear here once a host reports.</div></div>
-      </section>
-
-      <section class="panel" aria-labelledby="h-cal">
-        <div class="phead"><h2 id="h-cal">Next 14 days</h2><span class="pill warn" id="cal-pill"><i></i>CalDAV not linked</span></div>
-        <ul class="cal" id="cal"></ul>
-        <p class="note">Showing upkeep due dates for now. Calendar events from Odysseus (CalDAV) can join this list once Odysseus is reachable as a connector.</p>
-      </section>
-
-      <section class="panel" aria-labelledby="h-agent">
-        <div class="phead"><h2 id="h-agent">Agents</h2></div>
-        <div class="links" id="agent-links"></div>
-        <label class="small muted" for="ask">Ask about the lab. Claude answers from this page's projects, log, plans and upkeep.</label>
-        <textarea id="ask" rows="2" placeholder="What should I work on this weekend?"></textarea>
-        <div class="row" style="display:flex;gap:8px;align-items:center">
-          <button class="btn primary" id="ask-go">Ask</button>
-          <span class="status-line" id="ask-status"></span>
+<header class="top">
+  <div class="top-in">
+    <div class="brand-row">
+      <div class="brand">
+        <div class="orb-wrap" aria-hidden="true"><canvas id="orb" width="108" height="108"></canvas></div>
+        <div>
+          <h1>Pondering Orb</h1>
+          <div class="sub" id="today">The homelab, seen from the top of the tower</div>
         </div>
-        <div class="agent-out" id="ask-out" hidden></div>
-      </section>
+      </div>
+      <div class="summary" id="summary"><span class="pill"><i></i>Gazing…</span></div>
     </div>
+    <nav class="tabs" id="tabs" aria-label="Rooms"></nav>
   </div>
+</header>
 
-  <section class="panel" aria-labelledby="h-stack">
-    <div class="phead"><h2 id="h-stack">Stack</h2><span class="hint">Links open on your network. Edit a link to match your host.</span></div>
-    <div class="stack" id="stack"><div class="empty">Services appear here.</div></div>
-  </section>
-
-  <div class="status-line" id="dbstatus">Connecting to storage…</div>
-</div>
+<main id="main"></main>
+<div class="status-line" id="dbstatus" style="max-width:1240px;margin:0 auto 24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))">Connecting to storage…</div>
 
 <script>
 (() => {
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const DAY = 864e5;
-  const todayISO = () => new Date().toISOString().slice(0,10);
-  const fmtDate = iso => { const d = new Date(iso + (iso.length===10?"T12:00:00":"")); return isNaN(d) ? iso : d.toLocaleDateString(undefined,{month:"short",day:"numeric"}); };
-  const ago = iso => { const ms = Date.now() - new Date(iso).getTime(); if (isNaN(ms)) return ""; const m = Math.round(ms/6e4); if (m<60) return m+" min ago"; const h=Math.round(m/60); if (h<48) return h+" h ago"; return Math.round(h/24)+" days ago"; };
+  const todayISO = () => { const d=new Date(); return new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10); };
+  const isoOf = d => new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+  const fmtDate = iso => { const d = new Date(String(iso).length===10 ? iso+"T12:00:00" : iso); return isNaN(d) ? String(iso||"") : d.toLocaleDateString(undefined,{month:"short",day:"numeric"}); };
+  const ago = iso => { const ms = Date.now()-new Date(iso).getTime(); if (isNaN(ms)) return ""; const m=Math.round(ms/6e4); if(m<60) return m+" min ago"; const h=Math.round(m/60); if(h<48) return h+" h ago"; return Math.round(h/24)+" days ago"; };
+  const isUrl = u => /^https?:\/\//.test(u||"");
 
-  $("today").textContent = new Date().toLocaleDateString(undefined,{weekday:"long",year:"numeric",month:"long",day:"numeric"});
+  $("today").textContent = new Date().toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric",year:"numeric"});
 
-  const S = { projects:[], logs:[], plans:[], upkeep:[], services:[], stats:null, loaded:false };
-  let db = null, logLimit = 12;
+  // ---------- state ----------
+  const S = { projects:[], logs:[], plans:[], upkeep:[], notes:[], events:[], stats:null, yaml:null, layout:null, loaded:false };
+  let db = null;
+  const UI = { tab:"main", noteId:null, noteDraft:null, calMonth:new Date(new Date().getFullYear(), new Date().getMonth(), 1), logLimit:15, configuring:false, yamlDraft:null, yamlMsg:"", ask:{busy:false,text:"",status:""}, confirmDel:null };
+
+  const TABS = [
+    {id:"main", label:"Main", title:"Scrying Table", flavor:"Everything you chose to keep in view."},
+    {id:"projects", label:"Projects", title:"Workshop", flavor:"What is on the bench, and the log of how it got there."},
+    {id:"notes", label:"Notes & Plans", title:"Library", flavor:"Notes worth keeping and plans for later."},
+    {id:"calendar", label:"Calendar", title:"Star Chart", flavor:"Events and upkeep due dates by day."},
+    {id:"mail", label:"Mail", title:"Raven Post", flavor:"Your inbox, once the ravens are allowed in."},
+    {id:"upkeep", label:"Upkeep", title:"Wards", flavor:"Recurring checks that keep the tower standing."},
+    {id:"system", label:"System", title:"Engine Room", flavor:"How the machines are holding up."},
+    {id:"agents", label:"Agents", title:"Familiars", flavor:"Argos, Odysseus and a question for the orb."},
+    {id:"apps", label:"Apps", title:"Portals", flavor:"Every app in the stack, defined in YAML."}
+  ];
+
+  const WIDGETS = {
+    favorites:{label:"Favorites"}, week:{label:"Next 7 days"}, upkeep:{label:"Upkeep due"}, projects:{label:"Active projects"},
+    system:{label:"System"}, log:{label:"Recent log"}, plans:{label:"Next plans"}, mail:{label:"Mail"}, apps:{label:"Apps"}, ask:{label:"Ask the orb"}
+  };
+  const DEFAULT_MAIN = ["favorites","week","upkeep","projects","system","log"];
+  const mainLayout = () => (S.layout && Array.isArray(S.layout.main) ? S.layout.main.filter(w=>WIDGETS[w]) : DEFAULT_MAIN);
 
   const STATUSES = ["active","blocked","paused","shipped","idea"];
 
+  // ---------- yaml config ----------
+  let CFG = { groups:[], favorites:[] }, cfgError = "";
+  function parseYaml(text){
+    if (!window.jsyaml) return { cfg:null, error:"The YAML reader did not load." };
+    try {
+      const c = window.jsyaml.load(text || "") || {};
+      if (typeof c !== "object") return { cfg:null, error:"The config must be a mapping with groups: and favorites:." };
+      const groups = (Array.isArray(c.groups) ? c.groups : []).map(g => ({ name:String(g?.name||"Apps"), apps:(Array.isArray(g?.apps)?g.apps:[]).filter(a=>a&&a.name).map(a=>({ name:String(a.name), url:String(a.url||""), description:String(a.description||""), rune:String(a.rune||a.name[0]||"?").slice(0,2), live:a.live||null, links:Array.isArray(a.links)?a.links:[] })) }));
+      const favorites = Array.isArray(c.favorites) ? c.favorites : [];
+      return { cfg:{groups,favorites}, error:"" };
+    } catch(e){ return { cfg:null, error: e.message || String(e) }; }
+  }
+  function applyYaml(){
+    const r = parseYaml(S.yaml);
+    if (r.cfg){ CFG = r.cfg; cfgError = ""; } else { cfgError = r.error; }
+  }
+  const allApps = () => CFG.groups.flatMap(g=>g.apps);
+  const findApp = n => allApps().find(a => a.name.toLowerCase() === String(n).toLowerCase());
+
+  // ---------- helpers ----------
   function upkeepState(u){
     const last = u.lastDone ? new Date(u.lastDone+"T12:00:00").getTime() : 0;
     const due = last + (Number(u.everyDays)||7)*DAY;
     const left = Math.floor((due - Date.now())/DAY);
-    return { due, left, cls: left < 0 ? "over" : left <= 1 ? "soon" : "ok" };
+    return { due, left, cls: left<0 ? "over" : left<=1 ? "soon" : "ok" };
   }
-
-  function renderSummary(){
-    const el = $("summary");
-    if (!S.loaded){ return; }
-    const st = S.upkeep.map(upkeepState);
-    const over = st.filter(s=>s.cls==="over").length, soon = st.filter(s=>s.cls==="soon").length;
-    const active = S.projects.filter(p=>p.status==="active").length;
-    const blocked = S.projects.filter(p=>p.status==="blocked").length;
-    const hosts = (S.stats && S.stats.hosts) || [];
-    const hot = hosts.filter(h => (h.disk||0)>=85 || (h.mem||0)>=90).length;
-    const pills = [];
-    pills.push(`<span class="pill info"><i></i>${active} active</span>`);
-    if (blocked) pills.push(`<span class="pill bad"><i></i>${blocked} blocked</span>`);
-    pills.push(over ? `<span class="pill bad"><i></i>${over} upkeep overdue</span>` : `<span class="pill ok"><i></i>Upkeep on track</span>`);
-    if (soon) pills.push(`<span class="pill warn"><i></i>${soon} due soon</span>`);
-    if (hosts.length) pills.push(hot ? `<span class="pill warn"><i></i>${hot} host${hot>1?"s":""} running hot</span>` : `<span class="pill ok"><i></i>${hosts.length} hosts normal</span>`);
-    el.innerHTML = pills.join("");
+  const upkeepSorted = () => S.upkeep.map(u=>({u,s:upkeepState(u)})).sort((a,b)=>a.s.due-b.s.due);
+  function agendaBetween(fromISO, toISO){
+    const items = S.events.filter(e=>e.date>=fromISO && e.date<=toISO).map(e=>({date:e.date, time:e.time||"", title:e.title, kind:"ev", id:e._id}));
+    for (const {u,s} of upkeepSorted()){
+      const d = isoOf(new Date(Math.max(s.due, Date.now())));
+      if (d>=fromISO && d<=toISO) items.push({date:d, time:"", title:u.name, kind:"uk", over:s.left<0});
+    }
+    return items.sort((a,b)=> a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
   }
+  const star = (coll, item) => `<button class="star" data-act="fav" data-coll="${coll}" data-id="${esc(item._id)}" aria-pressed="${item.fav?"true":"false"}" aria-label="${item.fav?"Remove from":"Add to"} favorites">${item.fav?"★":"☆"}</button>`;
 
-  function renderProjects(){
-    const el = $("projects");
-    const order = s => STATUSES.indexOf(s);
-    const list = [...S.projects].sort((a,b)=> order(a.status)-order(b.status) || String(a.name).localeCompare(b.name));
-    el.innerHTML = list.length ? list.map(p => `
-      <article class="proj">
-        <div class="name">${esc(p.name)}</div>
-        ${p.repo?`<div class="repo">${esc(p.repo)}</div>`:""}
-        ${p.next?`<div class="next"><b>Next</b>${esc(p.next)}</div>`:""}
-        <div class="foot">
-          <select data-id="${esc(p._id)}" class="st-${esc(p.status)}" aria-label="Status of ${esc(p.name)}">
-            ${STATUSES.map(s=>`<option value="${s}" ${s===p.status?"selected":""}>${s}</option>`).join("")}
-          </select>
-          <span class="small muted mono">${p.updated?fmtDate(p.updated):""}</span>
-        </div>
-      </article>`).join("") : `<div class="empty">No projects yet. Add your first one below.</div>`;
-    const sel = $("nl-proj"), cur = sel.value;
-    sel.innerHTML = `<option value="General">General</option>` + list.map(p=>`<option>${esc(p.name)}</option>`).join("");
-    if (cur) sel.value = cur;
-  }
-
-  function renderLog(){
-    const list = [...S.logs].sort((a,b)=> String(b.date).localeCompare(String(a.date)) || (b.created||0)-(a.created||0));
-    $("log").innerHTML = list.length ? list.slice(0,logLimit).map(l=>`
-      <li><span class="d">${esc(l.date)}</span><span class="p">${esc(l.project)}</span><span class="t">${esc(l.text)}</span></li>`).join("")
-      : `<li class="empty">No log entries yet. Write what you changed today.</li>`;
-    $("log-more").hidden = list.length <= logLimit;
-  }
-
-  function renderPlans(){
-    const hz = {next:"Next", later:"Later", someday:"Someday"};
-    $("plans").innerHTML = Object.entries(hz).map(([k,label]) => {
-      const items = S.plans.filter(p=>(p.horizon||"later")===k).sort((a,b)=>(a.done?1:0)-(b.done?1:0));
-      return `<div class="hz"><h3>${label}</h3><ul>${items.length ? items.map(p=>`
-        <li class="${p.done?"done":""}"><input type="checkbox" data-id="${esc(p._id)}" ${p.done?"checked":""} aria-label="Done: ${esc(p.text)}"><span>${esc(p.text)}</span></li>`).join("")
-        : `<li class="empty">Nothing here.</li>`}</ul></div>`;
-    }).join("");
-  }
-
-  function renderUpkeep(){
-    const list = S.upkeep.map(u=>({u, s:upkeepState(u)})).sort((a,b)=>a.s.due-b.s.due);
-    $("upkeep").innerHTML = list.length ? list.map(({u,s}) => {
-      const msg = s.left < 0 ? `${-s.left} day${s.left===-1?"":"s"} overdue` : s.left===0 ? "due today" : `due in ${s.left} day${s.left===1?"":"s"}`;
-      return `<li class="uk ${s.cls}"><span class="stripe"></span>
-        <div><div class="n">${esc(u.name)}</div><div class="m">${msg} · every ${esc(u.everyDays)}d · last ${u.lastDone?esc(fmtDate(u.lastDone)):"never"}</div></div>
-        <button class="btn" data-done="${esc(u._id)}">Done</button></li>`;
-    }).join("") : `<li class="empty">No checks yet. Add backups, updates, disk scrubs.</li>`;
-
-    const horizon = Date.now() + 14*DAY;
-    const cal = list.filter(({s})=> s.due <= horizon).map(({u,s})=>({d: new Date(Math.max(s.due, Date.now())), t: u.name, over: s.left<0}));
-    $("cal").innerHTML = cal.length ? cal.map(c=>`<li><span class="d">${c.over?"overdue":c.d.toLocaleDateString(undefined,{weekday:"short",day:"numeric"})}</span><span>${esc(c.t)}</span></li>`).join("")
-      : `<li class="empty">Nothing due in the next two weeks.</li>`;
-  }
-
-  function spark(vals){
-    if (!Array.isArray(vals) || vals.length < 2) return "";
-    const w=200,h=36,p=3, max=100;
-    const pts = vals.map((v,i)=>[p+i*(w-2*p)/(vals.length-1), h-p-(Math.min(v,max)/max)*(h-2*p)]);
-    const line = pts.map(q=>q.map(n=>n.toFixed(1)).join(",")).join(" ");
-    const area = `${p},${h-p} ${line} ${w-p},${h-p}`;
-    const [ex,ey] = pts[pts.length-1];
-    return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="CPU over the last hours">
-      <line x1="${p}" x2="${w-p}" y1="${h/2}" y2="${h/2}" stroke="var(--line)" stroke-width="1" fill="none"/>
-      <polygon points="${area}" fill="var(--accent-soft)"/>
-      <polyline points="${line}" fill="none" stroke="var(--accent)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
-      <circle cx="${ex}" cy="${ey}" r="2.5" fill="var(--accent)"/></svg>`;
-  }
-  const meter = (label, v, unit="%", warnAt=80, critAt=90) => {
+  function meter(label, v, unit="%", warnAt=80, critAt=90){
     const n = Number(v); if (isNaN(n)) return "";
     const cls = n>=critAt?"crit":n>=warnAt?"hot":"";
     return `<div class="meter"><div class="lab"><span>${label}</span><b>${n}${unit}</b></div><div class="bar"><span class="${cls}" style="width:${Math.min(n,100)}%"></span></div></div>`;
-  };
-  function renderStats(){
-    const st = S.stats;
-    $("stats-banner").hidden = !(st && st.example);
-    $("stats-when").textContent = st && st.reportedAt ? "Reported " + ago(st.reportedAt) : "";
-    const hosts = (st && st.hosts) || [];
-    $("hosts").innerHTML = hosts.length ? hosts.map(h=>`
-      <div class="host">
+  }
+  function spark(vals){
+    if (!Array.isArray(vals) || vals.length<2) return "";
+    const w=200,h=38,p=3;
+    const pts = vals.map((v,i)=>[p+i*(w-2*p)/(vals.length-1), h-p-(Math.min(+v||0,100)/100)*(h-2*p)]);
+    const line = pts.map(q=>q.map(n=>n.toFixed(1)).join(",")).join(" ");
+    const [ex,ey] = pts[pts.length-1];
+    return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="CPU over recent hours">
+      <line x1="${p}" x2="${w-p}" y1="${h/2}" y2="${h/2}" stroke="var(--line)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+      <polygon points="${p},${h-p} ${line} ${w-p},${h-p}" fill="var(--arcane-soft)"/>
+      <polyline points="${line}" fill="none" stroke="var(--arcane)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+      <circle cx="${ex}" cy="${ey}" r="2.5" fill="var(--arcane)"/></svg>`;
+  }
+
+  // ---------- building blocks ----------
+  function hostsHTML(compact){
+    const st = S.stats, hosts = (st && st.hosts) || [];
+    if (!hosts.length) return `<div class="empty">No host has reported yet.</div>`;
+    return (st.example ? `<div class="banner">Example numbers. Nothing on your network reports here yet.</div>` : "") +
+      hosts.map(h=>`<div class="host">
         <div class="hn"><span>${esc(h.name)}</span><span class="small muted mono">${h.uptimeDays!=null?"up "+esc(h.uptimeDays)+"d":""}${h.tempC!=null?" · "+esc(h.tempC)+"°C":""}</span></div>
-        <div class="meters">${meter("CPU",h.cpu,"%",75,90)}${meter("Memory",h.mem)}${meter("Disk",h.disk,"%",80,90)}${h.gpu!=null?meter("GPU VRAM",h.gpu,"%",85,95):""}</div>
-        ${spark(h.cpuHistory)}
-      </div>`).join("") : `<div class="empty">No host has reported yet.</div>`;
+        <div class="meters">${meter("CPU",h.cpu,"%",75,90)}${meter("Memory",h.mem)}${meter("Disk",h.disk)}${h.gpu!=null?meter("GPU VRAM",h.gpu,"%",85,95):""}</div>
+        ${compact?"":spark(h.cpuHistory)}</div>`).join("") +
+      (st.reportedAt ? `<div class="hint">Reported ${esc(ago(st.reportedAt))}</div>` : "");
   }
-
-  function renderStack(){
-    const list = [...S.services].sort((a,b)=>(a.order||0)-(b.order||0));
-    $("stack").innerHTML = list.length ? list.map(s=>`
-      <div class="svc">
-        <div class="sn">${esc(s.name)}</div>
-        <div class="role">${esc(s.role)}</div>
-        <div class="url" data-url-for="${esc(s._id)}">${esc(s.url)}</div>
-        <div class="acts">
-          ${/^https?:\/\//.test(s.url||"")?`<a href="${esc(s.url)}" target="_blank" rel="noopener">Open</a>`:""}
-          ${(s.extra||[]).map(x=>/^https?:\/\//.test(x.url)?`<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.label)}</a>`:"").join("")}
-          <button class="btn" data-edit="${esc(s._id)}">Edit link</button>
-        </div>
-      </div>`).join("") : `<div class="empty">No services yet.</div>`;
-
-    const argos = list.find(s=>/argos/i.test(s.name));
-    const links = [];
-    if (argos && /^https?:\/\//.test(argos.url)){
-      links.push(`<a class="btn" href="${esc(argos.url)}" target="_blank" rel="noopener">Argos assistant</a>`);
-      links.push(`<a class="btn" href="${esc(argos.url.replace(/\/$/,""))}/v1/models" target="_blank" rel="noopener">Loaded models</a>`);
+  function upkeepHTML(limit){
+    let list = upkeepSorted(); if (limit) list = list.filter(x=>x.s.cls!=="ok").slice(0,limit);
+    if (!list.length) return `<div class="empty">${limit?"All wards hold. Nothing due.":"No checks yet. Add backups, updates, disk scrubs."}</div>`;
+    return list.map(({u,s})=>{
+      const msg = s.left<0 ? `${-s.left} day${s.left===-1?"":"s"} overdue` : s.left===0 ? "due today" : `due in ${s.left} day${s.left===1?"":"s"}`;
+      return `<div class="uk ${s.cls}"><span class="stripe"></span><div><div class="n">${esc(u.name)}</div><div class="m">${msg} · every ${esc(u.everyDays)}d · last ${u.lastDone?esc(fmtDate(u.lastDone)):"never"}</div></div>
+        <button class="btn" data-act="upkeep-done" data-id="${esc(u._id)}">Done</button></div>`;
+    }).join("");
+  }
+  function projectCards(filterActive){
+    const order = s => STATUSES.indexOf(s);
+    let list = [...S.projects].sort((a,b)=>order(a.status)-order(b.status) || String(a.name).localeCompare(b.name));
+    if (filterActive) list = list.filter(p=>p.status==="active"||p.status==="blocked");
+    if (!list.length) return `<div class="empty">No projects yet.</div>`;
+    return `<div class="projects">${list.map(p=>`<article class="proj">
+      <div class="name"><span>${esc(p.name)}</span>${star("projects",p)}</div>
+      ${p.repo?`<div class="repo">${esc(p.repo)}</div>`:""}
+      ${p.next?`<div class="next"><b>Next</b>${esc(p.next)}</div>`:""}
+      <div class="foot"><select data-act="proj-status" data-id="${esc(p._id)}" class="st-${esc(p.status)}" aria-label="Status of ${esc(p.name)}">${STATUSES.map(s=>`<option value="${s}" ${s===p.status?"selected":""}>${s}</option>`).join("")}</select>
+      <span class="small muted mono">${p.updated?esc(fmtDate(p.updated)):""}</span></div></article>`).join("")}</div>`;
+  }
+  function logHTML(limit){
+    const list = [...S.logs].sort((a,b)=>String(b.date).localeCompare(String(a.date)) || (b.created||0)-(a.created||0));
+    if (!list.length) return `<div class="empty">No log entries yet.</div>`;
+    return `<ul class="list">${list.slice(0,limit).map(l=>`<li><span class="date">${esc(l.date)}</span><div class="grow"><span class="tag">${esc(l.project)}</span> ${esc(l.text)}</div></li>`).join("")}</ul>` +
+      (list.length>limit && UI.tab==="projects" ? `<button class="btn" data-act="log-more">Show older</button>` : "");
+  }
+  function plansHTML(only){
+    const hz = {next:"Next", later:"Later", someday:"Someday"};
+    const keys = only ? [only] : Object.keys(hz);
+    const block = k => {
+      const items = S.plans.filter(p=>(p.horizon||"later")===k).sort((a,b)=>(a.done?1:0)-(b.done?1:0));
+      return `<div class="hz">${only?"":`<h4>${hz[k]}</h4>`}<ul>${items.length ? items.map(p=>`<li class="${p.done?"done":""}">
+        <input type="checkbox" data-act="plan-toggle" data-id="${esc(p._id)}" ${p.done?"checked":""} aria-label="Done: ${esc(p.text)}">
+        <span class="t grow">${esc(p.text)}</span>${star("plans",p)}</li>`).join("") : `<li class="empty">Nothing here.</li>`}</ul></div>`;
+    };
+    return only ? block(only) : `<div class="horizons">${keys.map(block).join("")}</div>`;
+  }
+  function agendaHTML(days){
+    const from = todayISO(), to = isoOf(new Date(Date.now()+days*DAY));
+    const items = agendaBetween(from, to);
+    if (!items.length) return `<div class="empty">Nothing in the next ${days} days.</div>`;
+    return `<ul class="list">${items.map(i=>`<li><span class="date">${i.kind==="uk"&&i.over?"overdue":esc(new Date(i.date+"T12:00:00").toLocaleDateString(undefined,{weekday:"short",day:"numeric"}))}${i.time?" "+esc(i.time):""}</span><div class="grow">${i.kind==="uk"?`<span class="tag" style="color:var(--warn)">upkeep</span> `:""}${esc(i.title)}</div></li>`).join("")}</ul>`;
+  }
+  function favoritesHTML(){
+    const out = [];
+    for (const f of CFG.favorites){
+      const name = typeof f === "string" ? f : f && f.app;
+      const a = name && findApp(name);
+      if (a) out.push(`<li><span class="date">app</span><div class="grow">${isUrl(a.url)?`<a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.name)}</a>`:esc(a.name)} <span class="muted small">${esc(a.description)}</span></div></li>`);
     }
-    const ody = list.find(s=>/odysseus/i.test(s.name));
-    if (ody && /^https?:\/\//.test(ody.url)) links.push(`<a class="btn" href="${esc(ody.url)}" target="_blank" rel="noopener">Odysseus agents</a>`);
-    $("agent-links").innerHTML = links.join("") || `<span class="small muted">Add Argos to the stack to link its assistant here.</span>`;
+    for (const p of S.projects.filter(x=>x.fav)) out.push(`<li><span class="date">project</span><div class="grow"><a href="#projects">${esc(p.name)}</a> <span class="muted small">${esc(p.next||"")}</span></div>${star("projects",p)}</li>`);
+    for (const n of S.notes.filter(x=>x.fav)) out.push(`<li><span class="date">note</span><div class="grow"><button class="btn link" data-act="open-note" data-id="${esc(n._id)}">${esc(n.title||"Untitled")}</button></div>${star("notes",n)}</li>`);
+    for (const p of S.plans.filter(x=>x.fav&&!x.done)) out.push(`<li><span class="date">plan</span><div class="grow">${esc(p.text)}</div>${star("plans",p)}</li>`);
+    return out.length ? `<ul class="list">${out.join("")}</ul>` : `<div class="empty">Star a project, note or plan to keep it here. Add apps under favorites: in the Apps YAML.</div>`;
+  }
+  function appsHTML(compact){
+    if (!CFG.groups.length) return `<div class="empty">No apps yet. Add a group in the YAML below.</div>`;
+    return CFG.groups.map(g=>`${compact?"":`<h4 class="group-name">${esc(g.name)}</h4>`}<div class="apps">${g.apps.map(a=>{
+      const inner = `<span class="rune">${esc(a.rune)}</span><span class="grow"><div class="an">${esc(a.name)}</div>${a.description&&!compact?`<div class="ad">${esc(a.description)}</div>`:""}${compact?"":`<div class="au">${esc(a.url)}</div>`}
+        ${a.live&&!compact?`<div class="live"><span class="pill warn"><i></i>Live: waiting for ${esc(a.live.source||"a connector")}</span></div>`:""}
+        ${!compact&&a.links.length?`<div class="row small" style="margin-top:4px">${a.links.filter(l=>isUrl(l.url)).map(l=>`<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label||l.url)}</a>`).join("")}</div>`:""}</span>`;
+      return isUrl(a.url) && (compact || !a.links.length) ? `<a class="app" href="${esc(a.url)}" target="_blank" rel="noopener">${inner}</a>` : `<div class="app">${inner}</div>`;
+    }).join("")}</div>`).join("");
+  }
+  function sealedMail(){
+    return `<div class="sealed"><h4>The ravens are not allowed in yet</h4>
+      <p class="small" style="margin:0">Gmail is installed on your claude.ai account but not connected. Once it is connected, this room can list unread threads and flag mail about your stack.</p>
+      <ol class="small"><li>In claude.ai, open Settings, then Connectors, and connect Gmail.</li><li>Ask Claude to wire the Mail room to it.</li></ol></div>`;
   }
 
-  function renderAll(){ renderSummary(); renderProjects(); renderLog(); renderPlans(); renderUpkeep(); renderStats(); renderStack(); }
-  renderAll();
+  const W = {
+    favorites:()=>favoritesHTML(),
+    week:()=>agendaHTML(7),
+    upkeep:()=>upkeepHTML(5),
+    projects:()=>projectCards(true),
+    system:()=>hostsHTML(true),
+    log:()=>logHTML(6),
+    plans:()=>plansHTML("next"),
+    mail:()=>`<div class="empty">Gmail is not connected yet. <a href="#mail">See the Mail room</a>.</div>`,
+    apps:()=>appsHTML(true),
+    ask:()=>`<div class="hint">Ask from the <a href="#agents">Agents</a> room.</div>`
+  };
 
+  // ---------- rooms ----------
+  function roomHead(t, extra=""){ return `<div class="room-head"><div class="titles"><h2>${esc(t.title)}</h2><span class="flavor">${esc(t.flavor)}</span></div>${extra}</div>`; }
+
+  const ROOMS = {
+    main(t){
+      const layout = mainLayout();
+      const cfg = UI.configuring ? `<section class="panel"><h3>Arrange the table</h3>
+        <p class="hint" style="margin:0">Tick what to show and move it up or down. Saved for everyone who opens this page.</p>
+        <ul class="cfg">${[...layout, ...Object.keys(WIDGETS).filter(k=>!layout.includes(k))].map(k=>{
+          const on = layout.includes(k);
+          return `<li><label><input type="checkbox" data-act="cfg-toggle" data-w="${k}" ${on?"checked":""}> ${esc(WIDGETS[k].label)}</label>
+            ${on?`<button class="btn" data-act="cfg-move" data-w="${k}" data-d="-1" aria-label="Move ${esc(WIDGETS[k].label)} up">↑</button><button class="btn" data-act="cfg-move" data-w="${k}" data-d="1" aria-label="Move ${esc(WIDGETS[k].label)} down">↓</button>`:""}</li>`;
+        }).join("")}</ul><div class="row"><button class="btn" data-act="cfg-reset">Reset to default</button></div></section>` : "";
+      return roomHead(t, `<button class="btn" data-act="cfg-open">${UI.configuring?"Done arranging":"Arrange"}</button>`) + cfg +
+        (layout.length ? `<div class="grid">${layout.map(k=>`<section class="panel"><h3>${esc(WIDGETS[k].label)}</h3>${W[k]()}</section>`).join("")}</div>`
+          : `<div class="empty">The table is empty. Use Arrange to choose what to show.</div>`);
+    },
+    projects(t){
+      return roomHead(t) + `<div class="two">
+        <section class="panel"><h3>On the bench</h3>${projectCards(false)}
+          <form class="row" data-form="proj"><input type="text" name="name" placeholder="Project name" aria-label="Project name" required><input type="text" name="next" placeholder="Next step" aria-label="Next step"><button class="btn primary" type="submit">Add project</button></form></section>
+        <section class="panel"><h3>Project log</h3>
+          <form class="row" data-form="log"><select name="project" aria-label="Project"><option>General</option>${S.projects.map(p=>`<option>${esc(p.name)}</option>`).join("")}</select>
+          <input type="text" name="text" placeholder="What changed today" aria-label="Log entry" required><button class="btn primary" type="submit">Log it</button></form>
+          ${logHTML(UI.logLimit)}</section></div>`;
+    },
+    notes(t){
+      const notes = [...S.notes].sort((a,b)=>(b.fav?1:0)-(a.fav?1:0) || String(b.updated||"").localeCompare(String(a.updated||"")));
+      const cur = UI.noteId === "new" ? {title:"",body:"",_id:"new"} : notes.find(n=>n._id===UI.noteId) || notes[0];
+      if (cur && UI.noteId !== "new") UI.noteId = cur._id;
+      const draft = UI.noteDraft && UI.noteDraft.id === (cur&&cur._id) ? UI.noteDraft : null;
+      return roomHead(t) + `<div class="two">
+        <section class="panel"><h3>Notes <span class="act"><button class="btn" data-act="note-new">New note</button></span></h3>
+          ${notes.length || UI.noteId==="new" ? `<div class="notes">
+            <ul class="note-list">${notes.map(n=>`<li><button data-act="open-note" data-id="${esc(n._id)}" aria-current="${cur&&cur._id===n._id?"true":"false"}"><span class="grow">${esc(n.title||"Untitled")}</span>${n.fav?`<span style="color:var(--gold)">★</span>`:""}</button></li>`).join("")}</ul>
+            ${cur ? `<form class="editor" data-form="note">
+              <input type="text" id="note-title" name="title" value="${esc(draft?draft.title:cur.title)}" placeholder="Title" aria-label="Note title">
+              <textarea id="note-body" name="body" aria-label="Note text" placeholder="Write it down before it slips away.">${esc(draft?draft.body:cur.body)}</textarea>
+              <div class="row"><button class="btn primary" type="submit">Save note</button>
+              ${cur._id!=="new" ? `${star("notes",cur)}<span class="grow"></span><button class="btn" type="button" data-act="note-del" data-id="${esc(cur._id)}">${UI.confirmDel===cur._id?"Click again to delete":"Delete"}</button>` : ""}
+              <span class="hint">${cur.updated?"Saved "+esc(fmtDate(cur.updated)):""}</span></div></form>` : ""}
+          </div>` : `<div class="empty">No notes yet. Start one with New note.</div>`}
+        </section>
+        <section class="panel"><h3>Plans</h3>${plansHTML()}
+          <form class="row" data-form="plan"><input type="text" name="text" placeholder="An idea or plan" aria-label="Plan" required>
+          <select name="horizon" aria-label="When"><option value="next">Next</option><option value="later">Later</option><option value="someday">Someday</option></select>
+          <button class="btn primary" type="submit">Add plan</button></form></section></div>`;
+    },
+    calendar(t){
+      const m = UI.calMonth, y = m.getFullYear(), mo = m.getMonth();
+      const start = new Date(y, mo, 1 - ((new Date(y,mo,1).getDay()+6)%7));
+      const cells = [];
+      for (let i=0;i<42;i++){ const d = new Date(start.getFullYear(), start.getMonth(), start.getDate()+i); cells.push(d); }
+      const from = isoOf(cells[0]), to = isoOf(cells[41]);
+      const items = agendaBetween(from, to);
+      const byDay = {}; items.forEach(i=>{ (byDay[i.date] = byDay[i.date] || []).push(i); });
+      const today = todayISO();
+      const grid = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d=>`<div class="dow">${d}</div>`).join("") + cells.map(d=>{
+        const iso = isoOf(d), ev = byDay[iso] || [];
+        return `<div class="cell ${d.getMonth()!==mo?"out":""} ${iso===today?"today":""}"><span class="dn">${d.getDate()}</span>${ev.slice(0,3).map(e=>`<span class="ev ${e.kind==="uk"?"uk":""}" title="${esc(e.title)}">${e.time?esc(e.time)+" ":""}${esc(e.title)}</span>`).join("")}${ev.length>3?`<span class="dn">+${ev.length-3}</span>`:""}</div>`;
+      }).join("");
+      return roomHead(t, `<span class="pill warn"><i></i>Google Calendar and CalDAV not linked</span>`) + `<div class="two">
+        <section class="panel"><h3>${esc(m.toLocaleDateString(undefined,{month:"long",year:"numeric"}))}<span class="act cal-nav"><button class="btn" data-act="cal-prev" aria-label="Previous month">‹</button><button class="btn" data-act="cal-today">Today</button><button class="btn" data-act="cal-next" aria-label="Next month">›</button></span></h3>
+          <div style="overflow-x:auto"><div class="month">${grid}</div></div>
+          <div class="hint">Blue: your events. Amber: upkeep due.</div></section>
+        <div class="room" style="gap:16px">
+          <section class="panel"><h3>Next 14 days</h3>${agendaHTML(14)}</section>
+          <section class="panel"><h3>Add an event</h3>
+            <form class="row" data-form="event"><input type="text" name="title" placeholder="What" aria-label="Event title" required>
+            <input type="date" name="date" value="${today}" aria-label="Date" required><input type="time" name="time" aria-label="Time"><button class="btn primary" type="submit">Add</button></form>
+            ${S.events.length?`<ul class="list">${[...S.events].sort((a,b)=>a.date.localeCompare(b.date)).filter(e=>e.date>=today).slice(0,8).map(e=>`<li><span class="date">${esc(fmtDate(e.date))}</span><div class="grow">${esc(e.title)}</div><button class="btn" data-act="event-del" data-id="${esc(e._id)}" aria-label="Remove ${esc(e.title)}">Remove</button></li>`).join("")}</ul>`:""}
+          </section>
+          <div class="sealed"><h4>Linking a real calendar</h4><ol class="small">
+            <li>Google Calendar: connect it in claude.ai Settings, Connectors, then ask Claude to wire this room.</li>
+            <li>Odysseus (CalDAV): the page cannot reach your network directly. An n8n workflow or an Odysseus connector can bridge it.</li></ol></div>
+        </div></div>`;
+    },
+    mail(t){ return roomHead(t, `<span class="pill warn"><i></i>Gmail not connected</span>`) + sealedMail(); },
+    upkeep(t){
+      return roomHead(t) + `<div class="two"><section class="panel"><h3>All checks</h3>${upkeepHTML(0)}
+        <form class="row" data-form="upkeep"><input type="text" name="name" placeholder="Check (e.g. test a restore)" aria-label="Check name" required>
+        <select name="every" aria-label="How often"><option value="1">Daily</option><option value="7" selected>Weekly</option><option value="30">Monthly</option><option value="90">Quarterly</option></select>
+        <button class="btn primary" type="submit">Add check</button></form></section>
+        <section class="panel"><h3>How the wards work</h3><p class="small" style="margin:0">Each check has a period. It turns amber a day before it is due and red once it is overdue. Done stamps today's date. The overdue count shows in the header on every tab.</p></section></div>`;
+    },
+    system(t){
+      return roomHead(t) + `<div class="two"><section class="panel"><h3>Hosts</h3>${hostsHTML(false)}</section>
+        <div class="sealed"><h4>Making the numbers live</h4><ol class="small">
+        <li>The page cannot read your hosts directly; something has to report.</li>
+        <li>Simplest path: an n8n workflow that collects stats (Glances, node_exporter or Proxmox API) and connects through the n8n connector.</li>
+        <li>Until then, Claude can update the numbers on request.</li></ol></div></div>`;
+    },
+    agents(t){
+      const argos = findApp("Argos"), ody = findApp("Odysseus");
+      const links = [];
+      if (argos && isUrl(argos.url)){ links.push(`<a class="btn" href="${esc(argos.url)}" target="_blank" rel="noopener">Argos assistant</a>`, `<a class="btn" href="${esc(argos.url.replace(/\/$/,""))}/v1/models" target="_blank" rel="noopener">Loaded models</a>`); }
+      if (ody && isUrl(ody.url)) links.push(`<a class="btn" href="${esc(ody.url)}" target="_blank" rel="noopener">Odysseus agents</a>`);
+      return roomHead(t) + `<div class="two">
+        <section class="panel"><h3>Ask the orb</h3>
+          <label class="hint" for="ask">Claude answers from this page's projects, log, notes, plans, upkeep and calendar.</label>
+          <textarea id="ask" rows="3" placeholder="What should I work on this weekend?">${esc(UI.ask.text)}</textarea>
+          <div class="row"><button class="btn primary" data-act="ask" ${UI.ask.busy?"disabled":""}>Ask</button><span class="hint" id="ask-status">${esc(UI.ask.status)}</span></div>
+          <div class="agent-out" id="ask-out" ${UI.ask.out?"":"hidden"}>${esc(UI.ask.out||"")}</div></section>
+        <section class="panel"><h3>Familiars</h3>
+          <div class="row">${links.join("") || `<span class="empty">Add Argos and Odysseus to the Apps YAML to link them here.</span>`}</div>
+          <p class="small muted" style="margin:0">Argos and Odysseus run on your network, so these open in a new tab. Talking to Argos from here needs a bridge, such as Argos exposed as a connector.</p></section></div>`;
+    },
+    apps(t){
+      const draft = UI.yamlDraft ?? S.yaml ?? "";
+      return roomHead(t) + `<section class="panel"><h3>Stack</h3>${appsHTML(false)}</section>
+        <section class="panel"><h3>orb.yaml</h3>
+          <p class="hint" style="margin:0">Groups hold apps. Each app takes name, url, description, rune (one or two letters), optional links, and an optional live: block for data a connector will feed later. favorites: lists app names for the Main tab.</p>
+          <textarea class="yaml" id="yaml" spellcheck="false" aria-label="Apps configuration in YAML">${esc(draft)}</textarea>
+          <div class="row"><button class="btn primary" data-act="yaml-save">Save YAML</button><button class="btn" data-act="yaml-revert">Discard changes</button>
+          ${UI.yamlMsg?`<span class="okmsg">${esc(UI.yamlMsg)}</span>`:""}</div>
+          ${cfgError?`<div class="err">${esc(cfgError)}</div>`:""}</section>`;
+    }
+  };
+
+  // ---------- render ----------
+  function renderSummary(){
+    if (!S.loaded) return;
+    const st = S.upkeep.map(upkeepState);
+    const over = st.filter(s=>s.cls==="over").length, soon = st.filter(s=>s.cls==="soon").length;
+    const active = S.projects.filter(p=>p.status==="active").length, blocked = S.projects.filter(p=>p.status==="blocked").length;
+    const hosts = (S.stats && S.stats.hosts) || [];
+    const hot = hosts.filter(h=>(h.disk||0)>=85 || (h.mem||0)>=90).length;
+    const p = [`<span class="pill info"><i></i>${active} active</span>`];
+    if (blocked) p.push(`<span class="pill bad"><i></i>${blocked} blocked</span>`);
+    p.push(over ? `<span class="pill bad"><i></i>${over} overdue</span>` : `<span class="pill ok"><i></i>Upkeep on track</span>`);
+    if (soon) p.push(`<span class="pill warn"><i></i>${soon} due soon</span>`);
+    if (hosts.length) p.push(hot ? `<span class="pill warn"><i></i>${hot} host${hot>1?"s":""} running hot</span>` : `<span class="pill ok"><i></i>Hosts normal</span>`);
+    $("summary").innerHTML = p.join("");
+  }
+  function renderTabs(){
+    $("tabs").innerHTML = TABS.map(t=>`<a href="#${t.id}" ${t.id===UI.tab?'aria-current="page"':""}>${esc(t.label)}</a>`).join("");
+  }
+  function captureDrafts(){
+    const ti = $("note-title"), bo = $("note-body");
+    if (ti && bo && UI.noteId) UI.noteDraft = {id:UI.noteId, title:ti.value, body:bo.value};
+    const y = $("yaml"); if (y) UI.yamlDraft = y.value === (S.yaml ?? "") ? null : y.value;
+    const a = $("ask"); if (a) UI.ask.text = a.value;
+  }
+  function render(){
+    captureDrafts();
+    const active = document.activeElement && document.activeElement.id;
+    renderSummary(); renderTabs();
+    const t = TABS.find(x=>x.id===UI.tab) || TABS[0];
+    $("main").innerHTML = `<div class="room">${ROOMS[t.id](t)}</div>`;
+    if (active && $(active) && /^(note-title|note-body|yaml|ask)$/.test(active)) $(active).focus();
+  }
+  function route(){
+    const h = location.hash.replace(/^#/,"");
+    UI.tab = TABS.some(t=>t.id===h) ? h : "main";
+    render();
+  }
+  window.addEventListener("hashchange", route);
+  route();
+
+  // ---------- storage ----------
   const setStatus = t => { $("dbstatus").textContent = t; };
   const fail = e => setStatus("Could not save: " + (e && (e.message||e.code) || "unknown error"));
-
-  // ---- storage ----
+  let pending = null;
+  const schedule = () => { if (pending) return; pending = requestAnimationFrame(()=>{ pending=null; render(); }); };
   (async () => {
-    const timer = setTimeout(()=> setStatus("Storage is slow to answer. Changes may not save yet."), 10000);
+    const timer = setTimeout(()=>setStatus("Storage is slow to answer. Changes may not save yet."), 10000);
     try { db = await window.claude?.use?.("db"); } catch { db = null; }
-    if (!db){ clearTimeout(timer); setStatus("Storage is not available in this view. Open the page signed in on claude.ai to save changes."); S.loaded = true; renderAll(); return; }
-    const coll = (name, key) => db.collection(name).onSnapshot(snap => {
-      clearTimeout(timer);
-      S[key] = snap.docs.map(d => ({...d.data(), _id:d.id}));
-      S.loaded = true; setStatus("Saved changes sync to everyone who opens this page.");
-      renderAll();
-    }, e => setStatus("Lost connection to storage: " + (e.message||e.code)));
-    coll("projects","projects"); coll("logs","logs"); coll("plans","plans"); coll("upkeep","upkeep"); coll("services","services");
-    db.doc("stats/current").onSnapshot(snap => { S.stats = snap.exists ? snap.data() : null; renderStats(); renderSummary(); }, ()=>{});
+    if (!db){ clearTimeout(timer); setStatus("Storage is not available in this view. Open the page signed in on claude.ai to save changes."); S.loaded = true; render(); return; }
+    const err = e => setStatus("Lost connection to storage: " + (e.message||e.code));
+    for (const k of ["projects","logs","plans","upkeep","notes","events"]){
+      db.collection(k).onSnapshot(snap => { clearTimeout(timer); S[k] = snap.docs.map(d=>({...d.data(), _id:d.id})); S.loaded = true; setStatus("Changes save for everyone who opens this page."); schedule(); }, err);
+    }
+    db.doc("stats/current").onSnapshot(s => { S.stats = s.exists ? s.data() : null; schedule(); }, err);
+    db.doc("config/orb").onSnapshot(s => { S.yaml = s.exists ? String(s.data().yaml||"") : ""; applyYaml(); schedule(); }, err);
+    db.doc("config/layout").onSnapshot(s => { S.layout = s.exists ? s.data() : null; schedule(); }, err);
   })();
-
   const need = () => { if (!db){ setStatus("Storage is not available, so this change was not saved."); return false; } return true; };
 
-  $("f-proj").addEventListener("submit", e => { e.preventDefault(); if(!need())return;
-    const name = $("np-name").value.trim(); if(!name) return;
-    db.collection("projects").add({name, next:$("np-next").value.trim(), status:"active", repo:"", updated:todayISO()}).then(()=>{ $("np-name").value=""; $("np-next").value=""; }).catch(fail);
+  async function saveLayout(list){ if(!need()) return; S.layout = {main:list}; render(); try { await db.doc("config/layout").set({main:list}); } catch(e){ fail(e); } }
+
+  // ---------- events ----------
+  document.addEventListener("click", async e => {
+    const el = e.target.closest("[data-act]"); if (!el) return;
+    const act = el.dataset.act, id = el.dataset.id;
+    if (el.tagName === "INPUT" || el.tagName === "SELECT") return;
+    if (act !== "note-del") UI.confirmDel = null;
+    switch (act){
+      case "fav": { if(!need())return; const item = S[el.dataset.coll].find(x=>x._id===id); if(item) db.doc(el.dataset.coll+"/"+id).update({fav:!item.fav}).catch(fail); break; }
+      case "upkeep-done": if(!need())return; el.disabled = true; db.doc("upkeep/"+id).update({lastDone:todayISO()}).catch(fail); break;
+      case "log-more": UI.logLimit += 25; render(); break;
+      case "open-note": UI.noteId = id; UI.noteDraft = null; if (UI.tab!=="notes") location.hash = "notes"; else render(); break;
+      case "note-new": UI.noteId = "new"; UI.noteDraft = null; render(); $("note-title")?.focus(); break;
+      case "note-del": if (UI.confirmDel !== id){ UI.confirmDel = id; render(); break; } if(!need())return; UI.confirmDel = null; UI.noteId = null; db.doc("notes/"+id).delete().catch(fail); break;
+      case "cal-prev": UI.calMonth = new Date(UI.calMonth.getFullYear(), UI.calMonth.getMonth()-1, 1); render(); break;
+      case "cal-next": UI.calMonth = new Date(UI.calMonth.getFullYear(), UI.calMonth.getMonth()+1, 1); render(); break;
+      case "cal-today": UI.calMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1); render(); break;
+      case "event-del": if(!need())return; db.doc("events/"+id).delete().catch(fail); break;
+      case "cfg-open": UI.configuring = !UI.configuring; render(); break;
+      case "cfg-move": { const l = [...mainLayout()], i = l.indexOf(el.dataset.w), j = i + Number(el.dataset.d); if (i<0||j<0||j>=l.length) break; [l[i],l[j]] = [l[j],l[i]]; saveLayout(l); break; }
+      case "cfg-reset": saveLayout([...DEFAULT_MAIN]); break;
+      case "yaml-save": {
+        const text = $("yaml").value, r = parseYaml(text);
+        if (!r.cfg){ cfgError = r.error; UI.yamlDraft = text; UI.yamlMsg = ""; render(); break; }
+        if(!need())return;
+        try { await db.doc("config/orb").set({yaml:text}); UI.yamlDraft = null; UI.yamlMsg = "Saved."; cfgError=""; } catch(err){ fail(err); }
+        render(); break;
+      }
+      case "yaml-revert": UI.yamlDraft = null; UI.yamlMsg = ""; applyYaml(); render(); break;
+      case "ask": ask(); break;
+    }
   });
-  $("projects").addEventListener("change", e => { const id = e.target.dataset.id; if(!id||!need()) return;
-    db.doc("projects/"+id).update({status:e.target.value, updated:todayISO()}).catch(fail);
+  document.addEventListener("change", e => {
+    const el = e.target, act = el.dataset && el.dataset.act; if (!act) return;
+    if (act === "proj-status"){ if(!need())return; db.doc("projects/"+el.dataset.id).update({status:el.value, updated:todayISO()}).catch(fail); }
+    if (act === "plan-toggle"){ if(!need())return; db.doc("plans/"+el.dataset.id).update({done:el.checked}).catch(fail); }
+    if (act === "cfg-toggle"){ const l = mainLayout().filter(w=>w!==el.dataset.w); if (el.checked) l.push(el.dataset.w); saveLayout(l); }
   });
-  $("f-log").addEventListener("submit", e => { e.preventDefault(); if(!need())return;
-    const text = $("nl-text").value.trim(); if(!text) return;
-    db.collection("logs").add({date:todayISO(), project:$("nl-proj").value||"General", text, created:Date.now()}).then(()=>{ $("nl-text").value=""; }).catch(fail);
-  });
-  $("log-more").addEventListener("click", ()=>{ logLimit += 20; renderLog(); });
-  $("f-plan").addEventListener("submit", e => { e.preventDefault(); if(!need())return;
-    const text = $("pl-text").value.trim(); if(!text) return;
-    db.collection("plans").add({text, horizon:$("pl-hz").value, done:false}).then(()=>{ $("pl-text").value=""; }).catch(fail);
-  });
-  $("plans").addEventListener("change", e => { const id = e.target.dataset.id; if(!id||!need()) return;
-    db.doc("plans/"+id).update({done:e.target.checked}).catch(fail);
-  });
-  $("f-up").addEventListener("submit", e => { e.preventDefault(); if(!need())return;
-    const name = $("uk-name").value.trim(); if(!name) return;
-    db.collection("upkeep").add({name, everyDays:Number($("uk-every").value), lastDone:""}).then(()=>{ $("uk-name").value=""; }).catch(fail);
-  });
-  $("upkeep").addEventListener("click", e => { const id = e.target.dataset.done; if(!id||!need()) return;
-    e.target.disabled = true;
-    db.doc("upkeep/"+id).update({lastDone:todayISO()}).catch(fail);
-  });
-  $("stack").addEventListener("click", e => {
-    const id = e.target.dataset.edit; if(!id) return;
-    const holder = document.querySelector(`[data-url-for="${CSS.escape(id)}"]`);
-    if (holder.querySelector("input")) return;
-    const svc = S.services.find(s=>s._id===id);
-    holder.innerHTML = `<form class="row"><input type="url" id="url-${esc(id)}" value="${esc(svc.url)}" aria-label="Link for ${esc(svc.name)}" style="flex:1 1 140px"><button class="btn primary" type="submit">Save</button></form>`;
-    const input = holder.querySelector("input"); input.focus();
-    holder.querySelector("form").addEventListener("submit", ev => { ev.preventDefault(); if(!need())return;
-      db.doc("services/"+id).update({url: input.value.trim()}).catch(fail);
-    });
+  document.addEventListener("submit", async e => {
+    const f = e.target.closest("form[data-form]"); if (!f) return;
+    e.preventDefault(); if(!need()) return;
+    const v = Object.fromEntries(new FormData(f).entries());
+    try {
+      switch (f.dataset.form){
+        case "proj": if(!v.name.trim()) return; await db.collection("projects").add({name:v.name.trim(), next:(v.next||"").trim(), status:"active", repo:"", updated:todayISO(), fav:false}); break;
+        case "log": if(!v.text.trim()) return; await db.collection("logs").add({date:todayISO(), project:v.project||"General", text:v.text.trim(), created:Date.now()}); break;
+        case "plan": if(!v.text.trim()) return; await db.collection("plans").add({text:v.text.trim(), horizon:v.horizon||"next", done:false, fav:false}); break;
+        case "upkeep": if(!v.name.trim()) return; await db.collection("upkeep").add({name:v.name.trim(), everyDays:Number(v.every)||7, lastDone:""}); break;
+        case "event": if(!v.title.trim()||!v.date) return; await db.collection("events").add({title:v.title.trim(), date:v.date, time:v.time||""}); break;
+        case "note": {
+          const data = {title:(v.title||"").trim()||"Untitled", body:v.body||"", updated:todayISO()};
+          if (UI.noteId === "new" || !UI.noteId){ const ref = await db.collection("notes").add({...data, fav:false}); UI.noteId = ref.id; }
+          else await db.doc("notes/"+UI.noteId).update(data);
+          UI.noteDraft = null; setStatus("Note saved."); render(); return;
+        }
+      }
+      f.reset();
+    } catch(err){ fail(err); }
   });
 
-  // ---- ask ----
-  let busy = false;
-  $("ask-go").addEventListener("click", async () => {
-    const q = $("ask").value.trim(); if (!q || busy) return;
-    const out = $("ask-out"); busy = true; $("ask-go").disabled = true; $("ask-status").textContent = "Thinking…";
+  // ---------- ask ----------
+  async function ask(){
+    const q = ($("ask")?.value || "").trim(); if (!q || UI.ask.busy) return;
+    UI.ask = {busy:true, text:q, status:"The orb clouds over…", out:""}; render();
     try {
       const sample = await window.claude?.use?.("sample");
-      if (!sample){ $("ask-status").textContent = "Asking is not available in this view."; return; }
-      const ctx = {
-        today: todayISO(),
-        projects: S.projects.map(({_id,...p})=>p),
-        recentLog: [...S.logs].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,40).map(({_id,created,...l})=>l),
-        plans: S.plans.map(({_id,...p})=>p),
-        upkeep: S.upkeep.map(u=>{const s=upkeepState(u); return {name:u.name, everyDays:u.everyDays, lastDone:u.lastDone, daysLeft:s.left};}),
-        stats: S.stats
-      };
-      out.hidden = false; out.textContent = "";
-      await sample(`You help someone run their homelab. Answer their question using only the dashboard data below. Be brief and concrete; plain text, short lists are fine. If the data does not cover it, say so.\n\nDashboard data (JSON):\n${JSON.stringify(ctx)}\n\nQuestion: ${q}`,
-        { modelTier:"default", onText: ({text}) => { out.textContent = text; } });
-      $("ask-status").textContent = "";
-    } catch (e) {
-      $("ask-status").textContent = e && e.code === "rate_limited" ? "Too many questions. Wait a minute and try again." : e && e.code === "not_granted" ? "Asking was not allowed for this page." : "Could not get an answer: " + (e && (e.message||e.code) || "unknown error");
-    } finally { busy = false; $("ask-go").disabled = false; }
-  });
+      if (!sample){ UI.ask.status = "Asking is not available in this view."; return; }
+      const strip = ({_id,...r}) => r;
+      const ctx = { today:todayISO(), projects:S.projects.map(strip),
+        recentLog:[...S.logs].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,40).map(({_id,created,...l})=>l),
+        notes:S.notes.map(n=>({title:n.title, body:String(n.body||"").slice(0,1500)})), plans:S.plans.map(strip),
+        upkeep:S.upkeep.map(u=>({name:u.name, everyDays:u.everyDays, lastDone:u.lastDone, daysLeft:upkeepState(u).left})),
+        upcoming:agendaBetween(todayISO(), isoOf(new Date(Date.now()+30*DAY))), stats:S.stats, apps:allApps().map(a=>({name:a.name, description:a.description})) };
+      await sample(`You help someone run their homelab. Answer using only the dashboard data below. Be brief and concrete; plain text, short lists are fine. If the data does not cover it, say so.\n\nDashboard data (JSON):\n${JSON.stringify(ctx)}\n\nQuestion: ${q}`,
+        { modelTier:"default", onText:({text}) => { UI.ask.out = text; const o = $("ask-out"); if (o){ o.hidden=false; o.textContent = text; } } });
+      UI.ask.status = "";
+    } catch(e){
+      UI.ask.status = e && e.code==="rate_limited" ? "Too many questions. Wait a minute and try again." : e && e.code==="not_granted" ? "Asking was not allowed for this page." : "Could not get an answer: " + (e && (e.message||e.code) || "unknown error");
+    } finally { UI.ask.busy = false; render(); }
+  }
+
+  // ---------- the orb ----------
+  (() => {
+    const c = $("orb"), g = c.getContext("2d"), R = c.width/2;
+    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+    const wisps = Array.from({length:5}, (_,i)=>({a:i*1.26, r:.25+.12*(i%3), s:.0025+.0012*i, size:.38+.08*(i%2)}));
+    let raf = 0;
+    function frame(){
+      const hi = css("--orb-hi"), mid = css("--orb-mid"), deep = css("--orb-deep");
+      g.clearRect(0,0,c.width,c.height);
+      g.save(); g.beginPath(); g.arc(R,R,R,0,Math.PI*2); g.clip();
+      const base = g.createRadialGradient(R*.7,R*.65,R*.1,R,R,R); base.addColorStop(0,mid); base.addColorStop(1,deep);
+      g.fillStyle = base; g.fillRect(0,0,c.width,c.height);
+      g.globalCompositeOperation = "lighter";
+      for (const w of wisps){
+        if (!reduce) w.a += w.s;
+        const x = R + Math.cos(w.a)*R*w.r, y = R + Math.sin(w.a*1.3)*R*w.r;
+        const rg = g.createRadialGradient(x,y,0,x,y,R*w.size); rg.addColorStop(0,mid); rg.addColorStop(1,"rgba(0,0,0,0)");
+        g.globalAlpha = .35; g.fillStyle = rg; g.fillRect(0,0,c.width,c.height);
+      }
+      g.globalCompositeOperation = "source-over"; g.globalAlpha = 1;
+      const sh = g.createRadialGradient(R*.62,R*.55,0,R*.62,R*.55,R*.32); sh.addColorStop(0,hi); sh.addColorStop(1,"rgba(255,255,255,0)");
+      g.globalAlpha = .7; g.fillStyle = sh; g.fillRect(0,0,c.width,c.height); g.globalAlpha = 1;
+      g.restore();
+      if (!reduce && !document.hidden) raf = requestAnimationFrame(frame); else raf = 0;
+    }
+    frame();
+    document.addEventListener("visibilitychange", ()=>{ if (!document.hidden && !raf && !reduce) frame(); });
+  })();
 })();
 </script>
