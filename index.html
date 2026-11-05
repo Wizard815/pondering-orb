@@ -1274,7 +1274,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     {id:"upstream", name:"UpstreamManager", fields:[["baseUrl","Base URL"]], test:c=>`GET ${c.baseUrl}/api/repos and /api/requests.`},
     {id:"hermes", name:"Hermes Studio", fields:[["baseUrl","Base URL"],["userEnv","User variable"],["passEnv","Password variable"]], test:c=>`POST ${c.baseUrl}/api/auth/login, then GET /api/studio/sessions?limit=5 and /api/studio/sessions/hermes?limit=5 with the token.`}
   ];
-  const CONN_DEFAULT = {uptime:{baseUrl:"http://uptime-kuma:3001", slug:"orb", keyEnv:""}, wiki:{baseUrl:"http://llmwiki:27123", keyEnv:"WIKI_API_KEY", vaultPath:"/vault"}, caldav:{url:"", userEnv:"CALDAV_USER", passEnv:"CALDAV_PASSWORD"}, upstream:{baseUrl:"http://upstream-manager:5000"}, hermes:{baseUrl:"http://hermes-studio:8648", userEnv:"HERMES_USER", passEnv:"HERMES_PASSWORD"}};
+  const CONN_DEFAULT = {uptime:{baseUrl:"http://uptime-kuma:3001", slug:"orb", keyEnv:""}, wiki:{baseUrl:"http://llmwiki:27123", keyEnv:"WIKI_API_KEY", vaultPath:"/vault"}, caldav:{url:"", userEnv:"CALDAV_USER", passEnv:"CALDAV_PASSWORD"}, upstream:{baseUrl:"http://upstream-manager:5000"}, hermes:{baseUrl:"http://hermes-studio:6060", userEnv:"HERMES_USER", passEnv:"HERMES_PASSWORD"}};
   const conn = () => { const c = settings().conn || {}; return Object.fromEntries(Object.entries(CONN_DEFAULT).map(([k,v])=>[k, {...v, ...(c[k]||{})}])); };
   function connectionsHTML(){
     const c = conn();
