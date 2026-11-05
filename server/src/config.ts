@@ -13,6 +13,7 @@ export interface OrbConfig {
   caldav: { url: string; userEnv: string; passwordEnv: string; choresList: string };
   wiki: { baseUrl: string; tokenEnv: string; vault: string };
   hermes: { baseUrl: string; userEnv: string; passwordEnv: string };
+  allglance: { baseUrl: string; tokenEnv: string };
   pollMinutes: number;
 }
 
@@ -26,6 +27,7 @@ const DEFAULTS: OrbConfig = {
   caldav: { url: "", userEnv: "CALDAV_USER", passwordEnv: "CALDAV_PASSWORD", choresList: "Chores" },
   wiki: { baseUrl: "http://llmwiki:27123", tokenEnv: "WIKI_API_KEY", vault: "/vault" },
   hermes: { baseUrl: "", userEnv: "HERMES_USER", passwordEnv: "HERMES_PASSWORD" },
+  allglance: { baseUrl: "", tokenEnv: "ALLGLANCE_TOKEN" },
   pollMinutes: 15,
 };
 
@@ -49,6 +51,7 @@ export function loadConfig(path = process.env.ORB_CONFIG || "/config/orb.yaml", 
     caldav: { ...DEFAULTS.caldav, ...(raw.caldav ?? {}) },
     wiki: { ...DEFAULTS.wiki, ...(raw.wiki ?? {}) },
     hermes: { ...DEFAULTS.hermes, ...(raw.hermes ?? {}) },
+    allglance: { ...DEFAULTS.allglance, ...(raw.allglance ?? {}) },
   };
   // Addresses can also come from the environment (docker-compose.example.yml).
   if (env.PORT) c.port = Number(env.PORT);
@@ -57,6 +60,7 @@ export function loadConfig(path = process.env.ORB_CONFIG || "/config/orb.yaml", 
   if (env.ARGOS_URL && !raw.golem) c.golem.baseUrl = env.ARGOS_URL.replace(/\/$/, "") + "/v1";
   if (env.WIKI_URL) c.wiki.baseUrl = env.WIKI_URL;
   if (env.HERMES_URL) c.hermes.baseUrl = env.HERMES_URL;
+  if (env.ALLGLANCE_URL) c.allglance.baseUrl = env.ALLGLANCE_URL;
   if (env.DOCKER_HOST) c.system.docker = env.DOCKER_HOST;
   if (env.ORB_PROC) c.system.proc = env.ORB_PROC;
   return c;

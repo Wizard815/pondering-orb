@@ -12,6 +12,7 @@ const CONNS: { id: string; name: string; fields: [string, string][]; note?: stri
   { id: "uptime", name: "Uptime Kuma", fields: [["baseUrl", "Base URL"], ["statusPage", "Status page slug"]] },
   { id: "caldav", name: "CalDAV tasks", fields: [["url", "CalDAV URL"], ["userEnv", "User variable"], ["passwordEnv", "Password variable"], ["choresList", "List that holds chores"]] },
   { id: "wiki", name: "LLMWIKI", fields: [["baseUrl", "REST API URL"], ["tokenEnv", "API key variable"], ["vault", "Vault folder in the container (read only)"]] },
+  { id: "allglance", name: "ALLGlance gateway", fields: [["baseUrl", "Base URL (e.g. http://allglance-gateway:8090)"], ["tokenEnv", "Token variable (same value as GATEWAY_TOKEN)"]], note: "Brings in dayGLANCE's day plan and inbox, lastGLANCE chores and lifeGLANCE milestones. vikunja tasks still come over CalDAV." },
   { id: "hermes", name: "Hermes Studio", fields: [["baseUrl", "Base URL"], ["userEnv", "User variable"], ["passwordEnv", "Password variable"]] },
 ];
 

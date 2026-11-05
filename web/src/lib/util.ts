@@ -9,9 +9,19 @@ export const clip = (t: string, n: number) => { t = String(t || "").replace(/\s+
 export const STATUSES = ["next", "active", "blocked", "paused", "shipped"] as const;
 export const STATUS_LABEL: Record<string, string> = { next: "Up next", active: "Active", blocked: "Blocked", paused: "Paused", shipped: "Shipped" };
 export const listOf = (t: any) => t.list || t.project || "Inbox";
-export const prioOf = (t: any) => { const p = Number(t.priority) || 0; return p === 0 ? 0 : p <= 4 ? 1 : p === 5 ? 5 : 9; };
-export const prioName = (p: number) => ({ 1: "High", 5: "Medium", 9: "Low" } as Record<number, string>)[p] || "";
-const prioRank = (t: any) => { const p = prioOf(t); return p === 0 ? 6 : p; };
+/** Task priority. Stored as CalDAV's PRIORITY (0 none, 1 highest .. 9 lowest)
+ *  and shown as vikunja's five levels, using the same mapping vikunja's CalDAV
+ *  server uses, so a level set here is the level vikunja and ALLGlance show. */
+export const PRIO_LEVELS = [
+  { level: 0, name: "None", cal: 0 }, { level: 1, name: "Low", cal: 9 }, { level: 2, name: "Medium", cal: 5 },
+  { level: 3, name: "High", cal: 3 }, { level: 4, name: "Urgent", cal: 2 }, { level: 5, name: "Do now", cal: 1 },
+] as const;
+const CAL_TO_LEVEL = [0, 5, 4, 3, 3, 2, 1, 1, 1, 1];
+/** 0 none, 1 low, 2 medium, 3 high, 4 urgent, 5 do now. */
+export const prioOf = (t: any) => CAL_TO_LEVEL[Math.max(0, Math.min(9, Math.round(Number(t?.priority) || 0)))];
+export const prioName = (level: number) => PRIO_LEVELS[level]?.name ?? "None";
+export const prioCal = (level: number) => PRIO_LEVELS[level]?.cal ?? 0;
+const prioRank = (t: any) => -prioOf(t);
 export const sortTasks = <T extends any>(l: T[]) => [...l].sort((a: any, b: any) => (a.done ? 1 : 0) - (b.done ? 1 : 0) || prioRank(a) - prioRank(b) || String(a.due || "9999").localeCompare(String(b.due || "9999")));
 export function choreState(c: any) {
   const last = c.lastDone ? new Date(c.lastDone + "T12:00:00").getTime() : 0;

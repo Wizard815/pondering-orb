@@ -81,6 +81,7 @@ Open `http://<host>:8095`. Put secrets in `.env` next to the compose file:
 | `CALDAV_USER`, `CALDAV_PASSWORD` | CalDAV account |
 | `WIKI_API_KEY` | Obsidian Local REST API key |
 | `HERMES_USER`, `HERMES_PASSWORD` | a Hermes Studio user for Orb |
+| `ALLGLANCE_TOKEN` | the ALLGlance gateway's `GATEWAY_TOKEN` |
 | `OPENROUTER_API_KEY` (or any name) | frontier model key, named in Settings → Golem |
 
 With neither `ORB_PASSWORD` nor `ORB_API_TOKENS` set, Orb is open to anyone
@@ -113,6 +114,7 @@ writes is marked with its token's name.
 [docs/backend.md](docs/backend.md) covers what Orb owns and what it reads
 from other apps, the API, the MCP tools, CalDAV, the wiki rules and what is
 built so far. [docs/miladash.md](docs/miladash.md) covers the ideas board.
+[docs/allglance.md](docs/allglance.md) covers ALLGlance and the task priority scale.
 
 `index.html` is the demo built as a claude.ai artifact. Its storage and
 Golem use the artifact runtime (`window.claude`), so opened as a plain file it

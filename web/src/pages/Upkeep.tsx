@@ -8,6 +8,7 @@ import { useFetch } from "../lib/useFetch";
 import { ago, choreState, clip } from "../lib/util";
 import { ChoreRows, projHref, removeWithUndo } from "../components/Common";
 import { Requests, UmRequest } from "./upkeep/Requests";
+import { GlanceChores } from "../components/Glance";
 import { baseOf, useOrbConfig } from "./upkeep/config";
 
 type Daily = { ranAt: number; results: any[] };
@@ -123,6 +124,7 @@ export const UpkeepPage: PageDef = {
       { key: "daily", title: "Daily check", node: <DailyCheck onDone={reload} />, w: 5, h: 10 },
       { key: "repos", title: "Repositories", node: <Repos repos={repos.data} error={repos.error} base={base} onDone={repos.reload} />, w: 12, h: 8 },
       { key: "chores", title: "Chores", node: <Chores />, w: 7, h: 8 },
+      { key: "lastglance", title: "lastGLANCE chores", node: <GlanceChores />, w: 5, h: 8 },
       { key: "how", title: "How this connects", node: <How />, w: 5, h: 8 },
     ];
     return { panels, extra };

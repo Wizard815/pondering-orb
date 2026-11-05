@@ -19,6 +19,7 @@ import { CalDav } from "./integrations/caldav.js";
 import { TaskSync } from "./sync.js";
 import { Wiki } from "./integrations/wiki.js";
 import { Hermes } from "./integrations/hermes.js";
+import { AllGlance } from "./integrations/allglance.js";
 
 export const VERSION = "0.1.0";
 
@@ -39,6 +40,7 @@ export async function buildApp(o: AppOptions = {}) {
       caldav: { ...base.caldav, ...(c.caldav || {}) },
       wiki: { ...base.wiki, ...(c.wiki || {}) },
       hermes: { ...base.hermes, ...(c.hermes || {}) },
+      allglance: { ...base.allglance, ...(c.allglance || {}) },
     };
   };
   const records = new Records(store, cfg);
@@ -48,6 +50,7 @@ export async function buildApp(o: AppOptions = {}) {
   const sync = new TaskSync(records, dav, cfg);
   const wiki = new Wiki(() => cfg().wiki.baseUrl, () => secret(cfg().wiki.tokenEnv), () => cfg().wiki.vault);
   const hermes = new Hermes(() => cfg().hermes.baseUrl, () => ({ user: secret(cfg().hermes.userEnv), pass: secret(cfg().hermes.passwordEnv) }));
+  const glance = new AllGlance(() => cfg().allglance.baseUrl, () => secret(cfg().allglance.tokenEnv));
   // The board's five states map onto the wiki's three; only project_status is written.
   const WIKI_STATUS: Record<string, string> = { next: "active", active: "active", blocked: "active", paused: "paused", shipped: "done" };
   const lastStatus = new Map((store.list("projects") as any[]).map(p => [p.id, p.status]));
@@ -59,7 +62,12 @@ export async function buildApp(o: AppOptions = {}) {
     wiki.setFront(p.wikiNote, "project_status", ws).then(() => wiki.setFront(p.wikiNote, "updated", new Date().toISOString().slice(0, 10)))
       .then(() => wiki.log(`[[${p.name}]]: project_status set to ${ws}`)).catch(e => app.log.warn({ err: e.message }, "wiki status update failed"));
   });
-  const tools = () => { const all = orbTools(records); return cfg().golem.canWrite ? all : all.filter(t => !t.write); };
+  const glanceTools = () => !cfg().allglance.baseUrl ? [] : [
+    { name: "allglance_day", description: "The day's plan from dayGLANCE through the ALLGlance gateway: time blocks with start time and length. date is YYYY-MM-DD (default today).",
+      parameters: { type: "object", properties: { date: { type: "string" } } }, run: ({ date }: any) => glance.day(/^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : new Date().toISOString().slice(0, 10)) },
+    { name: "allglance_dayglance_tasks", description: "dayGLANCE tasks (inbox and today) with priority 0 none to 5 do now.", parameters: { type: "object", properties: {} }, run: () => glance.dayglanceTasks() },
+  ];
+  const tools = () => { const all = [...orbTools(records), ...glanceTools()]; return cfg().golem.canWrite ? all : all.filter(t => !(t as any).write); };
 
   const app: FastifyInstance = Fastify({ logger: o.logger ?? false, bodyLimit: 2 * 1024 * 1024 });
   await app.register(cookie);
@@ -157,7 +165,8 @@ export async function buildApp(o: AppOptions = {}) {
     const c = cfg();
     return { logMax: c.logMax, golem: { baseUrl: c.golem.baseUrl, model: c.golem.model, keyEnv: c.golem.keyEnv, keySet: !!secret(c.golem.keyEnv), canWrite: c.golem.canWrite },
       upstream: { baseUrl: c.upstream.baseUrl }, uptime: c.uptime, caldav: { url: c.caldav.url, choresList: c.caldav.choresList, userSet: !!secret(c.caldav.userEnv) },
-      wiki: { baseUrl: c.wiki.baseUrl, keySet: !!secret(c.wiki.tokenEnv), vault: c.wiki.vault }, hermes: { baseUrl: c.hermes.baseUrl, userSet: !!secret(c.hermes.userEnv) } };
+      wiki: { baseUrl: c.wiki.baseUrl, keySet: !!secret(c.wiki.tokenEnv), vault: c.wiki.vault }, hermes: { baseUrl: c.hermes.baseUrl, userSet: !!secret(c.hermes.userEnv) },
+      allglance: { baseUrl: c.allglance.baseUrl, tokenEnv: c.allglance.tokenEnv, tokenSet: !!secret(c.allglance.tokenEnv) } };
   });
   app.post("/api/connections/test/:id", { preHandler: guard }, async (req: any) => {
     const c = cfg(), id = req.params.id;
@@ -168,6 +177,8 @@ export async function buildApp(o: AppOptions = {}) {
         if (!r.ok) return { ok: false, detail: `The model endpoint answered ${r.status}.` }; return { ok: true, detail: `Reached the model endpoint: ${(r.body?.data || []).length} models.` }; }
       if (id === "wiki") { const k = secret(c.wiki.tokenEnv); const r = await call(`${trimSlash(c.wiki.baseUrl)}/`, { headers: k ? { Authorization: `Bearer ${k}` } : {} });
         return { ok: r.ok && !!r.body?.authenticated, detail: r.ok ? (r.body?.authenticated ? "Reached the wiki and the key works." : "Reached the wiki, but the key wasn't accepted.") : `The wiki answered ${r.status}.` }; }
+      if (id === "allglance") { const h = await glance.health(); const a = h?.adapters || {}; const up = Object.entries(a).filter(([, v]: any) => v?.ok).map(([k]) => k);
+        await glance.users(); return { ok: true, detail: `Reached the ALLGlance gateway. Working: ${up.join(", ") || "none"}${Object.keys(a).length > up.length ? `; not working: ${Object.keys(a).filter(k => !up.includes(k)).join(", ")}` : ""}.` }; }
       if (id === "hermes") { const r = await call(`${trimSlash(c.hermes.baseUrl)}/api/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: secret(c.hermes.userEnv), password: secret(c.hermes.passwordEnv) }) });
         return { ok: r.ok, detail: r.ok ? "Signed in to Hermes Studio." : `Hermes Studio answered ${r.status}${r.body?.error ? ": " + r.body.error : ""}.` }; }
       if (id === "caldav") { if (!c.caldav.url) return { ok: false, detail: "Set a CalDAV URL first." };
@@ -210,6 +221,14 @@ export async function buildApp(o: AppOptions = {}) {
     records.patch("projects", p.id, { wikiNote: r.path, area });
     return r;
   });
+
+  // ---- ALLGlance gateway: dayGLANCE day plan and inbox, lastGLANCE chores, lifeGLANCE milestones ----
+  const dateParam = (v: unknown) => { const s = String(v || new Date().toISOString().slice(0, 10)); if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) throw new HttpError(400, "date must be YYYY-MM-DD."); return s; };
+  app.get("/api/allglance/day", { preHandler: guard }, async (req: any) => glance.day(dateParam(req.query.date), req.query.owner));
+  app.get("/api/allglance/dayglance-tasks", { preHandler: guard }, async (req: any) => glance.dayglanceTasks(req.query.owner));
+  app.get("/api/allglance/chores", { preHandler: guard }, async (req: any) => glance.chores(req.query.owner));
+  app.get("/api/allglance/milestones", { preHandler: guard }, async () => glance.milestones());
+  app.get("/api/allglance/users", { preHandler: guard }, async () => glance.users());
 
   // ---- Hermes Studio chats (read only) ----
   app.get("/api/hermes/sessions", { preHandler: guard }, async (req: any) => hermes.sessions(String(req.query.q || "")));

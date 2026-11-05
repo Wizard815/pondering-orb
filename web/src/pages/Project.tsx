@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { EditButton } from "../components/EditButton";
 import { PanelGrid, PanelDef } from "../components/PanelGrid";
-import { QuickLog, Star, TaskRows, patchWithUndo } from "../components/Common";
+import { QuickLog, Star, TaskRows, patchWithUndo, PrioSelect } from "../components/Common";
 import { create, patch, useColl, useReady } from "../lib/store";
 import { useUi } from "../lib/ui";
 import { useFetch } from "../lib/useFetch";
@@ -41,7 +41,7 @@ function Tasks({ p }: { p: any }) {
     <form className="row proj-form" onSubmit={add}>
       <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="New task" aria-label={"New task for " + p.name} required />
       <input type="date" value={due} onChange={e => setDue(e.target.value)} aria-label="Due date" />
-      <select value={prio} onChange={e => setPrio(e.target.value)} aria-label="Priority"><option value="0">No priority</option><option value="1">High</option><option value="5">Medium</option><option value="9">Low</option></select>
+      <PrioSelect value={Number(prio) || 0} onChange={v => setPrio(String(v))} />
       <button className="btn primary" type="submit">Add task</button>
     </form>
     <form className="row proj-form" onSubmit={saveNext}>

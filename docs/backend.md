@@ -94,9 +94,9 @@ or anything else that speaks the standard.
   `PERCENT-COMPLETE:100`, then `PUT` it back with `If-Match: <etag>`. On a 412
   (someone else changed it), re-read and retry once, then report.
 - **Create:** `PUT` a new `VTODO` with a fresh UID into the chosen list.
-- **Priority:** the standard `PRIORITY` property (RFC 5545): 0 none, 1 highest,
-  9 lowest. Orb shows High (1 to 4), Medium (5) and Low (6 to 9), writes 1, 5
-  or 9, sorts by it, and keeps whatever exact number another app set.
+- **Priority:** the standard `PRIORITY` property (RFC 5545), shown as vikunja's
+  five levels with vikunja's own mapping (Low 9, Medium 5, High 3, Urgent 2,
+  Do now 1). See `allglance.md`.
 - Credentials: `CALDAV_USER` and `CALDAV_PASSWORD` (or a token) from the
   environment.
 
