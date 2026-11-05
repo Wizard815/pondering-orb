@@ -44,7 +44,7 @@ a{color:var(--arcane)}
 
 /* header */
 .top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
-.top-in{max-width:1240px;margin:0 auto;padding-block:12px 0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:10px}
+.top-in{max-width:var(--page-w,none);margin:0 auto;padding-block:12px 0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:10px}
 .brand-row{display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:14px}
 .orb-wrap{width:54px;height:54px;flex:none;position:relative}
@@ -65,7 +65,7 @@ nav.tabs a{flex:none;text-decoration:none;color:var(--muted);font-family:var(--f
 nav.tabs a:hover{color:var(--ink)}
 nav.tabs a[aria-current="page"]{color:var(--gold);background:var(--panel);border-color:var(--line)}
 
-main{max-width:1240px;margin:0 auto;padding-block:20px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+main{max-width:var(--page-w,none);margin:0 auto;padding-block:20px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .room{display:flex;flex-direction:column;gap:16px}
 .room-head{display:flex;align-items:flex-end;justify-content:space-between;gap:10px 16px;flex-wrap:wrap}
 .room-head h2{font-size:1.4rem;letter-spacing:.05em}
@@ -336,7 +336,7 @@ nav.tabs a.tab-drop{outline:2px dashed var(--gold);outline-offset:-2px}
 input[type=search]{background:var(--inset);border:1px solid var(--line);border-radius:5px;padding:5px 9px;width:100%}
 
 /* ideas board */
-.mc{display:flex;gap:0;height:100%;min-height:560px;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--inset)}
+.mc{display:flex;gap:0;height:max(520px, calc(100vh - 300px));border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--inset)}
 .mc-rail{display:flex;flex-direction:column;gap:2px;padding:6px;background:var(--panel);border-right:1px solid var(--line)}
 .mc-rail .tool{width:36px;height:34px;border:1px solid transparent;border-radius:6px;background:none;font-size:1rem;color:var(--muted)}
 .mc-rail .tool:hover{color:var(--ink);background:var(--inset)}
@@ -381,7 +381,7 @@ input[type=search]{background:var(--inset);border:1px solid var(--line);border-r
 .mc-empty{padding:14px 0;text-align:center}
 .mc-rz{position:absolute;right:0;bottom:0;width:12px;height:12px;cursor:ew-resize;border-right:2px solid var(--line-hi);border-bottom:2px solid var(--line-hi);border-radius:0 0 5px 0}
 .mc-blank{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--muted);pointer-events:none;text-align:center;padding:16px}
-.mp.fixed .mc{min-height:0}
+.mp.fixed .mc{height:100%;min-height:0}
 /* UpstreamManager */
 .req{display:flex;flex-direction:column;gap:4px;background:var(--inset);border-radius:6px;padding:9px 11px;margin-bottom:8px;border-left:3px solid var(--warn)}
 .req.approved{border-left-color:var(--ok)} .req.denied{border-left-color:var(--line-hi)} .req.failed{border-left-color:var(--bad)}
@@ -431,7 +431,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
 </header>
 
 <main id="main"></main>
-<div class="status-line" id="dbstatus" style="max-width:1240px;margin:0 auto 24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))">Connecting to storage…</div>
+<div class="status-line" id="dbstatus" style="max-width:var(--page-w,none);margin:0 auto 24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))">Connecting to storage…</div>
 
 <script>
 (() => {
@@ -447,7 +447,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
   $("today").textContent = new Date().toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric",year:"numeric"});
 
   // ---------- state ----------
-  const S = { canvas:[], edges:[], upstream:{repos:null, requests:null, daily:null}, layouts:null, wiki:[], live:[], uptime:null, tasks:[], ideas:[], projects:[], logs:[], plans:[], upkeep:[], notes:[], events:[], stats:null, yaml:null, layout:null, settings:null, loaded:false };
+  const S = { hermes:null, canvas:[], edges:[], upstream:{repos:null, requests:null, daily:null}, layouts:null, wiki:[], live:[], uptime:null, tasks:[], ideas:[], projects:[], logs:[], plans:[], upkeep:[], notes:[], events:[], stats:null, yaml:null, layout:null, settings:null, loaded:false };
   let db = null;
   let savedChat = [];
   try { savedChat = JSON.parse(localStorage.getItem("orb.golem") || "[]"); if (!Array.isArray(savedChat)) savedChat = []; } catch { savedChat = []; }
@@ -582,7 +582,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
           <div class="name" style="display:flex;justify-content:space-between;gap:6px"><a href="${projHref(p)}" draggable="false">${esc(p.name)}</a>${star("projects",p)}</div>
           ${p.repo?`<div class="repo">${esc(p.repo)}</div>`:""}
           ${p.next?`<div class="next">${esc(p.next)}</div>`:""}
-          <div class="foot">${statusSelect(p)}${(()=>{ const r = p.upstreamRepo && umRepos().find(x=>x.id===p.upstreamRepo); return r&&r.behind?`<span class="chip warn" title="Upstream has ${r.behind} new commits">↓${r.behind}</span>`:""; })()}<span class="small muted">${logCount[p.name]||0} log${logCount[p.name]===1?"":"s"} · ${openTasks(p.name).length} task${openTasks(p.name).length===1?"":"s"}</span></div>
+          <div class="foot">${statusSelect(p)}${(()=>{ const r = p.upstreamRepo && umRepos().find(x=>x.id===p.upstreamRepo); return r&&r.behind?`<a class="chip warn" href="${projHref(p)}" draggable="false" title="${esc(r.name)}'s upstream has ${r.behind} commits you don't have yet (from UpstreamManager). Open the project to see its repo.">${r.behind} new upstream</a>`:""; })()}<span class="small muted">${logCount[p.name]||0} log${logCount[p.name]===1?"":"s"} · ${openTasks(p.name).length} task${openTasks(p.name).length===1?"":"s"}</span></div>
         </article>`).join("") || `<div class="empty small">Drop a card here.</div>`}</div>`;
     }).join("")}</div>${archivedHTML()}`;
   }
@@ -906,6 +906,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
               <button class="btn primary" type="submit">Add task</button></form>
             <form class="row" data-form="next"><input type="hidden" name="id" value="${esc(p._id)}"><input type="text" name="next" value="${esc(p.next||"")}" placeholder="Next step" aria-label="Next step"><button class="btn" type="submit">Save next step</button></form>`, {w:5}),
           P("repo","Repository", repoPanel(p), {w:7}),
+          P("chats","Chats", chatsPanel(p), {w:5}),
           P("wiki","Wiki note", wikiCard(p), {w:5})
         ]};
     },
@@ -951,7 +952,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     ideas(){
       const done = S.canvas.filter(i=>i.type==="idea" && i.promoted);
       return { extra:`<span class="pill info"><i></i>Preview of Miladash</span>`, panels: [
-        P("board","Board", boardHTML(), {w:12, h:680}),
+        P("board","Board", boardHTML(), {w:12}),
         P("promoted","Promoted to projects", done.length?`<ul class="list">${done.map(i=>`<li><span class="date">${esc(fmtDate(i.promoted))}</span><div class="grow">${esc(i.title)}</div></li>`).join("")}</ul>`:`<div class="empty">Nothing promoted yet. Right-click an idea card and choose Promote.</div>`, {w:6})
       ]};
     },
@@ -1239,6 +1240,9 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
   };
   const EDITABLE = [["bg","Background"],["panel","Panels"],["inset","Insets"],["line","Borders"],["ink","Text"],["muted","Quiet text"],["gold","Accent"],["arcane","Second accent"],["orb-mid","Orb glow"]];
   const theme = () => ({mode:"auto", preset:"night", custom:{}, ...(settings().theme||{})});
+  const PAGE_W = {fit:"none", wide:"1680px", comfortable:"1240px"};
+  let widthKey = "";
+  function applyWidth(){ const w = settings().pageWidth || "fit"; if (w===widthKey) return; widthKey = w; document.documentElement.style.setProperty("--page-w", PAGE_W[w] || "none"); }
   let themeKey = "";
   function applyTheme(){
     const th = theme(), key = JSON.stringify(th); if (key === themeKey) return; themeKey = key;
@@ -1251,7 +1255,10 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
   function appearanceHTML(){
     const th = theme(), base = PRESETS[th.preset] || PRESETS.night, vals = {...base.t, ...th.custom};
     const sw = p => `<span class="sw">${["bg","panel","gold","arcane","ink"].map(k=>`<i style="background:${p.t[k]}"></i>`).join("")}</span>`;
-    return `<p class="hint" style="margin:0">Follow device uses Night tower in dark mode and Parchment in light mode.</p>
+    const pw = settings().pageWidth || "fit";
+    return `<div class="setting"><div><div>Page width</div><div class="d">Fit window grows with the browser window. Comfortable and Wide stop at a set width on big screens.</div></div>
+        <select data-act="set-width" aria-label="Page width">${[["fit","Fit window"],["wide","Wide (1680 px)"],["comfortable","Comfortable (1240 px)"]].map(([k,l])=>`<option value="${k}" ${pw===k?"selected":""}>${l}</option>`).join("")}</select></div>
+      <p class="hint" style="margin:0">Follow device uses Night tower in dark mode and Parchment in light mode.</p>
       <div class="presets"><button class="preset ${th.mode==="auto"?"on":""}" data-act="theme-auto"><span class="sw"><i style="background:${PRESETS.night.t.bg}"></i><i style="background:${PRESETS.parchment.t.bg}"></i></span>Follow device</button>
       ${Object.entries(PRESETS).map(([id,p])=>`<button class="preset ${th.mode==="preset"&&th.preset===id?"on":""}" data-act="theme-preset" data-id="${id}">${sw(p)}${esc(p.name)}</button>`).join("")}</div>
       <details ${th.mode==="custom"?"open":""}><summary class="small">Customize colours${th.mode==="custom"?` (based on ${esc(base.name)})`:""}</summary>
@@ -1264,9 +1271,10 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     {id:"uptime", name:"Uptime Kuma", fields:[["baseUrl","Base URL"],["slug","Status page slug"],["keyEnv","Metrics key variable (optional)"]], test:c=>`GET ${c.baseUrl}/api/status-page/${c.slug} and /api/status-page/heartbeat/${c.slug}, then list the monitors it finds.`},
     {id:"wiki", name:"LLMWIKI", fields:[["baseUrl","REST API URL"],["keyEnv","API key variable"],["vaultPath","Vault folder in the container (read only)"]], test:c=>`GET ${c.baseUrl}/ with the key from ${c.keyEnv}, and check that ${c.vaultPath} holds the vault's .md files.`},
     {id:"caldav", name:"CalDAV tasks", fields:[["url","CalDAV URL"],["userEnv","User variable"],["passEnv","Password variable"]], test:c=>`PROPFIND ${c.url||"(set a URL)"} and list the collections that hold tasks.`},
-    {id:"upstream", name:"UpstreamManager", fields:[["baseUrl","Base URL"]], test:c=>`GET ${c.baseUrl}/api/repos and /api/requests.`}
+    {id:"upstream", name:"UpstreamManager", fields:[["baseUrl","Base URL"]], test:c=>`GET ${c.baseUrl}/api/repos and /api/requests.`},
+    {id:"hermes", name:"Hermes Studio", fields:[["baseUrl","Base URL"],["userEnv","User variable"],["passEnv","Password variable"]], test:c=>`POST ${c.baseUrl}/api/auth/login, then GET /api/studio/sessions?limit=5 and /api/studio/sessions/hermes?limit=5 with the token.`}
   ];
-  const CONN_DEFAULT = {uptime:{baseUrl:"http://uptime-kuma:3001", slug:"orb", keyEnv:""}, wiki:{baseUrl:"http://llmwiki:27123", keyEnv:"WIKI_API_KEY", vaultPath:"/vault"}, caldav:{url:"", userEnv:"CALDAV_USER", passEnv:"CALDAV_PASSWORD"}, upstream:{baseUrl:"http://upstream-manager:5000"}};
+  const CONN_DEFAULT = {uptime:{baseUrl:"http://uptime-kuma:3001", slug:"orb", keyEnv:""}, wiki:{baseUrl:"http://llmwiki:27123", keyEnv:"WIKI_API_KEY", vaultPath:"/vault"}, caldav:{url:"", userEnv:"CALDAV_USER", passEnv:"CALDAV_PASSWORD"}, upstream:{baseUrl:"http://upstream-manager:5000"}, hermes:{baseUrl:"http://hermes-studio:8648", userEnv:"HERMES_USER", passEnv:"HERMES_PASSWORD"}};
   const conn = () => { const c = settings().conn || {}; return Object.fromEntries(Object.entries(CONN_DEFAULT).map(([k,v])=>[k, {...v, ...(c[k]||{})}])); };
   function connectionsHTML(){
     const c = conn();
@@ -1275,6 +1283,26 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
         ${d.fields.map(([f,l])=>`<label class="small">${esc(l)}<input type="text" name="${f}" value="${esc(c[d.id][f]||"")}" aria-label="${esc(d.name)} ${esc(l)}"></label>`).join("")}
         <div class="row"><button class="btn primary" type="submit">Save</button><button class="btn" type="button" data-act="conn-test" data-id="${d.id}">Test</button></div>
         ${UI.connTest[d.id]?`<div class="banner">${esc(UI.connTest[d.id])}</div>`:""}</form>`).join("")}</div>`;
+  }
+
+  // ---------- Hermes chats ----------
+  const hermesChats = () => (S.hermes && S.hermes.items) || [];
+  const chatSrc = c => c.source==="hermes_agent" ? "Hermes Agent" : c.agent && c.agent!=="hermes" ? c.agent : "Hermes Studio";
+  function chatRow(c, p, linked){
+    const base = (conn().hermes.baseUrl||"").replace(/\/$/,"");
+    return `<li><div class="grow"><b>${esc(c.title||"Untitled chat")}</b><div class="hint">${esc(chatSrc(c))}${c.model?" · "+esc(c.model):""} · ${esc(c.messageCount)} messages · ${esc(ago(c.lastActive||c.startedAt))}</div></div>
+      ${linked ? `${isUrl(base)?`<a class="btn" href="${esc(base)}/" target="_blank" rel="noopener" title="Opens Hermes Studio; find the chat by its title">Open</a>`:""}<button class="btn" data-act="chat-unlink" data-id="${esc(p._id)}" data-c="${esc(c.id)}">Unlink</button>`
+        : `<button class="btn" data-act="chat-link" data-id="${esc(p._id)}" data-c="${esc(c.id)}">Link</button>`}</li>`;
+  }
+  function chatsPanel(p){
+    const all = hermesChats(), ids = p.chats || [], linked = all.filter(c=>ids.includes(c.id));
+    const q = (UI.chatQ||"").toLowerCase();
+    const rest = all.filter(c=>!ids.includes(c.id) && (!q || String(c.title||"").toLowerCase().includes(q))).sort((a,b)=>(b.lastActive||0)-(a.lastActive||0)).slice(0,6);
+    return `${S.hermes&&S.hermes.example?`<div class="banner">Example chats shaped like Hermes Studio's /api/studio/sessions.</div>`:""}
+      ${linked.length?`<ul class="list">${linked.map(c=>chatRow(c,p,true)).join("")}</ul>`:`<div class="empty">No chats linked yet.</div>`}
+      <h4 class="group-name">Link a chat</h4>
+      <input type="search" id="chat-q" value="${esc(UI.chatQ||"")}" placeholder="Search chat titles" aria-label="Search chats">
+      ${rest.length?`<ul class="list">${rest.map(c=>chatRow(c,p,false)).join("")}</ul>`:`<div class="empty small">No other chats match.</div>`}`;
   }
 
   // ---------- quick log ----------
@@ -1647,7 +1675,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     const ws = $("wiki-sec"); if (ws && UI.wikiEdit) UI.wikiEdit.text = ws.value;
   }
   function render(){
-    captureDrafts(); applyTheme();
+    captureDrafts(); applyTheme(); applyWidth();
     if (!UI.projectId) UI.split = linkOf(UI.tab) || null;
     const active = document.activeElement && document.activeElement.id;
     const caret = active && document.activeElement.selectionStart;
@@ -1665,7 +1693,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     $("main").innerHTML = `<div class="room">${html}</div>`;
     if ($("mc-edges")) requestAnimationFrame(mcDrawEdges);
     if (UI.mcEditNext){ const el = document.querySelector(`[data-mc="${CSS.escape(UI.mcEditNext)}"]`); if (el){ const id = UI.mcEditNext; UI.mcEditNext = null; setTimeout(()=>mcEdit(id, el), 0); } }
-    if (active && $(active) && /^(yaml|golem-in|logmax|wiki-sec|wiki-q)$/.test(active)){ const el = $(active); el.focus(); try { if (caret!=null) el.setSelectionRange(caret, caret); } catch {} }
+    if (active && $(active) && /^(yaml|golem-in|logmax|wiki-sec|wiki-q|chat-q)$/.test(active)){ const el = $(active); el.focus(); try { if (caret!=null) el.setSelectionRange(caret, caret); } catch {} }
   }
   function route(){
     const h = location.hash.replace(/^#/,"");
@@ -1700,6 +1728,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     db.doc("config/orb").onSnapshot(s => { S.yaml = s.exists ? String(s.data().yaml||"") : ""; applyYaml(); schedule(); }, err);
     db.doc("config/layout").onSnapshot(s => { S.layout = s.exists ? s.data() : null; schedule(); }, err);
     for (const d of ["repos","requests","daily"]) db.doc("upstream/"+d).onSnapshot(sn => { S.upstream = {...S.upstream, [d]: sn.exists ? sn.data() : null}; schedule(); }, err);
+    db.doc("hermes/sessions").onSnapshot(sn => { S.hermes = sn.exists ? sn.data() : null; schedule(); }, err);
     db.doc("config/layouts").onSnapshot(s => { if (!layoutTimer) { S.layouts = s.exists ? s.data() : null; schedule(); } }, err);
     db.doc("uptime/current").onSnapshot(s => { S.uptime = s.exists ? s.data() : null; schedule(); }, err);
     db.doc("config/settings").onSnapshot(s => { S.settings = s.exists ? s.data() : null; schedule(); }, err);
@@ -1740,6 +1769,8 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
       case "log-filter": UI.logFilter = el.dataset.p || ""; if (UI.tab!=="projects") location.hash = "projects"; else render(); break;
       case "edit-layout": UI.editing = !UI.editing; render(); break;
       case "pop-close": closeMenu(); break;
+      case "chat-link": { if(!need())return; const pr = S.projects.find(z=>z._id===id); if (pr) db.doc("projects/"+id).update({chats:[...new Set([...(pr.chats||[]), el.dataset.c])]}).catch(fail); break; }
+      case "chat-unlink": { if(!need())return; const pr = S.projects.find(z=>z._id===id); if (pr) db.doc("projects/"+id).update({chats:(pr.chats||[]).filter(x=>x!==el.dataset.c)}).catch(fail); break; }
       case "mc-tool": UI.mcTool = el.dataset.t; UI.mcFrom = null; render(); break;
       case "mc-open": UI.mcBoard = id; UI.mcFrom = null; render(); break;
       case "mc-zoom": { const b = mcBoardId(), cam = mcCam(b), v = $("mc-view"); const z = Math.max(.3, Math.min(2.2, cam.z * (Number(el.dataset.d)>0?1.2:1/1.2))); if (v){ const px = v.clientWidth/2, py = v.clientHeight/2; cam.x = px-(px-cam.x)*z/cam.z; cam.y = py-(py-cam.y)*z/cam.z; } cam.z = z; mcCams[b] = cam; saveCam(); render(); break; }
@@ -1778,6 +1809,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     if (act === "mc-todo"){ if(!need())return; const it = S.canvas.find(z=>z._id===el.dataset.id); if (it){ const items = (it.items||[]).map((x,k)=>k===Number(el.dataset.i)?{...x, done:el.checked}:x); db.doc("canvas/"+it._id).update({items}).catch(fail); } }
     if (act === "proj-repo"){ if(!need())return; db.doc("projects/"+el.dataset.id).update({upstreamRepo:el.value, lastLoggedSha:""}).catch(fail); }
     if (act === "proj-logcommits"){ if(!need())return; db.doc("projects/"+el.dataset.id).update({logCommits:el.checked}).catch(fail); }
+    if (act === "set-width"){ saveSettings({pageWidth:el.value}); }
     if (act === "show-archived"){ UI.showArchived = el.checked; render(); }
     if (act === "pick-project"){ const n = $("pick-new"); if (n){ n.hidden = el.value!=="__new"; if (!n.hidden) n.focus(); } }
     if (act === "np-wiki"){ const a = $("np-area"); if (a) a.hidden = !el.checked; }
@@ -1975,7 +2007,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     };
     grip.addEventListener("pointermove", move); grip.addEventListener("pointerup", up); grip.addEventListener("pointercancel", up);
   });
-  document.addEventListener("input", e => { if (e.target.id === "wiki-q"){ UI.wikiQ = e.target.value; render(); } });
+  document.addEventListener("input", e => { if (e.target.id === "wiki-q"){ UI.wikiQ = e.target.value; render(); } if (e.target.id === "chat-q"){ UI.chatQ = e.target.value; render(); } });
   document.addEventListener("input", e => { if (e.target.matches && e.target.matches("[data-counter]")){ const c = e.target.parentElement.querySelector(".counter"); if (c){ const n = e.target.value.length, m = Number(e.target.maxLength); c.textContent = n+"/"+m; c.classList.toggle("full", n>=m); } } });
   document.addEventListener("keydown", e => { if (e.target.id==="golem-in" && e.key==="Enter" && !e.shiftKey){ e.preventDefault(); golemSend(e.target.value); } });
 
