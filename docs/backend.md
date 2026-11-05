@@ -82,6 +82,9 @@ or anything else that speaks the standard.
   `PERCENT-COMPLETE:100`, then `PUT` it back with `If-Match: <etag>`. On a 412
   (someone else changed it), re-read and retry once, then report.
 - **Create:** `PUT` a new `VTODO` with a fresh UID into the chosen list.
+- **Priority:** the standard `PRIORITY` property (RFC 5545): 0 none, 1 highest,
+  9 lowest. Orb shows High (1 to 4), Medium (5) and Low (6 to 9), writes 1, 5
+  or 9, sorts by it, and keeps whatever exact number another app set.
 - Credentials: `CALDAV_USER` and `CALDAV_PASSWORD` (or a token) from the
   environment.
 
@@ -283,6 +286,32 @@ git, so it listens on `127.0.0.1` unless told otherwise. On that computer:
 If you put a reverse proxy in front of it, add the proxy's host to
 `UPSTREAM_ALLOWED_HOSTS` and let Orb send the proxy's auth header (set
 `upstream.header_env` in `orb.yaml`).
+
+### Where Fetch and the daily check run
+
+Everything git-related runs **inside UpstreamManager, on its own computer,
+against its own clones**. Orb never touches those folders and needs no file
+share (no SMB or NFS). Fetch is an HTTP call: Orb sends
+`POST /api/repo/<id>/fetch`, UpstreamManager runs `git fetch` locally and
+answers with the merge plan (behind, ahead, conflicts), and Orb shows that.
+The same goes for the daily check, approvals and commit lists. A shared
+folder would be worse: Orb would need git, the paths would differ between
+machines, and two programs would be writing the same repos.
+
+### Approving part of a request
+
+- **Component updates** (`type: components`, a `components` list) can be split
+  today: Orb denies the request, raises a new one for just the ticked
+  components with `POST /api/repo/<id>/components/request {"names": [...]}`,
+  and approves that.
+- **Merges with several upstreams** need a small UpstreamManager change:
+  accept `{"decision": "approve", "only": ["upstream-name"]}` in
+  `/api/request/<id>/decide`, run only those merges, and leave a new pending
+  request for the rest.
+- Each request links to UpstreamManager's Requests page and, when the repo has
+  a GitHub remote (`GET /api/repo/<id>/publish` gives `owner` and
+  `github_repo`), to its pull requests on GitHub.
+
 
 ### Linking a project to a repo
 

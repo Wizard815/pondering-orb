@@ -422,6 +422,13 @@ input[type=search]{background:var(--inset);border:1px solid var(--line);border-r
 .undo-bar .btn:hover{color:var(--gold);border-color:var(--gold)}
 .undo-x{border:0;background:none;color:inherit;opacity:.7;font-size:1.1rem;padding:0 4px}
 
+.prio{border:1px solid var(--line);background:none;border-radius:999px;font-size:.68rem;padding:0 7px;line-height:1.5;color:var(--muted);min-width:22px;flex:none;align-self:center}
+.prio.p1{color:var(--bad);border-color:var(--bad)} .prio.p5{color:var(--warn);border-color:var(--warn)} .prio.p9{color:var(--arcane);border-color:var(--arcane)}
+.req-form{display:flex;flex-direction:column;gap:4px}
+.req-item{display:flex;gap:6px;align-items:flex-start}
+.req-item input{margin-top:3px}
+.req-links{gap:12px}
+
 /* golem */
 .golem{display:flex;flex-direction:column;gap:10px}
 .golem-head{display:flex;align-items:center;gap:10px}
@@ -673,14 +680,19 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
   const listOf = t => t.list || t.project || "Inbox";
   const taskLists = () => [...new Set(S.tasks.map(listOf))].sort();
   const projectList = p => p.taskList || p.name;
+  const PRIO = [[0,"None"],[1,"High"],[5,"Medium"],[9,"Low"]];
+  const prioOf = t => { const p = Number(t.priority)||0; return p===0 ? 0 : p<=4 ? 1 : p===5 ? 5 : 9; };
+  const prioName = p => ({1:"High",5:"Medium",9:"Low"})[p] || "";
+  const prioChip = t => { const p = prioOf(t); return `<button class="prio p${p}" data-act="task-prio" data-id="${esc(t._id)}" title="Priority: ${p?prioName(p):"none"}. Click to change." aria-label="Priority ${p?prioName(p):"none"}">${p?prioName(p):"·"}</button>`; };
   function taskRows(list, showList){
     const today = todayISO();
     return `<div>${list.map(t=>`<div class="task ${t.done?"done":""}"><input type="checkbox" data-act="task-toggle" data-id="${esc(t._id)}" ${t.done?"checked":""} aria-label="Done: ${esc(t.title)}">
-      <div class="grow"><span class="t">${esc(t.title)}</span>${showList?` <span class="tag">${esc(listOf(t))}</span>`:""}
+      ${prioChip(t)}<div class="grow"><span class="t">${esc(t.title)}</span>${showList?` <span class="tag">${esc(listOf(t))}</span>`:""}
       ${t.done&&t.doneBy?`<div class="hint">done by ${esc(t.doneBy)}</div>`:""}</div>
       ${t.due?`<span class="due ${!t.done&&t.due<today?"late":""}">${esc(fmtDate(t.due))}</span>`:""}</div>`).join("")}</div>`;
   }
-  const sortTasks = l => l.sort((a,b)=>(a.done?1:0)-(b.done?1:0) || String(a.due||"9999").localeCompare(String(b.due||"9999")));
+  const prioRank = t => { const p = prioOf(t); return p===0 ? 6 : p; };
+  const sortTasks = l => l.sort((a,b)=>(a.done?1:0)-(b.done?1:0) || prioRank(a)-prioRank(b) || String(a.due||"9999").localeCompare(String(b.due||"9999")));
   const demoTasks = () => S.tasks.some(t=>t.example) ? `<div class="banner">Demo tasks. In the container these are VTODOs read and updated over CalDAV (your GLANCE stack).</div>` : "";
   function tasksHTML(project, limit){
     let list;
@@ -971,7 +983,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     mail(){ return { extra:`<span class="pill warn"><i></i>Gmail not connected</span>`, panels:[P("mail","Mail", sealedMail(), {w:12})] }; },
     upkeep(){
       const base = umBase();
-      return { extra:`${isUrl(base)?`<a class="btn" href="${esc(base)}" target="_blank" rel="noopener">Open UpstreamManager</a>`:""}<a class="btn" href="#config">Connection settings</a>`, panels: [
+      return { extra:`<span class="pill ${umExample()?"warn":"ok"}" title="Orb reads and acts on UpstreamManager through its API at ${esc(base)}"><i></i>${umExample()?"Demo copy of":"Live from"} UpstreamManager</span>${isUrl(base)?`<a class="btn" href="${esc(base)}" target="_blank" rel="noopener">Open UpstreamManager</a>`:""}<a class="btn" href="#config">Connection settings</a>`, panels: [
         P("requests","Approval requests", requestsHTML(), {w:7}),
         P("daily","Daily check", dailyHTML(), {w:5}),
         P("repos","Repositories", reposHTML(), {w:12}),
@@ -1003,7 +1015,9 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
         P("tasks","Tasks", `${demoTasks()}${shown.map(l=>{ const items = sortTasks(S.tasks.filter(x=>listOf(x)===l)); return `<h4 class="group-name">${esc(l)}</h4>${items.length?taskRows(items,false):`<div class="empty small">Empty list.</div>`}`; }).join("")}
           <form class="row" data-form="task"><input type="text" name="title" placeholder="New task" aria-label="New task" required>
             <input type="text" name="list" list="list-names" placeholder="List" aria-label="List" value="${esc(sel[0]||lists[0]||"Inbox")}"><datalist id="list-names">${lists.map(l=>`<option value="${esc(l)}">`).join("")}</datalist>
-            <input type="date" name="due" aria-label="Due date"><button class="btn primary" type="submit">Add task</button></form>`, {w:9})
+            <select name="priority" aria-label="Priority">${PRIO.map(([v,l])=>`<option value="${v}">${v?l:"No priority"}</option>`).join("")}</select>
+            <input type="date" name="due" aria-label="Due date"><button class="btn primary" type="submit">Add task</button></form>
+          <p class="hint" style="margin:0">Priority is CalDAV's own PRIORITY field: High = 1, Medium = 5, Low = 9.</p>`, {w:9})
       ]};
     },
     wiki(){
@@ -1453,7 +1467,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
       if (!l) return `${ttl("","Tasks")}<div class="hint">Double-click to choose a CalDAV list.</div>`;
       return `<div class="mc-head"><div class="mc-title">${esc(i.title||l)}</div><span class="chip" title="CalDAV list">☰ ${esc(l)}</span></div>
         <div class="hint">${open} open</div>
-        <ul class="mc-todo">${items.slice(0,12).map(x=>`<li><input type="checkbox" data-act="task-toggle" data-id="${esc(x._id)}" ${x.done?"checked":""} aria-label="${esc(x.title)}"><span class="${x.done?"done":""}">${esc(x.title)}</span>${x.due?`<span class="mono small muted" style="margin-left:auto">${esc(fmtDate(x.due))}</span>`:""}</li>`).join("")}</ul>
+        <ul class="mc-todo">${items.slice(0,12).map(x=>`<li><input type="checkbox" data-act="task-toggle" data-id="${esc(x._id)}" ${x.done?"checked":""} aria-label="${esc(x.title)}">${prioOf(x)?`<span class="prio p${prioOf(x)}">${prioName(prioOf(x))[0]}</span>`:""}<span class="${x.done?"done":""}">${esc(x.title)}</span>${x.due?`<span class="mono small muted" style="margin-left:auto">${esc(fmtDate(x.due))}</span>`:""}</li>`).join("")}</ul>
         <form data-form="mc-addtask" data-list="${esc(l)}" class="mc-add"><input type="text" name="t" placeholder="+ Add a task to ${esc(l)}" aria-label="Add a task"></form>`;
     }
     if (t==="link") return `${ttl(i.title||(i.url&&i.url!=="https://"?i.url:""),"Link")}${isUrl(i.url)?`<a href="${esc(i.url)}" target="_blank" rel="noopener" class="mc-url">${esc(i.url)}</a>`:""}`;
@@ -1685,15 +1699,26 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
   const umBase = () => (conn().upstream.baseUrl||"").replace(/\/$/,"");
   const umDemo = call => setStatus(`Demo: nothing was sent. In the container Orb calls ${call} on UpstreamManager.`);
   const reqType = r => r.type==="actions" ? "Actions change" : r.type==="push" ? "Push / pull request" : r.type==="components" ? "Component update" : "Merge from upstream";
+  const umRepo = id => umRepos().find(x=>x.id===id);
+  const ghLinks = r => { const g = r && r.github; return g ? {pulls:`https://github.com/${g}/pulls`, repo:`https://github.com/${g}`} : null; };
+  const reqItems = r => r.type==="components" ? (r.components||r.upstreams||[]) : (r.upstreams||[]);
   function requestsHTML(){
     const all = umRequests(), pend = all.filter(r=>r.status==="pending"), done = all.filter(r=>r.status!=="pending").sort((a,b)=>String(b.decided_at||"").localeCompare(String(a.decided_at||""))).slice(0,6);
-    const one = r => `<div class="req ${r.status}">
-      <div class="row" style="justify-content:space-between"><b>${esc(r.repo_name)}</b><span class="small mono muted">${esc(r.focus_branch||"")}</span></div>
-      <div class="row small"><span class="pill ${r.status==="pending"?(r.safe?"ok":"warn"):r.status==="approved"?"ok":r.status==="failed"?"bad":""}"><i></i>${r.status==="pending"?(r.safe?"safe to merge":"has conflicts"):esc(r.status)}</span><span class="muted">${esc(reqType(r))} · ${esc(ago(r.created_at))}</span></div>
-      ${(r.upstreams||[]).map(u=>`<div class="small">↓ ${esc(u.behind)} from <span class="mono">${esc(u.name)}/${esc(u.branch||r.focus_branch)}</span>${u.ahead?` · ${esc(u.ahead)} of yours`:""}${u.reason?` · ${esc(u.reason)}`:""}</div>`).join("")}
-      ${(r.conflicts||[]).length?`<div class="small st-blocked">Conflicts: ${r.conflicts.map(esc).join(", ")}</div>`:""}
-      ${r.status==="pending" ? `<form class="row" data-form="req-decide" data-id="${esc(r.id)}"><input type="text" name="comment" placeholder="Comment (optional)" aria-label="Comment"><button class="btn primary" type="submit" name="d" value="approve">Approve</button><button class="btn" type="submit" name="d" value="deny">Deny</button></form>`
-        : `<div class="hint">${esc(r.decided_at?ago(r.decided_at):"")}${r.comment?` · “${esc(r.comment)}”`:""}</div>`}</div>`;
+    const base = umBase();
+    const one = r => {
+      const items = reqItems(r), many = items.length > 1 && r.status==="pending", gh = ghLinks(umRepo(r.repo_id));
+      const links = `<div class="row small req-links">${isUrl(base)?`<a href="${esc(base)}/requests" target="_blank" rel="noopener">Open in UpstreamManager</a>`:""}${gh?`<a href="${esc(gh.pulls)}" target="_blank" rel="noopener">Pull requests on GitHub</a>`:""}</div>`;
+      const line = (u,k) => `<label class="small req-item">${many?`<input type="checkbox" name="pick" value="${esc(u.name)}" checked>`:""}<span>↓ ${esc(u.behind)} ${r.type==="components"?"in":"from"} <span class="mono">${esc(u.name)}${r.type==="components"?"":"/"+esc(u.branch||r.focus_branch)}</span>${u.ahead?` · ${esc(u.ahead)} of yours`:""}${u.reason?` · ${esc(u.reason)}`:""}</span></label>`;
+      return `<div class="req ${r.status}">
+        <div class="row" style="justify-content:space-between"><b>${esc(r.repo_name)}</b><span class="small mono muted">${esc(r.focus_branch||"")}</span></div>
+        <div class="row small"><span class="pill ${r.status==="pending"?(r.safe?"ok":"warn"):r.status==="approved"?"ok":r.status==="failed"?"bad":""}"><i></i>${r.status==="pending"?(r.safe?"safe to merge":"has conflicts"):esc(r.status)}</span><span class="muted">${esc(reqType(r))} · ${esc(ago(r.created_at))}</span></div>
+        ${r.status==="pending" ? `<form class="req-form" data-form="req-decide" data-id="${esc(r.id)}">${items.map(line).join("")}
+            ${many?`<div class="hint">Untick anything you don't want; the rest is approved on its own.</div>`:""}
+            ${(r.conflicts||[]).length?`<div class="small st-blocked">Conflicts: ${r.conflicts.map(esc).join(", ")}</div>`:""}
+            <div class="row"><input type="text" name="comment" placeholder="Comment (optional)" aria-label="Comment"><button class="btn primary" type="submit" name="d" value="approve">${many?"Approve ticked":"Approve"}</button><button class="btn" type="submit" name="d" value="deny">Deny${many?" all":""}</button></div></form>`
+          : `${items.map(line).join("")}<div class="hint">${esc(r.decided_at?ago(r.decided_at):"")}${r.comment?` · “${esc(r.comment)}”`:""}${r.partOf?` · split from a larger request`:""}</div>`}
+        ${links}</div>`;
+    };
     return (umExample()?`<div class="banner">Example data shaped like UpstreamManager's /api/requests.</div>`:"") +
       (pend.length ? pend.map(one).join("") : `<div class="empty">No requests waiting.</div>`) +
       (done.length ? `<h4 class="group-name">Decided</h4>${done.map(one).join("")}` : "");
@@ -1887,6 +1912,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
       case "chat-unlink": { if(!need())return; const pr = S.projects.find(z=>z._id===id), c = hermesChats().find(z=>z.id===el.dataset.c); if (!pr) break;
         confirmPop(el, `Unlink the chat <b>${esc(c?c.title:"this chat")}</b> from ${esc(pr.name)}? The chat itself isn't touched.`, "Unlink", ()=>updWithUndo("projects/"+id, {chats:(pr.chats||[]).filter(x=>x!==el.dataset.c)}, "Chat unlinked.")); break; }
       case "confirm-ok": { const run = UI.confirmRun; UI.confirmRun = null; closeMenu(); if (run) Promise.resolve(run()).catch(fail); break; }
+      case "task-prio": { if(!need())return; const t = S.tasks.find(z=>z._id===id); if (!t) break; const order = [0,1,5,9], next = order[(order.indexOf(prioOf(t))+1)%order.length]; db.doc("tasks/"+id).update({priority:next}).catch(fail); break; }
       case "mc-tool": UI.mcTool = el.dataset.t; UI.mcFrom = null; render(); break;
       case "mc-item-del": { if(!need())return; const it = S.canvas.find(z=>z._id===id); if (it){ const k = Number(el.dataset.i), t = (it.items||[])[k]; updWithUndo("canvas/"+id, {items:(it.items||[]).filter((x,j)=>j!==k)}, `Removed “${t?t.t:"item"}”.`).catch(fail); } break; }
       case "mc-open": UI.mcBoard = id; UI.mcFrom = null; render(); break;
@@ -1967,7 +1993,21 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
         case "edge-label": closeMenu(); await db.doc("edges/"+v.id).update({label:(v.label||"").trim()}); return;
         case "req-decide": {
           const d = e.submitter && e.submitter.value === "deny" ? "deny" : "approve", rid = f.dataset.id, doc = UM().requests; if (!doc) return;
-          const items = (doc.items||[]).map(r=>r.id===rid ? {...r, status: d==="approve"?"approved":"denied", decided_at:new Date().toISOString(), comment:(v.comment||"").trim()||null} : r);
+          const req = (doc.items||[]).find(r=>r.id===rid); if (!req) return;
+          const all = reqItems(req), picked = [...f.querySelectorAll('input[name="pick"]')].filter(x=>x.checked).map(x=>x.value);
+          const partial = d==="approve" && all.length>1 && f.querySelector('input[name="pick"]') && picked.length < all.length;
+          if (d==="approve" && all.length>1 && f.querySelector('input[name="pick"]') && !picked.length){ setStatus("Tick at least one item to approve, or press Deny all."); return; }
+          const now = new Date().toISOString(), comment = (v.comment||"").trim()||null;
+          let items = (doc.items||[]).map(r=>r.id===rid ? {...r, status: d==="approve"&&!partial?"approved":"denied", decided_at:now, comment: partial ? "split: approving only part of this request" : comment} : r);
+          if (partial){
+            const keep = all.filter(u=>picked.includes(u.name));
+            items = [...items, {...req, id:rid+":part", partOf:rid, [req.type==="components"?"components":"upstreams"]: keep, upstreams: req.type==="components" ? keep : keep, status:"approved", decided_at:now, comment}];
+            await db.doc("upstream/requests").update({items});
+            umDemo(req.type==="components"
+              ? `POST /api/request/${rid}/decide {"decision":"deny"}, then POST /api/repo/${req.repo_id}/components/request {"names":${JSON.stringify(picked)}}, then approve that new request`
+              : `POST /api/request/${rid}/decide {"decision":"approve","only":${JSON.stringify(picked)}} (needs the small UpstreamManager change in docs/backend.md)`);
+            return;
+          }
           await db.doc("upstream/requests").update({items});
           umDemo(`POST /api/request/${rid}/decide with {"decision":"${d}"}`); return;
         }
@@ -1992,7 +2032,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
         case "idea": if(!v.title.trim()) return; await db.collection("ideas").add({title:v.title.trim(), pitch:(v.pitch||"").trim(), stage:"thought", updated:todayISO()}); break;
         case "logmax": await saveSettings({logMax:Math.max(20, Math.min(200, Number(v.logmax)||50))}); setStatus("Log length saved."); return;
         case "golem": golemSend(v.q); return;
-        case "task": if(!v.title.trim()) return; await db.collection("tasks").add({title:v.title.trim(), list:(v.list||"Inbox").trim()||"Inbox", due:v.due||"", done:false}); break;
+        case "task": if(!v.title.trim()) return; await db.collection("tasks").add({title:v.title.trim(), list:(v.list||"Inbox").trim()||"Inbox", due:v.due||"", done:false, priority:Number(v.priority)||0}); break;
         case "wiki-sec": {
           const ed = UI.wikiEdit, n = ed && wikiByPath(ed.path); if (!n) return;
           await db.doc("wiki/"+n._id).update({body:replaceSection(n.body, ed.heading, (v.text||"").trim()), updated:todayISO()});
@@ -2068,7 +2108,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
         execute:() => S.canvas.filter(i=>i.type==="idea" && !i.promoted).map(i=>({title:i.title, stage:i.stage, pitch:i.text||""})) },
       { name:"list_tasks", description:"Returns tasks as {title, list, due, done}. Optional list filters to one task list (projects use their own name); openOnly defaults to true.",
         inputSchema:{type:"object", properties:{list:{type:"string"}, openOnly:{type:"boolean"}}},
-        execute:({list:project, openOnly}) => S.tasks.filter(t=>(!project || listOf(t).toLowerCase()===String(project).toLowerCase()) && (openOnly===false || !t.done)).map(t=>({title:t.title, list:listOf(t), due:t.due||"", done:!!t.done})) },
+        execute:({list:project, openOnly}) => S.tasks.filter(t=>(!project || listOf(t).toLowerCase()===String(project).toLowerCase()) && (openOnly===false || !t.done)).map(t=>({title:t.title, list:listOf(t), due:t.due||"", done:!!t.done, priority:prioName(prioOf(t))||"none"})) },
       { name:"list_upkeep", description:"Returns upkeep checks as {name, everyDays, lastDone, daysLeft}; negative daysLeft means overdue.",
         execute:() => S.upkeep.map(u=>({name:u.name, everyDays:u.everyDays, lastDone:u.lastDone||"never", daysLeft:upkeepState(u).left})) }
     ];
@@ -2096,9 +2136,9 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
           await db.doc("projects/"+p._id).update({status, updated:todayISO()}); did.push(`moved: ${p.name} → ${STATUS_LABEL[status]}`); return {name:p.name, status};
         } },
       { name:"add_task", description:"Adds a task to a task list (a CalDAV collection; use a project name for project work). due is optional, YYYY-MM-DD. Returns the task.",
-        inputSchema:{type:"object", properties:{title:{type:"string"}, list:{type:"string"}, due:{type:"string"}}, required:["title","list"]},
-        execute: async ({title, list, due}) => { const t = clip(title, 120); const l = clip(list||"Inbox", 60); const d = /^\d{4}-\d{2}-\d{2}$/.test(String(due||""))?String(due):"";
-          await db.collection("tasks").add({title:t, list:l, due:d, done:false}); did.push(`task added: ${l}`); return {title:t, list:l, due:d}; } },
+        inputSchema:{type:"object", properties:{title:{type:"string"}, list:{type:"string"}, due:{type:"string"}, priority:{type:"string", enum:["high","medium","low","none"]}}, required:["title","list"]},
+        execute: async ({title, list, due, priority}) => { const t = clip(title, 120); const l = clip(list||"Inbox", 60); const d = /^\d{4}-\d{2}-\d{2}$/.test(String(due||""))?String(due):"";
+          await db.collection("tasks").add({title:t, list:l, due:d, done:false, priority:({high:1,medium:5,low:9})[priority]||0}); did.push(`task added: ${l}`); return {title:t, list:l, due:d}; } },
       { name:"add_idea", description:"Adds an idea at the thought stage with an optional one-line pitch. Returns the idea.",
         inputSchema:{type:"object", properties:{title:{type:"string"}, pitch:{type:"string"}}, required:["title"]},
         execute: async ({title, pitch}) => { const t = clip(title, 80);
