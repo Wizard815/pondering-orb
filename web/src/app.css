@@ -1,0 +1,21 @@
+/* React app additions on top of demo.css */
+html, body { height: 100%; }
+#root { min-height: 100%; }
+.login { max-width: 360px; margin: 12vh auto; display: flex; flex-direction: column; gap: 12px; padding: 0 16px; }
+.login h1 { text-align: center; }
+.react-grid-layout { position: relative; transition: height 200ms ease; }
+.react-grid-item { transition: all 200ms ease; transition-property: left, top, width, height; }
+.react-grid-item.cssTransforms { transition-property: transform, width, height; }
+.react-grid-item.resizing, .react-grid-item.react-draggable-dragging { transition: none; z-index: 3; }
+.react-grid-item.react-grid-placeholder { background: var(--gold-soft); border: 1px dashed var(--gold); border-radius: 8px; opacity: .7; transition-duration: 100ms; z-index: 2; user-select: none; }
+.react-grid-item > .react-resizable-handle { position: absolute; width: 18px; height: 18px; right: 2px; bottom: 2px; cursor: se-resize; border-right: 3px solid var(--gold); border-bottom: 3px solid var(--gold); border-radius: 0 0 6px 0; }
+.react-grid-item.react-draggable-dragging .panel { box-shadow: 0 18px 30px -12px rgba(0,0,0,.6); }
+.gp { height: 100%; overflow: hidden; }
+.gp > .panel { height: 100%; }
+.gp .pbody { flex: 1; min-height: 0; overflow: auto; }
+.editing .gp > .panel { outline: 1px dashed var(--line-hi); outline-offset: 3px; }
+.editing .gp > .panel > h3 { cursor: move; user-select: none; }
+.gp.hiddenp > .panel { opacity: .45; }
+.offline { position: fixed; z-index: 70; top: 8px; left: 50%; transform: translateX(-50%); }
+.err-inline { color: var(--bad); font-size: .86rem; }
+div:not(.editing) > .react-grid-layout .react-resizable-handle { display: none; }
