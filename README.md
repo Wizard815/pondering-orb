@@ -54,9 +54,10 @@ groups:
 
 ## Running it
 
-`docker-compose.example.yml` sketches the planned stack: Orb, Uptime Kuma and
-a read-only Docker socket proxy in one file. UpstreamManager runs on another
-computer and is reached by URL.
+`docker-compose.example.yml` starts only Orb and a read-only Docker socket
+proxy. Apps you already run (Hermes Studio, Argos, LLMWIKI, UpstreamManager,
+CalDAV, Uptime Kuma) are reached by address. A bundled Uptime Kuma starts only
+with `docker compose --profile uptime up -d`.
 
 ## Container backend
 

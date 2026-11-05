@@ -2,10 +2,14 @@
 # with build step 1 in docs/backend.md. Uptime Kuma and the Docker socket proxy
 # are ordinary images and work today.
 #
-# One file, separate containers: Orb, Uptime Kuma, and a read-only proxy in
-# front of the Docker socket. UpstreamManager runs on another computer and is
-# reached by URL (UPSTREAM_URL). If you already run Uptime Kuma, delete its
-# service and point UPTIME_URL at yours.
+# This file starts Orb and a read-only proxy for the Docker socket. Nothing
+# else. Apps you already run (Hermes Studio, Argos, LLMWIKI, UpstreamManager,
+# your CalDAV server, Uptime Kuma) stay where they are; Orb only connects to
+# them by address, set below or in Settings -> Connections.
+#
+# No Uptime Kuma yet? Start the bundled one with:
+#   docker compose --profile uptime up -d
+# Already have one? Leave the profile off and point UPTIME_URL at yours.
 
 services:
   orb:
@@ -16,24 +20,32 @@ services:
       - "8095:8095"
     environment:
       ORB_CONFIG: /config/orb.yaml
+      # Addresses of apps you already run (container name on a shared
+      # network, or a LAN address for another machine):
       UPTIME_URL: http://uptime-kuma:3001
-      UPSTREAM_URL: http://192.168.20.10:5000        # the computer running UpstreamManager
+      UPSTREAM_URL: http://192.168.20.10:5000        # placeholder: the computer running UpstreamManager
+      HERMES_URL: http://hermes-studio:6060
+      ARGOS_URL: http://argos:8080
+      WIKI_URL: http://llmwiki:27123
       DOCKER_HOST: tcp://docker-proxy:2375
       WIKI_API_KEY: ${WIKI_API_KEY}
       CALDAV_USER: ${CALDAV_USER}
       CALDAV_PASSWORD: ${CALDAV_PASSWORD}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      HERMES_USER: ${HERMES_USER}
+      HERMES_PASSWORD: ${HERMES_PASSWORD}
     volumes:
       - ./config:/config
       - ./data:/data                                 # orb.db (SQLite)
       - /proc:/host/proc:ro                          # System tab: cores, memory, network
       - /mnt/user/appdata/llmwiki/vault:/vault:ro    # Wiki tab reads the whole vault; writes go through the REST API
-    networks: [edge, ai_net, orb]
+    networks: [edge, ai_net, orb]                  # ai_net reaches Hermes, Argos and llmwiki
     depends_on: [docker-proxy]
 
   uptime-kuma:
     image: louislam/uptime-kuma:1
     container_name: uptime-kuma
+    profiles: [uptime]                               # only with --profile uptime
     restart: unless-stopped
     ports:
       - "3001:3001"

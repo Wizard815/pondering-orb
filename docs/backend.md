@@ -299,8 +299,9 @@ can read a linked chat (read only) to answer "what did we decide about X".
 
 ## Uptime
 
-Uptime Kuma ships in the same `docker-compose.example.yml` as Orb: one file,
-two containers. Delete its service if you already run one. Read it; don't copy its code into
+Uptime Kuma is in `docker-compose.example.yml` behind a profile: it only
+starts with `docker compose --profile uptime up -d`. If you already run one,
+leave the profile off and set `UPTIME_URL`. Read it; don't copy its code into
 Orb. It is MIT, so copying is allowed, but it is a full Node app with its own
 database and Socket.io API, and a fork would have to be kept up to date by
 hand. As a separate container it keeps getting upstream fixes (and
