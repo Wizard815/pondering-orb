@@ -26,6 +26,7 @@ export async function startStore() {
   const connect = () => {
     const es = new EventSource("/api/stream");
     es.addEventListener("change", (e: MessageEvent) => { const ch = JSON.parse(e.data); apply(ch.coll, ch.id, ch.op === "delete" ? null : ch.doc); emit(); });
+    es.addEventListener("outbox", () => dispatchEvent(new Event("orb:outbox")));
     es.onopen = () => { if (!online) { online = true; resync(); } };
     es.onerror = () => { online = false; emit(); };
   };

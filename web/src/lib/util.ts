@@ -29,3 +29,11 @@ export function choreState(c: any) {
   return { due, left, cls: left < 0 ? "over" : left <= 1 ? "soon" : "ok" };
 }
 export const logSorted = (logs: any[]) => [...logs].sort((a, b) => String(b.date).localeCompare(String(a.date)) || (b.created || 0) - (a.created || 0));
+
+/** Runs a form's async submit once at a time: a double-click (or Enter
+ *  pressed twice) while the first request is in flight does nothing. */
+export async function oneAtATime(form: HTMLElement | null, fn: () => Promise<unknown>) {
+  if (!form || form.dataset.busy) return;
+  form.dataset.busy = "1"; form.setAttribute("aria-busy", "true");
+  try { await fn(); } finally { delete form.dataset.busy; form.removeAttribute("aria-busy"); }
+}

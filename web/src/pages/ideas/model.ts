@@ -50,12 +50,17 @@ export async function deleteCard(i: Doc) {
   const id = i.id, data = bare(i);
   const kids = getColl("canvas").filter(k => k.parent === id).map(k => ({ id: k.id, parent: k.parent, x: k.x, y: k.y, order: k.order }));
   const edges = getColl("edges").filter(e => e.from === id || e.to === id).map(e => ({ id: e.id, data: bare(e) }));
+  // Cards that lived on this board (if it was a board) move up to the board
+  // it sat on, so nothing is left on a board you can't open any more.
+  const inside = getColl("canvas").filter(k => k.board === id).map(k => ({ id: k.id, board: k.board, x: k.x, y: k.y }));
   for (const k of kids) await patch("canvas", k.id, { parent: "", x: (i.x || 0) + 20, y: (i.y || 0) + 40 + (k.order || 0) * 30 });
+  for (const [n, k] of inside.entries()) await patch("canvas", k.id, { board: i.board || "", x: (i.x || 0) + 30 + (n % 4) * 40, y: (i.y || 0) + 60 + Math.floor(n / 4) * 40 });
   for (const e of edges) await remove("edges", e.id);
   await remove("canvas", id);
   return async () => {
     await create("canvas", { ...data, id });
     for (const k of kids) await patch("canvas", k.id, { parent: k.parent, x: k.x ?? 0, y: k.y ?? 0, order: k.order ?? 0 });
+    for (const k of inside) await patch("canvas", k.id, { board: k.board, x: k.x ?? 0, y: k.y ?? 0 });
     for (const e of edges) await create("edges", { ...e.data, id: e.id });
   };
 }

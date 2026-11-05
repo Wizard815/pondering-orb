@@ -50,7 +50,8 @@ export function App() {
 
   const links: [string, string][] = (settings.links || []).filter((l: any) => Array.isArray(l) && l.length === 2 && l.every((x: string) => pageById(x)) && l[0] !== l[1]);
   const projectId = /^p-/.test(hash) ? hash.slice(2) : null;
-  let tab = projectId ? "projects" : hash.includes("--") ? hash.split("--")[0] : pageById(hash) ? hash : "main";
+  const first = hash.split("--")[0];
+  let tab = projectId ? "projects" : pageById(first) ? first : "main"; // an unknown hash shows Main, never a blank page
   const link = projectId ? null : links.find(l => l.includes(tab)) || null;
   const linkId = link ? link.join("--") : "";
   const r = ratio ?? (settings.splitRatio?.[linkId] ?? 0.5);

@@ -39,7 +39,8 @@ export class TaskSync {
   private pulling: Promise<{ lists: number; tasks: number }> | null = null;
   /** One pull at a time: callers that arrive during a pull share it. */
   pull() {
-    if (!this.pulling) this.pulling = this.pullNow().finally(() => { this.pulling = null; });
+    // A failed pull is shown as the sync status until the next one works.
+    if (!this.pulling) this.pulling = this.pullNow().catch(e => { this.lastError = e?.message || String(e); throw e; }).finally(() => { this.pulling = null; });
     return this.pulling;
   }
   private async pullNow() {

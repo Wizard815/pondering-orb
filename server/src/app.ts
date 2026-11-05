@@ -48,7 +48,7 @@ export async function buildApp(o: AppOptions = {}) {
     };
   };
   const records = new Records(store, cfg);
-  const outbox = new Outbox(store);
+  const outbox = new Outbox(store, () => records.emit("outbox")); // browsers refresh the "waiting to sync" pill
   const auth = new Auth(store, o.password ?? process.env.ORB_PASSWORD ?? "", o.tokens ?? process.env.ORB_API_TOKENS ?? "");
   const upstream = new Upstream(() => cfg().upstream.baseUrl, () => cfg().upstream.headerEnv);
   const dav = new CalDav(() => cfg().caldav.url, () => ({ user: secret(cfg().caldav.userEnv), pass: secret(cfg().caldav.passwordEnv) }));
@@ -145,6 +145,7 @@ export async function buildApp(o: AppOptions = {}) {
     const raw = req.body ?? {};
     if (typeof raw !== "object" || Array.isArray(raw)) throw new HttpError(400, "Send a JSON object.");
     const body: Record<string, any> = { ...raw };
+    if (c === "settings" && body.btopUrl && !/^https?:\/\//i.test(String(body.btopUrl))) throw new HttpError(422, "The btop address must start with http:// or https://.");
     if (c === "tasks" || c === "chores") { delete body.caldav; const cur: any = id && records.get(c, id); if (cur?.caldav && req.method === "PUT") body.caldav = cur.caldav; }
     if (c === "logs" && who(req) !== "you" && (req.method === "POST" || "by" in body)) body.by = who(req);
     return body;
@@ -167,10 +168,15 @@ export async function buildApp(o: AppOptions = {}) {
     reply.raw.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive", "X-Accel-Buffering": "no" });
     reply.raw.write(": connected\n\n");
     const send = (c: Change) => reply.raw.write(`event: change\ndata: ${JSON.stringify({ coll: c.coll, id: c.id, op: c.op, doc: c.doc })}\n\n`);
+    const ob = () => reply.raw.write("event: outbox\ndata: {}\n\n");
     const beat = setInterval(() => reply.raw.write(": ping\n\n"), 25000);
-    records.on("change", send);
-    req.raw.on("close", () => { clearInterval(beat); records.off("change", send); });
+    records.on("change", send); records.on("outbox", ob); streams.add(reply.raw);
+    req.raw.on("close", () => { clearInterval(beat); records.off("change", send); records.off("outbox", ob); streams.delete(reply.raw); });
   });
+  // On shutdown (docker stop) end the open streams, or close() would wait on
+  // them forever; browsers then reconnect to the new server.
+  const streams = new Set<import("node:http").ServerResponse>();
+  app.addHook("preClose", async () => { for (const s of streams) s.end(); streams.clear(); });
 
   // ---- UpstreamManager (runs on another computer; git happens there) ----
   app.get("/api/upstream/repos", { preHandler: guard }, async () => {
@@ -241,8 +247,11 @@ export async function buildApp(o: AppOptions = {}) {
   app.get("/api/config", { preHandler: guard }, async () => {
     const c = cfg();
     return { logMax: c.logMax, golem: { baseUrl: c.golem.baseUrl, model: c.golem.model, keyEnv: c.golem.keyEnv, keySet: !!secret(c.golem.keyEnv), canWrite: c.golem.canWrite },
-      upstream: { baseUrl: c.upstream.baseUrl }, uptime: c.uptime, caldav: { url: c.caldav.url, choresList: c.caldav.choresList, userSet: !!secret(c.caldav.userEnv) },
-      wiki: { baseUrl: c.wiki.baseUrl, keySet: !!secret(c.wiki.tokenEnv), vault: c.wiki.vault }, hermes: { baseUrl: c.hermes.baseUrl, userSet: !!secret(c.hermes.userEnv) },
+      // Variable names (never their values), so the Settings forms show them.
+      upstream: { baseUrl: c.upstream.baseUrl, headerEnv: c.upstream.headerEnv || "" }, uptime: c.uptime,
+      caldav: { url: c.caldav.url, choresList: c.caldav.choresList, userEnv: c.caldav.userEnv, passwordEnv: c.caldav.passwordEnv, userSet: !!secret(c.caldav.userEnv) },
+      wiki: { baseUrl: c.wiki.baseUrl, tokenEnv: c.wiki.tokenEnv, keySet: !!secret(c.wiki.tokenEnv), vault: c.wiki.vault },
+      hermes: { baseUrl: c.hermes.baseUrl, userEnv: c.hermes.userEnv, passwordEnv: c.hermes.passwordEnv, userSet: !!secret(c.hermes.userEnv) },
       allglance: { baseUrl: c.allglance.baseUrl, tokenEnv: c.allglance.tokenEnv, tokenSet: !!secret(c.allglance.tokenEnv) } };
   });
   app.post("/api/connections/test/:id", { preHandler: guard }, async (req: any) => {

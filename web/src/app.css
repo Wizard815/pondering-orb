@@ -19,3 +19,13 @@ html, body { height: 100%; }
 .offline { position: fixed; z-index: 70; top: 8px; left: 50%; transform: translateX(-50%); }
 .err-inline { color: var(--bad); font-size: .86rem; }
 div:not(.editing) > .react-grid-layout .react-resizable-handle { display: none; }
+
+/* Audit fixes: long unbroken text wraps instead of widening the page;
+   popups and their selects stay on screen; the phone tab bar fades at the
+   edge to show it scrolls. */
+.room-head h2, .room-head .flavor, .room-head .titles { overflow-wrap: anywhere; min-width: 0 }
+.pop { max-width: calc(100vw - 16px) }
+.pop select, .pop input { max-width: 100% }
+@media (max-width: 640px) {
+  nav.tabs { -webkit-mask-image: linear-gradient(to right, #000 85%, transparent); mask-image: linear-gradient(to right, #000 85%, transparent); padding-right: 24px }
+}

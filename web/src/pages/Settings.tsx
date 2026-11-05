@@ -23,7 +23,7 @@ function Connections() {
   const val = (id: string, f: string) => s.connections?.[id]?.[f] ?? eff?.[id]?.[f] ?? "";
   return <><p className="hint" style={{ margin: 0 }}>Addresses as this server sees them. Keys and passwords stay in environment variables; only their names are saved.</p>
     <div className="conns">{CONNS.map(c => <form key={c.id} className="conn" onSubmit={async e => { e.preventDefault(); const v = Object.fromEntries(new FormData(e.currentTarget).entries());
-        await saveSettings({ connections: { ...(s.connections || {}), [c.id]: v } }).catch(ui.error); setRes({ ...res, [c.id]: { ok: true, detail: "Saved." } }); }}>
+        try { await saveSettings({ connections: { ...(s.connections || {}), [c.id]: v } }); setRes({ ...res, [c.id]: { ok: true, detail: "Saved. Test checks the saved values." } }); } catch (x) { ui.error(x); } }}>
       <h4 className="group-name">{c.name}</h4>
       {c.fields.map(([f, l]) => <label key={f} className="small">{l}<input type="text" name={f} defaultValue={val(c.id, f)} key={val(c.id, f)} /></label>)}
       {c.note && <div className="hint">{c.note}</div>}
@@ -39,7 +39,7 @@ function GolemSettings() {
   return <>
     <div className="setting"><div><div>Chat text size</div></div><select value={s.golemFont || "m"} onChange={e => saveSettings({ golemFont: e.target.value })}>{[["s", "Small"], ["m", "Normal"], ["l", "Large"], ["xl", "Extra large"]].map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></div>
     <form className="editor" key={JSON.stringify(g)} onSubmit={async e => { e.preventDefault(); const v = Object.fromEntries(new FormData(e.currentTarget).entries()) as any;
-        await saveSettings({ golem: { baseUrl: v.baseUrl.trim(), model: v.model.trim(), keyEnv: v.keyEnv.trim(), canWrite: !!v.canWrite } }).catch(ui.error); ui.status("Golem settings saved."); }}>
+        try { await saveSettings({ golem: { baseUrl: v.baseUrl.trim(), model: v.model.trim(), keyEnv: v.keyEnv.trim(), canWrite: !!v.canWrite } }); ui.status("Golem settings saved."); } catch (x) { ui.error(x); } }}>
       <label className="small">Model endpoint (OpenAI-compatible /v1)<input type="url" name="baseUrl" defaultValue={g.baseUrl || ""} placeholder="http://argos:8080/v1" /></label>
       <div className="hint">Local: Argos, llama-server or Ollama. Frontier: https://openrouter.ai/api/v1 or https://api.anthropic.com/v1/.</div>
       <div className="row"><label className="small" style={{ flex: 1 }}>Model<input type="text" name="model" defaultValue={g.model || ""} placeholder="model name" /></label>
@@ -51,7 +51,7 @@ function GolemSettings() {
 }
 
 function Appearance() {
-  const s = useSettings(), th = { mode: "auto", preset: "night", custom: {} as Record<string, string>, ...(s.theme || {}) }, base = PRESETS[th.preset] || PRESETS.night, vals = { ...base.t, ...th.custom };
+  const ui = useUi(), s = useSettings(), th = { mode: "auto", preset: "night", custom: {} as Record<string, string>, ...(s.theme || {}) }, base = PRESETS[th.preset] || PRESETS.night, vals = { ...base.t, ...th.custom };
   const sw = (p: any) => <span className="sw">{["bg", "panel", "gold", "arcane", "ink"].map(k => <i key={k} style={{ background: p.t[k] }} />)}</span>;
   return <>
     <div className="setting"><div><div>Page width</div><div className="d">Fit window grows with the browser window.</div></div>
@@ -61,7 +61,7 @@ function Appearance() {
       {Object.entries(PRESETS).map(([id, p]) => <button key={id} className={"preset" + (th.mode === "preset" && th.preset === id ? " on" : "")} onClick={() => saveSettings({ theme: { ...th, mode: "preset", preset: id, custom: {} } })}>{sw(p)}{p.name}</button>)}
     </div>
     <details open={th.mode === "custom"}><summary className="small">Customize colours</summary>
-      <form className="colors" onSubmit={e => { e.preventDefault(); saveSettings({ theme: { ...th, mode: "custom", custom: Object.fromEntries(new FormData(e.currentTarget).entries()) } }); }}>
+      <form className="colors" key={JSON.stringify(vals)} onSubmit={e => { e.preventDefault(); saveSettings({ theme: { ...th, mode: "custom", custom: Object.fromEntries(new FormData(e.currentTarget).entries()) } }).catch(ui.error); }}>
         {EDITABLE.map(([k, l]) => <label key={k}><input type="color" name={k} defaultValue={/^#/.test(vals[k]) ? vals[k] : "#888888"} /> {l}</label>)}
         <div className="row" style={{ gridColumn: "1/-1" }}><button className="btn primary" type="submit">Use these colours</button></div></form></details></>;
 }
@@ -96,7 +96,7 @@ export const SettingsPage: PageDef = {
           <div className="setting"><div><div>Note my log activity in the wiki</div><div className="d">The wiki's daily log always lists Orb's edits to wiki notes. Turn this on to also add one line each day for the day before, such as “Orb, 2026-11-04: 4 log entries (3 on [[Pondering Orb]], 1 on [[Argos]])”. The text of your entries isn't copied.</div></div>
             <input type="checkbox" checked={!!s.wikiDigest} onChange={e => saveSettings({ wikiDigest: e.target.checked }).catch(ui.error)} aria-label="Note my log activity in the wiki" /></div>
           <div className="row"><button className="btn" onClick={async () => { try { const r = await post<{ written: string }>("/api/wiki/digest", {}); ui.status(r.written ? `Wrote the digest for ${r.written}.` : "Nothing to write."); } catch (x) { ui.error(x); } }}>Write yesterday's digest now</button></div></>, w: 6, h: 5 },
-      { key: "btop", title: "btop terminal", node: <form className="setting" onSubmit={e => { e.preventDefault(); saveSettings({ btopUrl: String(new FormData(e.currentTarget).get("btop") || "").trim() }).then(() => ui.status("Saved. The System tab shows btop when this is set.")).catch(ui.error); }}>
+      { key: "btop", title: "btop terminal", node: <form className="setting" onSubmit={e => { e.preventDefault(); (() => { const u = String(new FormData(e.currentTarget).get("btop") || "").trim(); if (u && !/^https?:\/\//i.test(u)) return Promise.reject(new Error("The btop address must start with http:// or https://.")); return saveSettings({ btopUrl: u }); })().then(() => ui.status("Saved. The System tab shows btop when this is set.")).catch(ui.error); }}>
           <div><label htmlFor="btopurl">btop address</label><div className="d">The ttyd sidecar from the compose file (profile btop), e.g. http://your-server:7681. Leave empty to hide it.</div></div>
           <div className="row"><input type="url" id="btopurl" name="btop" defaultValue={s.btopUrl || ""} key={s.btopUrl} placeholder="http://your-server:7681" /><button className="btn" type="submit">Save</button></div></form>, w: 6, h: 4 },
       { key: "lists", title: "Task lists on Main", node: <MainLists />, w: 6, h: 5 },

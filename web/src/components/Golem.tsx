@@ -10,12 +10,22 @@ export function Golem() {
   const [msgs, setMsgs] = useState<M[]>(load), [text, setText] = useState(""), [busy, setBusy] = useState(false);
   const [live, setLive] = useState(""), [tool, setTool] = useState(""), stop = useRef<AbortController | null>(null);
   const chat = useRef<HTMLDivElement>(null);
+  // gen changes on Clear, so a reply that finishes afterwards is dropped.
+  // A reply that finishes after the panel unmounted (another tab) is still
+  // saved to the stored history, so it's there when you come back.
+  const gen = useRef(0), mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const finish = (g: number, next: M[], reply: M) => {
+    if (g !== gen.current) return;
+    if (mounted.current) setMsgs([...next, reply]);
+    else try { localStorage.setItem("orb.golem", JSON.stringify([...next, reply].slice(-30))); } catch { /* private window */ }
+  };
   useEffect(() => { try { localStorage.setItem("orb.golem", JSON.stringify(msgs.slice(-30))); } catch { /* private window */ } chat.current?.scrollTo({ top: 1e9 }); }, [msgs, busy, live]);
   /** Streams the reply from /api/golem/stream (Server-Sent Events over a POST). */
   const send = async (q: string) => {
     q = q.trim(); if (!q || busy) return;
     const next: M[] = [...msgs, { role: "user", content: q }]; setMsgs(next); setText(""); setBusy(true); setLive(""); setTool("");
-    const ctl = new AbortController(); stop.current = ctl; let textSoFar = "";
+    const ctl = new AbortController(); stop.current = ctl; let textSoFar = ""; const g = gen.current;
     try {
       const res = await fetch("/api/golem/stream", { method: "POST", credentials: "same-origin", signal: ctl.signal, headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: next.map(m => ({ role: m.role, content: m.content })) }) });
@@ -34,15 +44,15 @@ export function Golem() {
           else if (ev === "error") throw new Error(d.error);
         }
       }
-      setMsgs([...next, { role: "assistant", content: (final?.text || textSoFar || "…").trim(), did: final?.did }]);
+      finish(g, next, { role: "assistant", content: (final?.text || textSoFar || "…").trim(), did: final?.did });
     } catch (e: any) {
-      if (e?.name === "AbortError") setMsgs([...next, { role: "assistant", content: (textSoFar ? textSoFar + "\n\n" : "") + "_Stopped._" }]);
-      else setMsgs([...next, { role: "assistant", content: `${textSoFar ? textSoFar + "\n\n" : ""}Something cracked: ${e.message}` }]);
-    } finally { setBusy(false); setLive(""); setTool(""); stop.current = null; }
+      if (e?.name === "AbortError") finish(g, next, { role: "assistant", content: (textSoFar ? textSoFar + "\n\n" : "") + "_Stopped._" });
+      else finish(g, next, { role: "assistant", content: `${textSoFar ? textSoFar + "\n\n" : ""}Something cracked: ${e.message}` });
+    } finally { if (mounted.current) { setBusy(false); setLive(""); setTool(""); } stop.current = null; }
   };
   return <div className="golem" style={{ height: "100%" }}>
     <div className="golem-head"><span className={"golem-face" + (busy ? " busy" : "")} aria-hidden="true" /><div className="grow hint">{busy ? (tool ? `Consulting ${tool.replace(/_/g, " ")}…` : "The Golem stirs…") : ""}</div>{busy && <button className="btn" onClick={() => stop.current?.abort()}>Stop</button>}
-      {msgs.length > 0 && <button className="btn" onClick={() => setMsgs([])}>Clear</button>}<a className="btn" href="#config">Settings</a></div>
+      {msgs.length > 0 && <button className="btn" onClick={() => { gen.current++; stop.current?.abort(); setMsgs([]); }}>Clear</button>}<a className="btn" href="#config">Settings</a></div>
     <div className="chat" ref={chat} aria-live="polite" style={{ flex: 1, maxHeight: "none", minHeight: 80 }}>
       {msgs.length ? msgs.map((m, i) => <div key={i} className={"msg " + (m.role === "user" ? "user" : "golem")}>{m.role === "user" ? m.content : <Markdown text={m.content} />}
         {m.did && m.did.length > 0 && <span className="did">{m.did.join(" · ")}</span>}</div>)

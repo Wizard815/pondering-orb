@@ -31,7 +31,7 @@ export class Hermes {
   }
   async sessions(q = "") {
     const [studio, agent] = await Promise.all([
-      this.get(q ? `/api/studio/search/sessions?q=${encodeURIComponent(q)}` : "/api/studio/sessions?limit=100").catch(() => ({ sessions: [] })),
+      this.get(q ? `/api/studio/search/sessions?q=${encodeURIComponent(q)}` : "/api/studio/sessions?limit=100"), // an outage is an error, not "no chats"
       q ? Promise.resolve({ sessions: [] }) : this.get("/api/studio/sessions/hermes?limit=100").catch(() => ({ sessions: [] })),
     ]);
     const norm = (s: any, source: string) => ({ id: String(s.id), title: s.title || "", source: s.source === "hermes" || source === "hermes_agent" ? "hermes_agent" : "studio", agent: s.agent || "", model: s.model || "",

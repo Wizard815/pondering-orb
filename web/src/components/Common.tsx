@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { create, patch, remove, useColl, useSettings, getDoc } from "../lib/store";
 import { post } from "../lib/api";
 import { useUi } from "../lib/ui";
-import { choreState, fmtDate, listOf, logSorted, prioName, prioOf, sortTasks, todayISO, PRIO_LEVELS } from "../lib/util";
+import { choreState, fmtDate, listOf, logSorted, oneAtATime, prioName, prioOf, sortTasks, todayISO, PRIO_LEVELS } from "../lib/util";
 
 export const projHref = (p: { id: string }) => "#p-" + String(p.id).replace(/[^A-Za-z0-9-]/g, "");
 export const useLogMax = () => { const s = useSettings(); return Math.max(20, Math.min(200, Number(s.logMax) || 50)); };
@@ -34,6 +34,7 @@ export function TaskRows({ tasks, showList }: { tasks: any[]; showList?: boolean
     <PrioChip t={t} />
     <div className="grow"><span className="t">{t.title}</span>{showList && <> <span className="tag">{listOf(t)}</span></>}{t.done && t.doneBy && <div className="hint">done by {t.doneBy}</div>}</div>
     {t.due && <span className={"due" + (!t.done && t.due < today ? " late" : "")}>{fmtDate(t.due)}</span>}
+    <button className="btn sm ghost x" title="Delete task" aria-label={"Delete task: " + t.title} onClick={() => removeWithUndo(ui, "tasks", t.id, `Deleted “${t.title}”${t.caldav ? " (also in CalDAV)" : ""}.`).catch(ui.error)}>×</button>
   </div>)}</div>;
 }
 
@@ -69,11 +70,11 @@ export function QuickLog({ project }: { project?: string }) {
   const commit = async (name: string, t: string) => { await create("logs", { project: name, text: t, date: todayISO(), created: Date.now() }); localStorage.setItem("orb.lastLogProject", name); ui.status(`Logged to ${name}.`); };
   const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault(); const t = text.trim(); if (!t) return;
-    if (project) { await commit(project, t).catch(ui.error); setText(""); return; }
+    if (project) { await oneAtATime(e.currentTarget, async () => { try { await commit(project, t); setText(""); } catch (x) { ui.error(x); } }); return; }
     const anchor = (e.currentTarget.querySelector("button[type=submit]") as Element);
     const last = localStorage.getItem("orb.lastLogProject") || "";
     ui.pop(anchor, <LogPick text={t} names={live} def={live.includes(last) ? last : live[0] || "General"} onPick={async (name, isNew) => {
-      try { if (isNew && !projects.some(p => p.name === name)) await create("projects", { name, status: "next" }); await commit(name, t); setText(""); ui.close(); } catch (x) { ui.error(x); }
+      try { if (isNew && !projects.some(p => p.name.toLowerCase() === name.toLowerCase())) await create("projects", { name, status: "next" }); await commit(name, t); setText(""); ui.close(); } catch (x) { ui.error(x); }
     }} />);
   };
   return <form className="row" onSubmit={submit}>
@@ -82,9 +83,9 @@ export function QuickLog({ project }: { project?: string }) {
     <button className="btn primary" type="submit">Log it</button>
   </form>;
 }
-function LogPick({ text, names, def, onPick }: { text: string; names: string[]; def: string; onPick: (n: string, isNew: boolean) => void }) {
+function LogPick({ text, names, def, onPick }: { text: string; names: string[]; def: string; onPick: (n: string, isNew: boolean) => Promise<void> }) {
   const [sel, setSel] = useState(def), [nn, setNn] = useState("");
-  return <form className="pop-form" onSubmit={e => { e.preventDefault(); sel === "__new" ? nn.trim() && onPick(nn.trim(), true) : onPick(sel, false); }}>
+  return <form className="pop-form" onSubmit={e => { e.preventDefault(); const f = e.currentTarget; if (sel === "__new" && !nn.trim()) return; oneAtATime(f, () => sel === "__new" ? onPick(nn.trim(), true) : onPick(sel, false)); }}>
     <div className="small">Log <b>“{text}”</b> for which project?</div>
     <select value={sel} onChange={e => setSel(e.target.value)} aria-label="Project">{names.map(n => <option key={n}>{n}</option>)}<option>General</option><option value="__new">+ New project…</option></select>
     {sel === "__new" && <input type="text" value={nn} onChange={e => setNn(e.target.value)} placeholder="New project name" autoFocus />}

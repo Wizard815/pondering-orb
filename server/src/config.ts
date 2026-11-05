@@ -84,5 +84,5 @@ export const secret = (name?: string) => (okEnvName(name) ? process.env[name!] |
 /** Settings from the web app with any unsafe *Env name dropped. */
 export function envSafe(o: unknown): Record<string, any> {
   if (!o || typeof o !== "object") return {};
-  return Object.fromEntries(Object.entries(o as Record<string, any>).filter(([k, v]) => !/Env$/.test(k) || v === "" || okEnvName(v)));
+  return Object.fromEntries(Object.entries(o as Record<string, any>).filter(([k, v]) => !/Env$/.test(k) || okEnvName(v))); // an empty name keeps the default
 }
