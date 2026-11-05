@@ -25,12 +25,17 @@ export async function hostStats(proc: string, disks: string[]) {
   return { cpu, cores, cpuHistory: [...history], mem, memTotalGiB: Math.round(mi.MemTotal / 1048576), disks: diskInfo, uptimeDays: Math.floor(up / 86400) };
 }
 
-/** GET a Docker API path over tcp://host:port (the socket proxy). */
+/** GET a Docker API path over tcp://host:port (the socket proxy) or a
+ *  unix:// socket. */
 function docker(host: string, path: string): Promise<any> {
-  const u = new URL(host.replace(/^tcp:/, "http:"));
+  const where = host.startsWith("unix://") ? { socketPath: host.slice(7) } : (() => { const u = new URL(host.replace(/^tcp:/, "http:")); return { host: u.hostname, port: u.port || 2375 }; })();
   return new Promise((resolve, reject) => {
-    const r = request({ host: u.hostname, port: u.port || 2375, path, timeout: 5000 }, res => {
-      let b = ""; res.on("data", d => (b += d)); res.on("end", () => { try { resolve(JSON.parse(b)); } catch (e) { reject(e); } });
+    const r = request({ ...where, path, timeout: 5000 }, res => {
+      let b = ""; res.on("data", d => (b += d)); res.on("error", reject); res.on("aborted", () => reject(new Error("Docker closed the connection")));
+      res.on("end", () => {
+        if ((res.statusCode || 0) >= 300) return reject(new Error(`Docker answered ${res.statusCode}${res.statusCode === 403 ? " (the socket proxy doesn't allow this)" : ""}`));
+        try { resolve(JSON.parse(b)); } catch (e) { reject(e); }
+      });
     });
     r.on("error", reject); r.on("timeout", () => r.destroy(new Error("timeout"))); r.end();
   });

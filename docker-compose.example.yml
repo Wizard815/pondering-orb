@@ -21,16 +21,16 @@ services:
       - "8095:8095"
     environment:
       ORB_CONFIG: /config/orb.yaml
-      ORB_PASSWORD: ${ORB_PASSWORD}                  # sign-in for the web app
+      ORB_PASSWORD: ${ORB_PASSWORD:?set ORB_PASSWORD in .env}  # sign-in for the web app; Orb is reachable through the tunnel
       ORB_API_TOKENS: ${ORB_API_TOKENS:-}            # "hermes:<token>,claude:<token>" for agents and /mcp
       # Addresses of apps you already run (container name on a shared
       # network, or a LAN address for another machine):
       UPTIME_URL: http://uptime-kuma:3001
-      UPSTREAM_URL: http://192.168.20.10:5000        # placeholder: the computer running UpstreamManager
+      UPSTREAM_URL: ${UPSTREAM_URL:-}                # e.g. http://192.168.1.20:5000, the computer running UpstreamManager
       HERMES_URL: http://hermes-studio:6060
       ARGOS_URL: http://argos:8080
       WIKI_URL: http://llmwiki:27123
-      ALLGLANCE_URL: http://allglance-gateway:8090
+      ALLGLANCE_URL: ${ALLGLANCE_URL:-}              # e.g. http://allglance-gateway:8090 once you run it
       ALLGLANCE_TOKEN: ${ALLGLANCE_TOKEN:-}
       ORB_PROC: /host/proc
       DOCKER_HOST: tcp://docker-proxy:2375
@@ -47,8 +47,8 @@ services:
       - ./data:/data                                 # orb.db (SQLite); the container runs as uid 1000
       - /proc:/host/proc:ro                          # System tab: cores, memory, network
       # set ORB_PROC=/host/proc (or system.proc in orb.yaml) to read the host, not the container
-      - /mnt/user/appdata/llmwiki/vault:/vault:ro    # Wiki tab reads the whole vault; writes go through the REST API
-    networks: [edge, ai_net, orb]                  # ai_net reaches Hermes, Argos and llmwiki
+      - /mnt/user/appdata/llmwiki/vault:/vault:ro    # CHANGE to your vault folder. Wiki tab reads it; writes go through the REST API
+    networks: [edge, ai_net, orb, dockerapi]       # ai_net reaches Hermes, Argos and llmwiki
     depends_on: [docker-proxy]
 
   uptime-kuma:
@@ -71,8 +71,13 @@ services:
     profiles: [btop]
     restart: unless-stopped
     pid: host                                        # see the host's processes, not just this container's
+    environment:
+      # Optional sign-in for the terminal ("user:password"). Without it anyone
+      # on your LAN can watch btop, which shows every host process's command
+      # line. Your browser asks for it once inside the System tab.
+      BTOP_AUTH: ${BTOP_AUTH:-}
     ports:
-      - "7681:7681"
+      - "7681:7681"                                  # use "<LAN-IP>:7681:7681" to keep it off other interfaces
 
   docker-proxy:
     image: tecnativa/docker-socket-proxy:latest      # pin a version you have tested
@@ -84,10 +89,14 @@ services:
       POST: 0
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    networks: [orb]
+    networks: [dockerapi]                            # only Orb can reach it
 
+# edge and ai_net must already exist (docker network create proxynat / ai_net),
+# or remove them from orb's networks list above.
 networks:
   orb: {}
+  dockerapi:
+    internal: true
   edge:
     external: true
     name: proxynat

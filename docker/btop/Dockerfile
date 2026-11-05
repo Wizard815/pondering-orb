@@ -5,4 +5,5 @@ FROM alpine:3.20
 RUN apk add --no-cache btop ttyd
 EXPOSE 7681
 # ttyd is read-only unless -W is given, so viewers can't type into btop.
-CMD ["ttyd", "-p", "7681", "-t", "fontSize=13", "-t", "titleFixed=btop", "btop"]
+# BTOP_AUTH="user:password" turns on ttyd's basic sign-in.
+CMD ["/bin/sh", "-c", "exec ttyd -p 7681 ${BTOP_AUTH:+-c \"$BTOP_AUTH\"} -t fontSize=13 -t titleFixed=btop btop"]

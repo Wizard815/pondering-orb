@@ -70,8 +70,15 @@ from it.
 ```bash
 cp config/orb.example.yaml config/orb.yaml   # addresses of your apps
 cp docker-compose.example.yml docker-compose.yml
+mkdir -p data && sudo chown 1000:1000 data       # Orb runs as uid 1000 and keeps orb.db here
 docker compose up -d --build
 ```
+
+The compose file joins two networks you may not have (`proxynat` for a
+tunnel, `ai_net` for Hermes, Argos and LLMWIKI). Create them with
+`docker network create <name>`, or remove them from the `orb` service. Change
+the vault path to your own LLMWIKI vault folder. `ORB_PASSWORD` must be set
+in `.env`; compose refuses to start without it.
 
 Open `http://<host>:8095`. Put secrets in `.env` next to the compose file:
 

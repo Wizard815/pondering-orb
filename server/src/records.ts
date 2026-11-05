@@ -1,6 +1,8 @@
 import { EventEmitter } from "node:events";
 import { Store, Doc, newId } from "./db.js";
 import type { OrbConfig } from "./config.js";
+import { today } from "./dates.js";
+import { isNoteName, notePath } from "./integrations/wiki.js";
 
 /** Collections the web app and agents may read and write through
  *  /api/c/<name>. Anything else is refused. */
@@ -11,7 +13,6 @@ export const isColl = (c: string): c is Coll => (COLLECTIONS as readonly string[
 export class HttpError extends Error { constructor(public status: number, message: string) { super(message); } }
 
 export const STATUSES = ["next", "active", "blocked", "paused", "shipped"];
-const today = () => new Date().toISOString().slice(0, 10);
 
 /** `origin` says who made the change ("caldav" for the sync, so it isn't
  *  pushed back); `prev` is the record before a delete. */
@@ -25,7 +26,7 @@ export class Records extends EventEmitter {
   list(coll: Coll) { return this.store.list(coll); }
   get(coll: Coll, id: string) { return this.store.get(coll, id); }
 
-  private logMax() {
+  logMax() {
     const s = this.store.get("settings", "app") as any;
     const n = Number(s?.logMax) || this.cfg().logMax || 50;
     return Math.max(20, Math.min(200, n));
@@ -44,7 +45,11 @@ export class Records extends EventEmitter {
       if (!partial) { d.date ??= today(); d.project ??= "General"; d.created ??= Date.now(); }
     }
     if (coll === "projects") {
-      if (!partial || "name" in d) { const n = String(d.name ?? "").trim(); if (!n) throw new HttpError(422, "A project needs a name."); d.name = n; }
+      if (!partial || "name" in d) { const n = String(d.name ?? "").trim(); if (!n) throw new HttpError(422, "A project needs a name.");
+        // The name is also its wiki note's file name and [[link]].
+        if (!isNoteName(n)) throw new HttpError(422, "A project name can't have / \\ [ ] | # ^ : * ? \" < > or line breaks (it is also the wiki note's name).");
+        d.name = n; }
+      if (d.wikiNote) { try { d.wikiNote = notePath(d.wikiNote, true); } catch { throw new HttpError(422, "wikiNote must be a .md note under wiki/."); } }
       if ("status" in d && !STATUSES.includes(d.status)) throw new HttpError(422, `Status must be one of ${STATUSES.join(", ")}.`);
       if (!partial) d.status ??= "next";
       d.updated = today();
