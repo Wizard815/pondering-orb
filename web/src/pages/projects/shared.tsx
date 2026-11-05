@@ -56,7 +56,9 @@ export function NewProjectForm() {
   const [name, setName] = useState(""), [next, setNext] = useState(""), [status, setStatus] = useState("next"), [area, setArea] = useState(""), [err, setErr] = useState("");
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); const n = name.trim(); if (!n) return;
-    if (projects.some(p => p.name === n)) { setErr(`There is already a project called ${n}.`); return; }
+    const same = projects.find(p => p.name.toLowerCase() === n.toLowerCase());
+    if (same) { setErr(`There is already a project called ${same.name}${same.archived ? " (archived)" : ""}.`); return; }
+    const form = e.currentTarget as HTMLFormElement; if (form.dataset.busy) return; form.dataset.busy = "1";
     try {
       const p = await create("projects", { name: n, next: next.trim(), status, repo: "", updated: todayISO(), ...(area ? { area } : {}) });
       ui.close(); ui.status(`${n} added to ${STATUS_LABEL[status]}.`);
@@ -66,7 +68,7 @@ export function NewProjectForm() {
           ui.status(r.created ? `${n} added, with a wiki note${r.linked ? " linked from its area hub" : ""}.` : `${n} added and linked to its existing wiki note.`); }
         catch (x: any) { ui.status(`${n} added, but the wiki note wasn't created: ${x.message}`); }
       }
-    } catch (x: any) { setErr(x?.message || String(x)); }
+    } catch (x: any) { setErr(x?.message || String(x)); } finally { delete form.dataset.busy; }
   };
   return <form className="pop-form" style={{ minWidth: "min(320px,86vw)" }} onSubmit={submit}>
     <div className="mh" style={{ padding: 0 }}>New project</div>

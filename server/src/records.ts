@@ -66,13 +66,21 @@ export class Records extends EventEmitter {
     return d;
   }
 
+  /** Logs, tasks and the wiki find a project by name, so names are unique
+   *  (ignoring case). */
+  private uniqueName(coll: Coll, id: string, d: Record<string, any>) {
+    if (coll !== "projects" || !("name" in d)) return d;
+    const n = String(d.name).toLowerCase(), other: any = this.store.list("projects").find((p: any) => p.id !== id && String(p.name).toLowerCase() === n);
+    if (other) throw new HttpError(409, `There is already a project called ${other.name}${other.archived ? " (archived)" : ""}.`);
+    return d;
+  }
   create(coll: Coll, data: Record<string, any>, id = newId(), origin?: string) {
-    const doc = this.store.set(coll, id, this.check(coll, data, false));
+    const doc = this.store.set(coll, id, this.uniqueName(coll, id, this.check(coll, data, false)));
     this.emit("change", { coll, id, op: "set", doc, origin } satisfies Change);
     return doc;
   }
   put(coll: Coll, id: string, data: Record<string, any>, origin?: string) {
-    const doc = this.store.set(coll, id, this.check(coll, data, false));
+    const doc = this.store.set(coll, id, this.uniqueName(coll, id, this.check(coll, data, false)));
     this.emit("change", { coll, id, op: "set", doc, origin } satisfies Change);
     return doc;
   }
@@ -80,7 +88,7 @@ export class Records extends EventEmitter {
     const cur = this.store.get(coll, id);
     if (!cur) throw new HttpError(404, `No ${coll} record ${id}.`);
     if (ifVersion && cur.version !== ifVersion) throw new HttpError(409, `That record changed (now version ${cur.version}). Reload and try again.`);
-    const doc = this.store.update(coll, id, this.check(coll, data, true))!;
+    const doc = this.store.update(coll, id, this.uniqueName(coll, id, this.check(coll, data, true)))!;
     this.emit("change", { coll, id, op: "set", doc, origin } satisfies Change);
     return doc;
   }

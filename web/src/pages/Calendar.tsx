@@ -57,6 +57,7 @@ function AddEvent() {
     e.preventDefault(); const t = title.trim(); if (!t || !date) return;
     try { await create("events", { title: t, date, time }); setTitle(""); setTime(""); ui.status(`Added ${t} on ${fmtDate(date)}.`); } catch (x) { ui.error(x); }
   };
+  const past = [...events].filter(e => e.date < today).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 30);
   const upcoming = [...events].filter(e => e.date >= today).sort((a, b) => a.date.localeCompare(b.date) || String(a.time || "").localeCompare(String(b.time || ""))).slice(0, 8);
   return <>
     <form className="row" onSubmit={add}>
@@ -67,6 +68,8 @@ function AddEvent() {
     </form>
     {upcoming.length > 0 && <ul className="list">{upcoming.map(e => <li key={e.id}><span className="date">{fmtDate(e.date)}{e.time ? " " + e.time : ""}</span><div className="grow">{e.title}</div>
       <button className="btn" aria-label={"Remove " + e.title} onClick={() => removeWithUndo(ui, "events", e.id, `Removed ${e.title}.`).catch(ui.error)}>Remove</button></li>)}</ul>}
+    {past.length > 0 && <details><summary className="small">Past events ({past.length})</summary><ul className="list">{past.map(e => <li key={e.id}><span className="date">{fmtDate(e.date)}{e.time ? " " + e.time : ""}</span><div className="grow">{e.title}</div>
+      <button className="btn" aria-label={"Remove " + e.title} onClick={() => removeWithUndo(ui, "events", e.id, `Removed ${e.title}.`).catch(ui.error)}>Remove</button></li>)}</ul></details>}
   </>;
 }
 

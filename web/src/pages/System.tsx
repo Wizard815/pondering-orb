@@ -59,7 +59,8 @@ const cpuRows = (n: number) => Math.max(4, Math.ceil((120 + Math.ceil(n / 6) * 1
 export const SystemPage: PageDef = {
   id: "system", label: "System", title: "Engine Room", flavor: "Cores, memory, disks and containers, btop style.",
   usePanels: () => {
-    const btopUrl: string = (useSettings().btopUrl || "").trim();
+    // Only http(s): a javascript: address in an iframe would run in Orb's page.
+    const raw: string = (useSettings().btopUrl || "").trim(), btopUrl = /^https?:\/\//i.test(raw) ? raw : "";
     const { data, error } = useFetch<{ hosts: Host[] }>("/api/system", 3000);
     const hosts = data?.hosts || [];
     if (!hosts.length) return { panels: [{ key: "none", title: "Hosts", node: <div className="empty">{error || "Reading…"}</div>, w: 12, h: 4 }] };

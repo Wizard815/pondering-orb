@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useState } from "react";
+import { Component, StrictMode, useEffect, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import "./demo.css";
 import "./app.css";
@@ -17,6 +17,21 @@ function Login({ onDone }: { onDone: () => void }) {
   </form>;
 }
 
+/** A render error shows a message instead of a blank page, and going to
+ *  another tab (or Try again) renders again. */
+class Boundary extends Component<{ children: ReactNode }, { err: Error | null }> {
+  state = { err: null as Error | null };
+  static getDerivedStateFromError(err: Error) { return { err }; }
+  private reset = () => this.setState({ err: null });
+  componentDidMount() { addEventListener("hashchange", this.reset); }
+  componentWillUnmount() { removeEventListener("hashchange", this.reset); }
+  render() {
+    if (!this.state.err) return this.props.children;
+    return <div className="login"><h1>Pondering Orb</h1><div className="err-inline">This page hit a problem: {this.state.err.message}</div>
+      <div className="row"><button className="btn" onClick={this.reset}>Try again</button><a className="btn" href="#main" onClick={this.reset}>Go to Main</a></div></div>;
+  }
+}
+
 function Root() {
   const [state, setState] = useState<"loading" | "login" | "ready" | "error">("loading"), [err, setErr] = useState("");
   const boot = () => startStore().then(() => setState("ready")).catch(e => { if (e instanceof ApiError && e.status === 401) setState("login"); else { setErr(e.message); setState("error"); } });
@@ -24,7 +39,7 @@ function Root() {
   if (state === "login") return <Login onDone={() => { setState("loading"); boot(); }} />;
   if (state === "error") return <div className="login"><h1>Pondering Orb</h1><div className="err-inline">Couldn't load: {err}</div><button className="btn" onClick={() => { setState("loading"); boot(); }}>Try again</button></div>;
   if (state === "loading") return <div className="login"><h1>Pondering Orb</h1><div className="hint">Gazing…</div></div>;
-  return <UiProvider><App /></UiProvider>;
+  return <Boundary><UiProvider><App /></UiProvider></Boundary>;
 }
 
 createRoot(document.getElementById("root")!).render(<StrictMode><Root /></StrictMode>);
