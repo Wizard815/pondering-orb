@@ -13,7 +13,9 @@ export class HttpError extends Error { constructor(public status: number, messag
 export const STATUSES = ["next", "active", "blocked", "paused", "shipped"];
 const today = () => new Date().toISOString().slice(0, 10);
 
-export type Change = { coll: Coll; id: string; op: "set" | "delete"; doc?: Doc };
+/** `origin` says who made the change ("caldav" for the sync, so it isn't
+ *  pushed back); `prev` is the record before a delete. */
+export type Change = { coll: Coll; id: string; op: "set" | "delete"; doc?: Doc; prev?: Doc; origin?: string };
 
 /** The one place records are written, so checks and live updates can't be
  *  skipped. Every write emits a change that /api/stream sends to browsers. */
@@ -59,27 +61,28 @@ export class Records extends EventEmitter {
     return d;
   }
 
-  create(coll: Coll, data: Record<string, any>, id = newId()) {
+  create(coll: Coll, data: Record<string, any>, id = newId(), origin?: string) {
     const doc = this.store.set(coll, id, this.check(coll, data, false));
-    this.emit("change", { coll, id, op: "set", doc } satisfies Change);
+    this.emit("change", { coll, id, op: "set", doc, origin } satisfies Change);
     return doc;
   }
-  put(coll: Coll, id: string, data: Record<string, any>) {
+  put(coll: Coll, id: string, data: Record<string, any>, origin?: string) {
     const doc = this.store.set(coll, id, this.check(coll, data, false));
-    this.emit("change", { coll, id, op: "set", doc } satisfies Change);
+    this.emit("change", { coll, id, op: "set", doc, origin } satisfies Change);
     return doc;
   }
-  patch(coll: Coll, id: string, data: Record<string, any>, ifVersion?: number) {
+  patch(coll: Coll, id: string, data: Record<string, any>, ifVersion?: number, origin?: string) {
     const cur = this.store.get(coll, id);
     if (!cur) throw new HttpError(404, `No ${coll} record ${id}.`);
     if (ifVersion && cur.version !== ifVersion) throw new HttpError(409, `That record changed (now version ${cur.version}). Reload and try again.`);
     const doc = this.store.update(coll, id, this.check(coll, data, true))!;
-    this.emit("change", { coll, id, op: "set", doc } satisfies Change);
+    this.emit("change", { coll, id, op: "set", doc, origin } satisfies Change);
     return doc;
   }
-  remove(coll: Coll, id: string) {
+  remove(coll: Coll, id: string, origin?: string) {
+    const prev = this.store.get(coll, id) ?? undefined;
     const ok = this.store.delete(coll, id);
-    if (ok) this.emit("change", { coll, id, op: "delete" } satisfies Change);
+    if (ok) this.emit("change", { coll, id, op: "delete", prev, origin } satisfies Change);
     return ok;
   }
 }

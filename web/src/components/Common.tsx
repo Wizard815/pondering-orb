@@ -41,8 +41,8 @@ export function ChoreRows({ limit = 0 }: { limit?: number }) {
   if (limit) list = list.filter(x => x.s.cls !== "ok").slice(0, limit);
   if (!list.length) return <div className="empty">{limit ? "All chores done. Nothing due." : "No chores yet. Add backups, updates, disk scrubs."}</div>;
   const done = (c: any) => { const before = c.lastDone || ""; patch("chores", c.id, { lastDone: todayISO() }).then(() => ui.undo(`${c.name} done.`, () => patch("chores", c.id, { lastDone: before }))).catch(ui.error); };
-  return <>{list.map(({ c, s }) => <div key={c.id} className={"uk " + s.cls}><span className="stripe" />
-    <div><div className="n">{c.name}</div><div className="m">{s.left < 0 ? `${-s.left} day${s.left === -1 ? "" : "s"} overdue` : s.left === 0 ? "due today" : `due in ${s.left} day${s.left === 1 ? "" : "s"}`} · every {c.everyDays}d · last {c.lastDone ? fmtDate(c.lastDone) : "never"}</div></div>
+  return <>{list.map(({ c, s }) => <div key={c.id} data-id={c.id} className={"uk " + (c.lastDone ? s.cls : "soon")}><span className="stripe" />
+    <div><div className="n">{c.name}</div><div className="m">{!c.lastDone ? "never done" : s.left < 0 ? `${-s.left} day${s.left === -1 ? "" : "s"} overdue` : s.left === 0 ? "due today" : `due in ${s.left} day${s.left === 1 ? "" : "s"}`} · every {c.everyDays}d · last {c.lastDone ? fmtDate(c.lastDone) : "never"}</div></div>
     <button className="btn" onClick={() => done(c)}>Done</button></div>)}</>;
 }
 

@@ -54,31 +54,72 @@ groups:
 
 ## Running it
 
-`docker-compose.example.yml` starts only Orb and a read-only Docker socket
-proxy. Apps you already run (Hermes Studio, Argos, LLMWIKI, UpstreamManager,
-CalDAV, Uptime Kuma) are reached by address. A bundled Uptime Kuma starts only
-with `docker compose --profile uptime up -d`.
+The app is two parts in one repo:
 
-## Container backend
+- `server/`: Node.js 22 + TypeScript + Fastify, with Node's built-in SQLite.
+  It holds Orb's records, talks to your other apps, runs Golem, and serves the
+  MCP endpoint and the web app.
+- `web/`: React 18 + Vite + TypeScript.
 
-The page here is the demo. The real Orb runs as a container with its own
-REST API and MCP endpoint, reads and completes tasks through ALLGlance, runs
-Golem on Argos, and uses Miladash (a Milaclone branch) for ideas. See
-[docs/backend.md](docs/backend.md).
+`index.html` at the root is the original single-page demo, kept as the design
+reference.
 
-## Status
+### With Docker
 
-`index.html` is the first version, built as a claude.ai artifact. Its
-storage and "ask" box use the artifact runtime (`window.claude`), so opened
-as a plain file it renders but does not save.
+```bash
+cp config/orb.example.yaml config/orb.yaml   # addresses of your apps
+cp docker-compose.example.yml docker-compose.yml
+docker compose up -d --build
+```
 
-## Planned
+Open `http://<host>:8095`. Put secrets in `.env` next to the compose file:
 
-- Gmail and Google Calendar through claude.ai connectors
-- Odysseus CalDAV events through n8n
-- A small reporter on each host that posts system stats
-- Milaclone boards through its MCP server
-- Free-form app tiles
+| Variable | What it is |
+| --- | --- |
+| `ORB_PASSWORD` | sign-in password for the web app |
+| `ORB_API_TOKENS` | `name:token` pairs for agents and `/mcp`, e.g. `hermes:abc,claude:def` |
+| `CALDAV_USER`, `CALDAV_PASSWORD` | CalDAV account |
+| `WIKI_API_KEY` | Obsidian Local REST API key |
+| `HERMES_USER`, `HERMES_PASSWORD` | a Hermes Studio user for Orb |
+| `OPENROUTER_API_KEY` (or any name) | frontier model key, named in Settings → Golem |
+
+With neither `ORB_PASSWORD` nor `ORB_API_TOKENS` set, Orb is open to anyone
+who can reach the port. That is only for a private LAN, and the server warns
+about it when it starts.
+
+`docker compose up` starts only Orb and a read-only Docker socket proxy. Apps
+you already run (Hermes Studio, Argos, LLMWIKI, UpstreamManager, CalDAV,
+Uptime Kuma) are reached by address. A bundled Uptime Kuma starts only with
+`docker compose --profile uptime up -d`.
+
+### For development
+
+```bash
+npm install
+npm run dev        # server on :8095 (restarts on change), web on :5173 with the API proxied
+npm test           # server tests and the web type check
+npm run build      # server/dist and web/dist
+```
+
+### For agents (MCP)
+
+`POST /mcp` with `Authorization: Bearer <token>` (from `ORB_API_TOKENS`)
+serves tools to list and get projects, read and add logs, move projects,
+list, add and complete tasks, and list and finish chores. Anything an agent
+writes is marked with its token's name.
+
+## Design and status
+
+[docs/backend.md](docs/backend.md) covers what Orb owns and what it reads
+from other apps, the API, the MCP tools, CalDAV, the wiki rules and what is
+built so far. [docs/miladash.md](docs/miladash.md) covers the ideas board.
+
+`index.html` is the demo built as a claude.ai artifact. Its storage and
+Golem use the artifact runtime (`window.claude`), so opened as a plain file it
+renders but does not save.
+
+Not built yet: live Plex and SABnzbd panels, mail, the wiki outbox, Miladash
+itself, and Golem streaming its replies.
 
 ## License
 

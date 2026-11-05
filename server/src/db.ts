@@ -22,7 +22,7 @@ export class Store {
     `);
   }
   list(coll: string): Doc[] {
-    return (this.db.prepare("SELECT id, data, version FROM docs WHERE coll = ? ORDER BY updated_at").all(coll) as any[])
+    return (this.db.prepare("SELECT id, data, version FROM docs WHERE coll = ? ORDER BY updated_at, rowid").all(coll) as any[])
       .map(r => ({ id: r.id, version: r.version, ...JSON.parse(r.data) }));
   }
   get(coll: string, id: string): Doc | null {

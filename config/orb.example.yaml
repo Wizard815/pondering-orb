@@ -1,0 +1,41 @@
+# Copy to config/orb.yaml. Secrets are never written here: *_env names an
+# environment variable that holds the value. Settings → Connections in the web
+# app can override any address saved here.
+port: 8095
+log_max: 50          # most characters in one log entry
+poll_minutes: 15     # how often new commits are logged for linked projects
+
+golem:               # any OpenAI-compatible /v1 endpoint
+  base_url: http://argos:8080/v1
+  model: ""
+  key_env: ""        # e.g. OPENROUTER_API_KEY for https://openrouter.ai/api/v1
+  can_write: true
+
+upstream:            # UpstreamManager on another computer (start it with HOST=0.0.0.0)
+  base_url: http://192.168.20.10:5000
+
+uptime:              # Uptime Kuma with a published status page
+  base_url: http://uptime-kuma:3001
+  status_page: orb
+
+caldav:              # calendar home that holds your task lists
+  url: http://vikunja:3456/dav/principals/you/
+  user_env: CALDAV_USER
+  password_env: CALDAV_PASSWORD
+  chores_list: Chores
+
+wiki:                # LLMWIKI: reads from the mount, writes over the REST API
+  base_url: http://llmwiki:27123
+  token_env: WIKI_API_KEY
+  vault: /vault
+  area_hubs: { homelab: Homelab, ai: Local AI }
+
+hermes:
+  base_url: http://hermes-studio:6060
+  user_env: HERMES_USER
+  password_env: HERMES_PASSWORD
+
+system:
+  proc: /host/proc
+  docker: tcp://docker-proxy:2375
+  disks: ["/"]

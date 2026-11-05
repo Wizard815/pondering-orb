@@ -7,7 +7,7 @@ export async function call(url: string, init: RequestInit & { timeoutMs?: number
     const res = await fetch(url, { ...init, signal: ctl.signal });
     const text = await res.text();
     let body: any = text; try { body = text ? JSON.parse(text) : null; } catch { /* not JSON */ }
-    return { status: res.status, ok: res.ok, body };
+    return { status: res.status, ok: res.ok, body, headers: res.headers };
   } catch (e: any) {
     const why = e?.name === "AbortError" ? "timed out" : (e?.cause?.code || e?.message || "failed");
     throw new HttpError(502, `Couldn't reach ${new URL(url).host} (${why}).`);

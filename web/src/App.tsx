@@ -19,7 +19,7 @@ function useHash() {
 function Summary() {
   const projects = useColl("projects"), chores = useColl("chores");
   const active = projects.filter(p => p.status === "active" && !p.archived).length, blocked = projects.filter(p => p.status === "blocked" && !p.archived).length;
-  const st = chores.map(choreState), over = st.filter(s => s.cls === "over").length, soon = st.filter(s => s.cls === "soon").length;
+  const st = chores.filter(c => c.lastDone).map(choreState), over = st.filter(s => s.cls === "over").length, soon = st.filter(s => s.cls === "soon").length;
   return <div className="summary">
     <span className="pill info"><i />{active} active</span>
     {blocked > 0 && <span className="pill bad"><i />{blocked} blocked</span>}
