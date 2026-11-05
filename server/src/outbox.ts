@@ -31,9 +31,14 @@ export class Outbox {
       for (const it of this.list()) {
         if (!force && it.next > Date.now()) continue;
         const h = this.handlers.get(it.kind); if (!h) continue;
-        try { await h(it.payload); this.store.delete("outbox", it.id); done++; }
-        catch (e: any) {
+        try {
+          await h(it.payload); done++;
+          // A newer failure for the same thing may have replaced this entry
+          // while the retry ran; keep that one.
+          if ((this.store.get("outbox", it.id) as any)?.version === (it as any).version) this.store.delete("outbox", it.id);
+        } catch (e: any) {
           failed++;
+          if ((this.store.get("outbox", it.id) as any)?.version !== (it as any).version) continue;
           const tries = it.tries + 1, wait = Math.min(60, 2 ** Math.min(tries, 6)) * 60000; // 2, 4, 8 ... 60 minutes
           const { id: _i, version: _v, ...rest } = it as any;
           this.store.set("outbox", it.id, { ...rest, tries, lastError: e?.message || String(e), next: Date.now() + wait });

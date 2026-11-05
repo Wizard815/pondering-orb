@@ -1,6 +1,7 @@
 # Copy to config/orb.yaml. Secrets are never written here: *_env names an
 # environment variable that holds the value. Settings → Connections in the web
-# app can override any address saved here.
+# app can override any address saved here. A value set here beats the same
+# address passed as an environment variable (UPSTREAM_URL, WIKI_URL, ...).
 port: 8095
 log_max: 50          # most characters in one log entry
 poll_minutes: 15     # how often new commits are logged for linked projects
@@ -30,9 +31,9 @@ wiki:                # LLMWIKI: reads from the mount, writes over the REST API
   vault: /vault
   area_hubs: { homelab: Homelab, ai: Local AI }
 
-allglance:          # the ALLGlance gateway (dayGLANCE, lastGLANCE, lifeGLANCE)
-  base_url: http://allglance-gateway:8090
-  token_env: ALLGLANCE_TOKEN   # same value as GATEWAY_TOKEN on the gateway
+# allglance:         # the ALLGlance gateway (dayGLANCE, lastGLANCE, lifeGLANCE); leave
+#   base_url: http://allglance-gateway:8090   # commented out until you run it
+#   token_env: ALLGLANCE_TOKEN   # same value as GATEWAY_TOKEN on the gateway
 
 hermes:
   base_url: http://hermes-studio:6060

@@ -92,7 +92,12 @@ or anything else that speaks the standard.
 - **Read:** `REPORT calendar-query` with a `VTODO` filter, per list.
 - **Complete:** `GET` the `.ics`, set `STATUS:COMPLETED`, `COMPLETED:<now>`,
   `PERCENT-COMPLETE:100`, then `PUT` it back with `If-Match: <etag>`. On a 412
-  (someone else changed it), re-read and retry once, then report.
+  (someone else changed it), Orb pulls the list and queues the write in the
+  outbox, which retries it with the new etag. Only the master VTODO is
+  edited (recurrence exceptions are left alone), a DUE with a time keeps its
+  time, and an edit that changes none of these fields writes nothing.
+- **Move:** changing a task's list creates it in the new list and deletes the
+  old copy.
 - **Create:** `PUT` a new `VTODO` with a fresh UID into the chosen list.
 - **Priority:** the standard `PRIORITY` property (RFC 5545), shown as vikunja's
   five levels with vikunja's own mapping (Low 9, Medium 5, High 3, Urgent 2,
@@ -110,10 +115,9 @@ default "Chores"), so the GLANCE apps and phones see them too.
 
 - Each chore is a `VTODO` with `RRULE` (for example `FREQ=DAILY;INTERVAL=7`)
   and a `DUE` date. "Every N days" in Orb maps to that rule.
-- **Done** completes the current round: Orb sets `COMPLETED` and
-  `LAST-MODIFIED`, then moves `DTSTART`/`DUE` forward by one interval and keeps
-  `STATUS:NEEDS-ACTION`, the "complete and roll forward" pattern most CalDAV
-  task apps use. The PUT carries `If-Match` like any other task update.
+- **Done** rolls the chore forward: Orb moves `DUE` to one interval after
+  today and `DTSTART` to today, and keeps `STATUS:NEEDS-ACTION` (it doesn't
+  write `COMPLETED`). The PUT carries `If-Match` like any other task update.
 - Overdue and due-soon colours come from `DUE`. A Chores panel can sit on
   Main as well as the Upkeep tab.
 
@@ -254,7 +258,7 @@ that hold its secrets, and a **Test** button. Test runs from the server:
 | CalDAV | `PROPFIND`, lists collections that hold VTODOs |
 | UpstreamManager | `GET /api/repos` and `/api/requests` |
 
-**Live app panels** (not built yet) come from small adapters in the server. Each adapter
+**Live app panels** come from small adapters in the server. Each adapter
 polls its app, keeps the last result in `cache`, and serves the browser a
 small JSON shape. The browser never sees an app's key.
 
@@ -262,8 +266,6 @@ small JSON shape. The browser never sees an app's key.
 | --- | --- | --- |
 | `plex` | `GET /status/sessions` with `X-Plex-Token` | who is watching what, progress |
 | `sabnzbd` | `GET /api?mode=queue&output=json&apikey=` | speed, time left, queue |
-| `upstreammanager` | `GET /api/repos`, `GET /api/requests` | repos behind upstream, requests waiting |
-| `uptimekuma` | status page API (below) | monitors up or down |
 
 New types are one file each; Homepage's widget list is a good backlog
 (Sonarr, Radarr, qBittorrent, Proxmox, Home Assistant).
@@ -411,45 +413,62 @@ plus the LLMWIKI MCP tools (read only) and Argos's `/api/mcp` status tools.
 
 ## REST API
 
-All routes need `Authorization: Bearer <token>`. Tokens are named, so the log
-shows which agent wrote what.
+People sign in with `ORB_PASSWORD` (an HttpOnly cookie that lasts 30 days);
+agents send `Authorization: Bearer <token>` from `ORB_API_TOKENS`. Tokens are
+named, so the log shows which agent wrote what. Only `/api/health`,
+`/api/login` and `/api/logout` are open. Writes must be JSON, and writes from
+another site (a different `Origin`) are refused.
 
 ```
-GET    /api/projects                 list, with open task counts
-GET    /api/projects/:id             project, recent logs, tasks, wiki sections
-PATCH  /api/projects/:id             status, next, fav, task_list, wiki_note
-GET    /api/logs?project=&limit=     newest first
-POST   /api/logs                     {project, text}  -> 422 if text > log_max
-GET    /api/task-lists               CalDAV lists that hold VTODOs
-GET    /api/tasks?list=&open=        tasks from one or more lists
-POST   /api/tasks                    {list, title, due}
-PATCH  /api/tasks/:list/:uid         {done: true}  -> CalDAV PUT with If-Match
-GET    /api/wiki/:path               note sections (cached when the wiki is down)
-PATCH  /api/wiki/:path/:heading      replace one section
+GET    /api/health                   version and sign-in mode (open)
+POST   /api/login  /api/logout       {password}
+GET    /api/me                       who you are
+GET    /api/c/:coll[/:id]            records: projects, logs, tasks, chores, canvas,
+POST   /api/c/:coll                    edges, events, layouts, settings, chats
+PUT    /api/c/:coll/:id              (If-Match: "<version>" on PATCH)
+PATCH  /api/c/:coll/:id
+DELETE /api/c/:coll/:id
+GET    /api/stream                   SSE: every record change
+GET    /api/config                   settings as the server sees them (no secrets)
+POST   /api/connections/test/:id     test a connection
+GET    /api/caldav/status            lists, last sync, last error
+POST   /api/caldav/sync              pull now
+POST   /api/chores/:id/done          mark done (runs its action first)
+GET    /api/wiki/tree                notes with front-matter
+GET    /api/wiki/note?path=          one note
+GET    /api/wiki/search?q=
+POST   /api/wiki/section             {path, heading, text}  Current state / Next steps
+POST   /api/wiki/project             {projectId, area}  new note from the template
+POST   /api/wiki/related             {path, titles}  add related links
+POST   /api/wiki/digest              {date?}  write a day's digest line
+GET    /api/upstream/repos | requests | repo/:id/commits
+POST   /api/upstream/repo/:id/fetch | run-daily | request/:id/decide | poll
+GET    /api/uptime   GET /api/system   GET /api/hermes/sessions
 GET    /api/widgets/:app             live panel data
-GET    /api/uptime   GET /api/system
 POST   /api/golem                    {messages} -> {text, did}
 POST   /api/golem/stream             {messages} -> SSE: text, tool, done, error
 GET    /api/outbox                   writes waiting to retry
 POST   /api/outbox/retry             retry them now
 DELETE /api/outbox/:id               drop one
-POST   /api/wiki/related             {path, titles}  add related links
-POST   /api/chores/:id/done          mark done (runs its action first)
-POST   /api/wiki/digest              write a day's digest line
 ```
+
+Agents can't write `settings` (only a signed-in person can), can't set a
+task's `caldav` sync fields, and their logs always carry their own name in
+`by`.
 
 ## MCP tools (POST /mcp)
 
 | Tool | Does |
 | --- | --- |
-| `orb_list_projects` / `orb_get_project` | projects; one project with logs, tasks, wiki sections |
+| `orb_list_projects` / `orb_get_project` | projects; one project with its recent logs and tasks |
 | `orb_add_log` / `orb_list_logs` | short log entries (rejects over `log_max`) |
 | `orb_move_project` | change board column (and wiki `project_status`) |
-| `orb_list_task_lists` / `orb_list_tasks` | CalDAV lists and their tasks |
-| `orb_add_task` / `orb_complete_task` | create or close a task over CalDAV; closing also logs it |
-| `orb_update_wiki_section` | replace "Current state" or "Next steps" |
-| `orb_list_upkeep` / `orb_upkeep_done` | upkeep checks |
-| `orb_status` | one call: overdue upkeep, blocked projects, down monitors, hot hosts |
+| `orb_list_tasks` / `orb_add_task` | tasks, from CalDAV lists or Orb-only lists |
+| `orb_set_task_priority` / `orb_complete_task` | change priority; close a task (also logs it) |
+| `orb_list_chores` / `orb_chore_done` | chores and when they are due |
+
+Golem has these plus read-only `wiki_search`, `wiki_read` and
+`project_chats` (and the ALLGlance tools when that gateway is set).
 
 `orb_complete_task` is how an agent marks work done: one call closes the
 VTODO where it lives and writes a log line like `Done: test prompt cache`,
@@ -457,31 +476,22 @@ with `by` set to the agent.
 
 ## orb.yaml
 
+See `config/orb.example.yaml` for every key. A value in orb.yaml beats the
+same address passed as an environment variable. Golem can be flat
+(`base_url`, `model`, `key_env`, `can_write`) or have a block per provider:
+
 ```yaml
-log_max: 50
 golem:
   provider: local                       # local | frontier
   local:    { base_url: http://argos:8080/v1, model: "" }
-  frontier: { service: openrouter, base_url: https://openrouter.ai/api/v1, model: "", key_env: OPENROUTER_API_KEY }
-  can_write: true
-caldav:
-  url: http://vikunja:3456/dav/
-  user_env: CALDAV_USER
-  password_env: CALDAV_PASSWORD
-  main_lists: [Homelab, Pondering Orb]
-wiki:
-  base_url: http://llmwiki:27123
-  token_env: WIKI_API_KEY
-  daily_digest: false
-  area_hubs: { homelab: Homelab, ai: Local AI }   # area -> hub note title
-uptime:
-  base_url: http://uptime-kuma:3001
-  status_page: orb
-system:
-  proc: /host/proc
-  docker: tcp://docker-proxy:2375
-projects:
-  - { name: Pondering Orb, task_list: Pondering Orb, wiki_note: "wiki/1-projects/Pondering Orb.md" }
+  frontier: { base_url: https://openrouter.ai/api/v1, model: "", key_env: OPENROUTER_API_KEY }
+  can_write: true                       # applies to both
+```
+
+Apps, app groups and live widgets are not in orb.yaml: they live in
+Settings → Apps (YAML), for example:
+
+```yaml
 groups:
   - name: Media
     apps:
@@ -493,8 +503,12 @@ groups:
         widget: { type: sabnzbd, url: http://sabnzbd:8085, key_env: SABNZBD_API_KEY }
 ```
 
+`key_env` (and every `*_env` in Settings) must be a plain upper-case variable
+name and can't be one of Orb's own (`ORB_*`).
+
 Check the CalDAV URL against your vikunja version; the path differs between
-servers.
+servers. The Obsidian Local REST API's plain-HTTP port (27123) is off by
+default in the plugin; turn it on, or use the HTTPS port.
 
 ## Build status
 

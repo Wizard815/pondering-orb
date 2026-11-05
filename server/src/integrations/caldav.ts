@@ -10,7 +10,13 @@ export type Item = { href: string; etag: string; ics: string };
 export class CalDav {
   constructor(private url: () => string, private creds: () => { user: string; pass: string }) {}
   private auth(): Record<string, string> { const { user, pass } = this.creds(); return user ? { Authorization: "Basic " + Buffer.from(`${user}:${pass}`).toString("base64") } : {}; }
-  private abs(href: string) { return new URL(href, trimSlash(this.url()) + "/").toString(); }
+  /** An href from the server, made absolute. It must stay on the configured
+   *  server: the login is sent with every request. */
+  private abs(href: string) {
+    const base = new URL(trimSlash(this.url()) + "/"), u = new URL(href, base);
+    if (u.origin !== base.origin) throw new HttpError(502, `CalDAV pointed at another server (${u.host}); Orb only talks to ${base.host}.`);
+    return u.toString();
+  }
   get configured() { return !!this.url(); }
 
   private home = ""; private homeFor = "";
@@ -53,7 +59,7 @@ export class CalDav {
     const body = `<?xml version="1.0"?><c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:prop><d:getetag/><c:calendar-data/></d:prop><c:filter><c:comp-filter name="VCALENDAR"><c:comp-filter name="VTODO"/></c:comp-filter></c:filter></c:calendar-query>`;
     const r = await call(this.abs(list.href), { method: "REPORT", headers: { Depth: "1", "Content-Type": "application/xml", ...this.auth() }, body, timeoutMs: 30000 });
     if (r.status !== 207) throw new HttpError(502, `CalDAV answered ${r.status} for ${list.name}.`);
-    return responses(String(r.body)).map(x => ({ href: x.href, etag: tag(x.xml, "getetag"), ics: decodeXml(tag(x.xml, "calendar-data")) })).filter(x => x.ics.includes("VTODO"));
+    return responses(String(r.body)).map(x => ({ href: x.href, etag: decodeXml(tag(x.xml, "getetag")), ics: decodeXml(tag(x.xml, "calendar-data")) })).filter(x => x.ics.includes("VTODO"));
   }
   /** Write a VTODO. With etag: only if unchanged (412 means someone else
    *  changed it). Without: only if it doesn't exist yet. */
@@ -64,7 +70,9 @@ export class CalDav {
     return { etag: r.headers.get("etag") || undefined };
   }
   async del(href: string, etag?: string) {
-    const r = await call(this.abs(href), { method: "DELETE", headers: { ...(etag ? { "If-Match": etag } : {}), ...this.auth() } });
+    let r = await call(this.abs(href), { method: "DELETE", headers: { ...(etag ? { "If-Match": etag } : {}), ...this.auth() } });
+    // Changed on the server since Orb last saw it: it was still deleted in Orb, so delete it anyway.
+    if (r.status === 412 && etag) r = await call(this.abs(href), { method: "DELETE", headers: this.auth() });
     if (r.status >= 300 && r.status !== 404) throw new HttpError(502, `CalDAV answered ${r.status} when deleting.`);
   }
 }
@@ -76,4 +84,10 @@ function responses(xml: string) {
   return out;
 }
 function tag(xml: string, name: string) { const m = new RegExp(`<(?:[a-z0-9]+:)?${name}\\b[^>]*>([\\s\\S]*?)</(?:[a-z0-9]+:)?${name}>`, "i").exec(xml); return m ? m[1].trim() : ""; }
-const decodeXml = (s: string) => s.replace(/^<!\[CDATA\[([\s\S]*)\]\]>$/, "$1").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&#13;/g, "\r").replace(/&amp;/g, "&");
+/** XML text → string: CDATA, the five named entities and every numeric one
+ *  (sabre/dav writes &quot; in ETags, Go's encoder writes &#34; and &#xA;). */
+const NAMED: Record<string, string> = { lt: "<", gt: ">", quot: '"', apos: "'", amp: "&" };
+const decodeXml = (s: string) => {
+  const cdata = /^<!\[CDATA\[([\s\S]*)\]\]>$/.exec(s); if (cdata) return cdata[1];
+  return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e: string) => e[0] === "#" ? String.fromCodePoint(e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10)) : NAMED[e] ?? m);
+};

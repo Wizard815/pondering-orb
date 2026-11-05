@@ -1,8 +1,8 @@
 import type { Records } from "./records.js";
 import type { Tool } from "./integrations/llm.js";
 import { STATUSES } from "./records.js";
+import { today } from "./dates.js";
 
-const today = () => new Date().toISOString().slice(0, 10);
 // Priority is stored as CalDAV PRIORITY and named on vikunja's five levels,
 // with vikunja's own mapping (low 9, medium 5, high 3, urgent 2, do now 1).
 const LEVELS = ["none", "low", "medium", "high", "urgent", "do_now"];
@@ -57,7 +57,7 @@ export function orbTools(r: Records): Tool[] {
         const t: any = m[0]; const by = who === "you" ? "golem" : who;
         r.patch("tasks", t.id, { done: true, doneAt: today(), doneBy: by });
         const p = r.list("projects").find((x: any) => (x.taskList || x.name) === listOf(t)) as any;
-        if (p) { try { r.create("logs", { project: p.name, text: `Done: ${t.title}`.slice(0, 50), by }); } catch { /* too long etc */ } }
+        if (p) { try { r.create("logs", { project: p.name, text: `Done: ${t.title}`.slice(0, r.logMax()), by }); } catch { /* too long etc */ } }
         return { title: t.title, list: listOf(t), done: true };
       } },
     { name: "orb_list_chores", description: "Recurring chores with days left until due (negative means overdue).",

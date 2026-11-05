@@ -6,7 +6,7 @@ import { hostname } from "node:os";
 import { Store } from "./db.js";
 import { Records, HttpError, isColl, Change } from "./records.js";
 import { Auth } from "./auth.js";
-import { OrbConfig, loadConfig, secret } from "./config.js";
+import { OrbConfig, loadConfig, secret, envSafe } from "./config.js";
 import { Upstream } from "./integrations/upstream.js";
 import { uptime } from "./integrations/uptime.js";
 import { hostStats, containers } from "./integrations/system.js";
@@ -18,10 +18,11 @@ import { mountMcp } from "./mcp.js";
 import { logCommits } from "./pollers.js";
 import { CalDav } from "./integrations/caldav.js";
 import { TaskSync } from "./sync.js";
-import { Wiki } from "./integrations/wiki.js";
+import { Wiki, notePath, isNoteName } from "./integrations/wiki.js";
 import { Hermes } from "./integrations/hermes.js";
 import { AllGlance } from "./integrations/allglance.js";
 import { Outbox } from "./outbox.js";
+import { today, localDay, isDay } from "./dates.js";
 
 export const VERSION = "0.1.0";
 
@@ -35,14 +36,15 @@ export async function buildApp(o: AppOptions = {}) {
     const s: any = store.get("settings", "app") || {};
     const c = s.connections || {};
     return {
-      ...base, logMax: Number(s.logMax) || base.logMax,
-      golem: { ...base.golem, ...(s.golem || {}) },
-      upstream: { ...base.upstream, ...(c.upstream || {}) },
-      uptime: { ...base.uptime, ...(c.uptime || {}) },
-      caldav: { ...base.caldav, ...(c.caldav || {}) },
-      wiki: { ...base.wiki, ...(c.wiki || {}) },
-      hermes: { ...base.hermes, ...(c.hermes || {}) },
-      allglance: { ...base.allglance, ...(c.allglance || {}) },
+      ...base, logMax: Math.max(20, Math.min(200, Number(s.logMax) || base.logMax || 50)),
+      golem: { ...base.golem, ...envSafe(s.golem) },
+      upstream: { ...base.upstream, ...envSafe(c.upstream) },
+      uptime: { ...base.uptime, ...envSafe(c.uptime) },
+      caldav: { ...base.caldav, ...envSafe(c.caldav) },
+      // The vault mount path is fixed by orb.yaml / compose, never by settings.
+      wiki: { ...base.wiki, ...envSafe(c.wiki), vault: base.wiki.vault },
+      hermes: { ...base.hermes, ...envSafe(c.hermes) },
+      allglance: { ...base.allglance, ...envSafe(c.allglance) },
     };
   };
   const records = new Records(store, cfg);
@@ -64,7 +66,7 @@ export async function buildApp(o: AppOptions = {}) {
     const ws = WIKI_STATUS[p.status] || "active";
     wikiWrite(`Set ${p.name}'s wiki project_status to ${ws}`, [
       { type: "front", path: p.wikiNote, key: "project_status", value: ws },
-      { type: "front", path: p.wikiNote, key: "updated", value: new Date().toISOString().slice(0, 10) },
+      { type: "front", path: p.wikiNote, key: "updated", value: today() },
       { type: "log", line: `[[${p.name}]]: project_status set to ${ws}` }], `status:${p.id}`);
   });
   /** Background wiki writes: tried now, queued in the outbox when the wiki is unreachable. */
@@ -72,11 +74,13 @@ export async function buildApp(o: AppOptions = {}) {
   const runWikiOps = async (ops: WikiOp[]) => { for (const op of ops) op.type === "front" ? await wiki.setFront(op.path, op.key, op.value) : await wiki.log(op.line); };
   outbox.on("wiki", (p: { ops: WikiOp[] }) => runWikiOps(p.ops));
   function wikiWrite(label: string, ops: WikiOp[], key?: string) {
-    runWikiOps(ops).catch(e => { app.log.warn({ err: e.message }, "wiki write queued"); outbox.add("wiki", label, { ops }, e.message, key); });
+    // Success drops an older queued write for the same thing, so a stale
+    // retry can't overwrite this newer one.
+    runWikiOps(ops).then(() => { if (key) outbox.drop(`wiki:${key}`); }, e => { app.log.warn({ err: e.message }, "wiki write queued"); outbox.add("wiki", label, { ops }, e.message, key); });
   }
   const glanceTools = () => !cfg().allglance.baseUrl ? [] : [
     { name: "allglance_day", description: "The day's plan from dayGLANCE through the ALLGlance gateway: time blocks with start time and length. date is YYYY-MM-DD (default today).",
-      parameters: { type: "object", properties: { date: { type: "string" } } }, run: ({ date }: any) => glance.day(/^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : new Date().toISOString().slice(0, 10)) },
+      parameters: { type: "object", properties: { date: { type: "string" } } }, run: ({ date }: any) => glance.day(/^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : today()) },
     { name: "allglance_dayglance_tasks", description: "dayGLANCE tasks (inbox and today) with priority 0 none to 5 do now.", parameters: { type: "object", properties: {} }, run: () => glance.dayglanceTasks() },
   ];
   // Read-only tools for the wiki (search, read a note) and linked Hermes chats.
@@ -97,6 +101,18 @@ export async function buildApp(o: AppOptions = {}) {
 
   const app: FastifyInstance = Fastify({ logger: o.logger ?? false, bodyLimit: 2 * 1024 * 1024 });
   await app.register(cookie);
+  // Only JSON bodies. A text/plain or form POST is a "simple" cross-site
+  // request that any web page could send to a LAN dashboard.
+  app.removeContentTypeParser("text/plain");
+  // Refuse writes from other sites (browsers send Origin / Sec-Fetch-Site),
+  // which matters most in open mode where there is no sign-in at all.
+  app.addHook("onRequest", async (req, reply) => {
+    if (["GET", "HEAD", "OPTIONS"].includes(req.method) || !req.url.startsWith("/api/") && !req.url.startsWith("/mcp")) return;
+    const site = String(req.headers["sec-fetch-site"] || ""), origin = String(req.headers.origin || "");
+    let cross = site === "cross-site";
+    if (!cross && origin && origin !== "null") { try { const h = new URL(origin).host; cross = h !== req.headers.host && h !== String(req.headers["x-forwarded-host"] || "").split(",")[0].trim(); } catch { cross = true; } }
+    if (cross) return reply.code(403).send({ error: "Requests from other sites are refused." });
+  });
   app.setErrorHandler((e: any, _req, reply) => {
     const status = e instanceof HttpError ? e.status : e.statusCode && e.statusCode < 500 ? e.statusCode : 500;
     if (status >= 500 && !(e instanceof HttpError)) app.log.error(e);
@@ -120,16 +136,29 @@ export async function buildApp(o: AppOptions = {}) {
   const coll = (c: string) => { if (!isColl(c)) throw new HttpError(404, `No collection ${c}.`); return c; };
   app.get("/api/c/:coll", { preHandler: guard }, async (req: any) => records.list(coll(req.params.coll)));
   app.get("/api/c/:coll/:id", { preHandler: guard }, async (req: any) => records.get(coll(req.params.coll), req.params.id) ?? (() => { throw new HttpError(404, "Not found."); })());
+  /** What a caller may write. Agents (API tokens) can't change settings, so
+   *  they can't point a connection at another host or name another secret.
+   *  Sync bookkeeping (`caldav`) is the server's own: a client-set href would
+   *  send the CalDAV login wherever it points. Agents sign their own logs. */
+  const writable = (req: any, c: string, id?: string) => {
+    if (c === "settings" && who(req) !== "you") throw new HttpError(403, "Only a signed-in person can change settings.");
+    const raw = req.body ?? {};
+    if (typeof raw !== "object" || Array.isArray(raw)) throw new HttpError(400, "Send a JSON object.");
+    const body: Record<string, any> = { ...raw };
+    if (c === "tasks" || c === "chores") { delete body.caldav; const cur: any = id && records.get(c, id); if (cur?.caldav && req.method === "PUT") body.caldav = cur.caldav; }
+    if (c === "logs" && who(req) !== "you" && (req.method === "POST" || "by" in body)) body.by = who(req);
+    return body;
+  };
   app.post("/api/c/:coll", { preHandler: guard }, async (req: any, reply) => {
-    const c = coll(req.params.coll), body = { ...(req.body || {}) };
-    if (c === "logs" && !body.by && who(req) !== "you") body.by = who(req);
+    const c = coll(req.params.coll), body = writable(req, c);
     const id = typeof body.id === "string" && /^[A-Za-z0-9_.:-]{1,80}$/.test(body.id) ? body.id : undefined;
     reply.code(201); return records.create(c, body, id);
   });
-  app.put("/api/c/:coll/:id", { preHandler: guard }, async (req: any) => records.put(coll(req.params.coll), req.params.id, req.body || {}));
+  app.put("/api/c/:coll/:id", { preHandler: guard }, async (req: any) => { const c = coll(req.params.coll); return records.put(c, req.params.id, writable(req, c, req.params.id)); });
   app.patch("/api/c/:coll/:id", { preHandler: guard }, async (req: any) => {
-    const v = Number(String(req.headers["if-match"] || "").replace(/"/g, "")) || undefined;
-    return records.patch(coll(req.params.coll), req.params.id, req.body || {}, v);
+    const m = String(req.headers["if-match"] || "").trim(), v = m ? Number(m.replace(/^W\//, "").replace(/"/g, "")) : undefined;
+    if (m && !Number.isInteger(v)) throw new HttpError(400, "If-Match must be a record version, like \"3\".");
+    const c = coll(req.params.coll); return records.patch(c, req.params.id, writable(req, c, req.params.id), v);
   });
   app.delete("/api/c/:coll/:id", { preHandler: guard }, async (req: any, reply) => { records.remove(coll(req.params.coll), req.params.id); reply.code(204).send(); });
 
@@ -188,7 +217,10 @@ export async function buildApp(o: AppOptions = {}) {
     const g = cfg().golem, messages = golemMessages(req.body), ctl = new AbortController();
     reply.raw.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive", "X-Accel-Buffering": "no" });
     const send = (event: string, data: unknown) => reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-    req.raw.on("close", () => ctl.abort());
+    // The response closing before we end it means the browser stopped (Stop,
+    // or the tab went away): abort the model and skip any further tool rounds.
+    reply.hijack();
+    reply.raw.on("close", () => { if (!reply.raw.writableEnded) ctl.abort(); });
     try {
       const r = await chatStream({ baseUrl: g.baseUrl, model: g.model, key: secret(g.keyEnv), messages, tools: tools(), who: who(req), signal: ctl.signal,
         onEvent: e => send(e.type, e.type === "text" ? { delta: e.delta } : { name: e.name }) });
@@ -202,7 +234,7 @@ export async function buildApp(o: AppOptions = {}) {
   });
   function golemSystem(): Msg {
     const g = cfg().golem, max = cfg().logMax;
-    return { role: "system", content: `You are Golem, the stone servant of the Pondering Orb, a homelab dashboard. Speak plainly with a light touch of wizard flavour; be brief and concrete. Use Markdown for lists and emphasis. Use the tools to read the dashboard before answering questions about it. ${g.canWrite ? `When the user says they finished something or asks you to log it, call orb_add_log with a short entry (at most ${max} characters). When finished work matches an open task, offer to complete it.` : "You are read-only."} ${cfg().wiki.baseUrl ? " Use wiki_search and wiki_read to look things up in the user's notes." : ""}${cfg().hermes.baseUrl ? " project_chats reads chats linked to a project." : ""} Today is ${new Date().toISOString().slice(0, 10)}.` };
+    return { role: "system", content: `You are Golem, the stone servant of the Pondering Orb, a homelab dashboard. Speak plainly with a light touch of wizard flavour; be brief and concrete. Use Markdown for lists and emphasis. Use the tools to read the dashboard before answering questions about it. ${g.canWrite ? `When the user says they finished something or asks you to log it, call orb_add_log with a short entry (at most ${max} characters). When finished work matches an open task, offer to complete it.` : "You are read-only."} ${cfg().wiki.baseUrl ? " Use wiki_search and wiki_read to look things up in the user's notes." : ""}${cfg().hermes.baseUrl ? " project_chats reads chats linked to a project." : ""} Today is ${today()}.` };
   }
 
   // ---- settings helpers and connection tests ----
@@ -239,12 +271,6 @@ export async function buildApp(o: AppOptions = {}) {
   app.post("/api/caldav/sync", { preHandler: guard }, async () => sync.pull());
 
   // ---- LLMWIKI (reads from the read-only mount when present; writes over REST) ----
-  const notePath = (p: unknown, write = false) => {
-    const s = String(p || "");
-    if (!s.endsWith(".md") || s.includes("..") || s.startsWith("/")) throw new HttpError(400, "That isn't a note path.");
-    if (write && (s.startsWith("raw/") || !s.startsWith("wiki/"))) throw new HttpError(403, "Orb only edits notes under wiki/, never raw/.");
-    return s;
-  };
   app.get("/api/wiki/tree", { preHandler: guard }, async () => ({ mount: await wiki.hasMount(), notes: await wiki.tree() }));
   app.get("/api/wiki/note", { preHandler: guard }, async (req: any) => wiki.note(notePath(req.query.path)));
   app.get("/api/wiki/search", { preHandler: guard }, async (req: any) => wiki.search(String(req.query.q || "")));
@@ -268,7 +294,7 @@ export async function buildApp(o: AppOptions = {}) {
   });
 
   // ---- ALLGlance gateway: dayGLANCE day plan and inbox, lastGLANCE chores, lifeGLANCE milestones ----
-  const dateParam = (v: unknown) => { const s = String(v || new Date().toISOString().slice(0, 10)); if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) throw new HttpError(400, "date must be YYYY-MM-DD."); return s; };
+  const dateParam = (v: unknown) => { const s = String(v || today()); if (!isDay(s)) throw new HttpError(400, "date must be YYYY-MM-DD."); return s; };
   app.get("/api/allglance/day", { preHandler: guard }, async (req: any) => glance.day(dateParam(req.query.date), req.query.owner));
   app.get("/api/allglance/dayglance-tasks", { preHandler: guard }, async (req: any) => glance.dayglanceTasks(req.query.owner));
   app.get("/api/allglance/chores", { preHandler: guard }, async (req: any) => glance.chores(req.query.owner));
@@ -302,7 +328,7 @@ export async function buildApp(o: AppOptions = {}) {
     const c: any = records.get("chores", req.params.id); if (!c) throw new HttpError(404, "No such chore.");
     let result: unknown = null;
     if (c.action === "upstream-daily") result = await upstream.runDaily(); // fails before the chore is marked when UpstreamManager is down
-    return { chore: records.patch("chores", c.id, { lastDone: new Date().toISOString().slice(0, 10) }), result };
+    return { chore: records.patch("chores", c.id, { lastDone: today() }), result };
   });
 
   // ---- daily digest of Orb's log in the wiki's log (Settings → Logs) ----
@@ -310,7 +336,8 @@ export async function buildApp(o: AppOptions = {}) {
   async function writeDigest(date = "", force = false) {
     const s: any = store.get("settings", "app") || {};
     if (!s.wikiDigest && !force) return "";
-    const day = date || new Date(Date.now() - 864e5).toISOString().slice(0, 10); // yesterday
+    const day = date || localDay(Date.now() - 864e5); // yesterday
+    if (!isDay(day)) throw new HttpError(400, "date must be YYYY-MM-DD.");
     const jobs: any = store.get("settings", "jobs") || {};
     if (!force && jobs.digestFor >= day) return "";
     const counts = new Map<string, number>();
@@ -322,7 +349,8 @@ export async function buildApp(o: AppOptions = {}) {
       wikiWrite(`Daily digest for ${day}`, [{ type: "log", line }], `digest:${day}`);
     }
     const { id: _i, version: _v, ...rest } = jobs;
-    store.set("settings", "jobs", { ...rest, digestFor: day });
+    // A manual digest for another day doesn't move the automatic job's marker back.
+    if (!jobs.digestFor || day > jobs.digestFor) store.set("settings", "jobs", { ...rest, digestFor: day });
     return day;
   }
 

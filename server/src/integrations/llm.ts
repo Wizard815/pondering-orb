@@ -57,26 +57,37 @@ export async function chatStream(opts: Parameters<typeof chat>[0] & { onEvent: (
       text = m.content || ""; if (text) opts.onEvent({ type: "text", delta: text });
       for (const c of m.tool_calls || []) calls.push({ id: c.id, name: c.function?.name, args: c.function?.arguments || "" });
     } else {
-      const reader = res.body!.getReader(), dec = new TextDecoder(); let buf = "";
+      const reader = res.body!.getReader(), dec = new TextDecoder(); let buf = "", last = -1;
+      const line = (raw: string) => {
+        const l = raw.trim(); if (!l.startsWith("data:")) return;
+        const data = l.slice(5).trim(); if (data === "[DONE]") return;
+        let ev: any; try { ev = JSON.parse(data); } catch { return; }
+        if (ev.error) throw new HttpError(502, `The model reported an error: ${String(ev.error.message || ev.error).slice(0, 200)}`);
+        const d = ev.choices?.[0]?.delta || {};
+        if (d.content) { text += d.content; opts.onEvent({ type: "text", delta: d.content }); }
+        for (const tc of d.tool_calls || []) {
+          // Without an index, a chunk with a new id starts a new call.
+          const k = tc.index ?? (tc.id && calls[last]?.id && calls[last].id !== tc.id ? last + 1 : Math.max(last, 0)); last = k;
+          calls[k] ??= { id: "", name: "", args: "" };
+          if (tc.id) calls[k].id = tc.id;
+          // Some servers repeat the whole name in every chunk.
+          if (tc.function?.name && !calls[k].name.endsWith(tc.function.name)) calls[k].name += tc.function.name;
+          if (tc.function?.arguments) calls[k].args += tc.function.arguments;
+        }
+      };
       for (;;) {
         const { done, value } = await reader.read(); if (done) break;
         buf += dec.decode(value, { stream: true });
-        let i; while ((i = buf.indexOf("\n")) >= 0) {
-          const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
-          if (!line.startsWith("data:")) continue;
-          const data = line.slice(5).trim(); if (data === "[DONE]") continue;
-          let ev: any; try { ev = JSON.parse(data); } catch { continue; }
-          const d = ev.choices?.[0]?.delta || {};
-          if (d.content) { text += d.content; opts.onEvent({ type: "text", delta: d.content }); }
-          for (const tc of d.tool_calls || []) { const k = tc.index ?? 0; calls[k] ??= { id: "", name: "", args: "" }; if (tc.id) calls[k].id = tc.id; if (tc.function?.name) calls[k].name += tc.function.name; if (tc.function?.arguments) calls[k].args += tc.function.arguments; }
-        }
+        let i; while ((i = buf.indexOf("\n")) >= 0) { const l = buf.slice(0, i); buf = buf.slice(i + 1); line(l); }
       }
+      if (buf) line(buf + dec.decode()); // a last line with no newline
     }
     full += text;
     const real = calls.filter(Boolean);
     if (!real.length) return { text: full.trim(), did };
     msgs.push({ role: "assistant", content: text || null, tool_calls: real.map(c => ({ id: c.id, type: "function", function: { name: c.name, arguments: c.args } })) });
     for (const c of real) {
+      if (opts.signal?.aborted) throw new HttpError(499, "Stopped.");
       const t = opts.tools.find(x => x.name === c.name); opts.onEvent({ type: "tool", name: c.name });
       let out: unknown;
       try { out = t ? await t.run(c.args ? JSON.parse(c.args) : {}, opts.who) : { error: "unknown tool" }; if (t?.write) did.push(t.name); }

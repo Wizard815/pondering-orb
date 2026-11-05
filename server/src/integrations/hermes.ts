@@ -4,17 +4,18 @@ import { HttpError } from "../records.js";
 /** Hermes Studio: its own chats and Hermes Agent's sessions, read only.
  *  Signs in with a user and password from the environment and keeps the JWT. */
 export class Hermes {
-  private token = ""; private at = 0;
+  private token = ""; private tokenFor = ""; private at = 0;
   constructor(private base: () => string, private creds: () => { user: string; pass: string }) {}
   private async login() {
     const b = trimSlash(this.base()); if (!b) throw new HttpError(503, "Hermes Studio isn't set up. Add its address in Settings → Connections.");
     const { user, pass } = this.creds();
     const r = await call(`${b}/api/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: user, password: pass }) });
     if (!r.ok || !r.body?.token) throw new HttpError(502, `Hermes Studio sign-in failed (${r.status}${r.body?.error ? ": " + r.body.error : ""}).`);
-    this.token = r.body.token; this.at = Date.now();
+    this.token = r.body.token; this.at = Date.now(); this.tokenFor = b;
   }
   private async get(p: string): Promise<any> {
-    if (!this.token || Date.now() - this.at > 6 * 3600e3) await this.login();
+    // A token from one Hermes address is never sent to another.
+    if (!this.token || this.tokenFor !== trimSlash(this.base()) || Date.now() - this.at > 6 * 3600e3) await this.login();
     let r = await call(trimSlash(this.base()) + p, { headers: { Authorization: `Bearer ${this.token}` } });
     if (r.status === 401) { await this.login(); r = await call(trimSlash(this.base()) + p, { headers: { Authorization: `Bearer ${this.token}` } }); }
     if (!r.ok) throw new HttpError(502, `Hermes Studio answered ${r.status}.`);
