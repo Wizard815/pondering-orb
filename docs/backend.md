@@ -53,7 +53,7 @@ old Plans list is gone; it became task lists.
 
 ```
 projects(id, name, status, next, repo, fav, archived, task_list, wiki_note,
-         upstream_repo, log_commits, last_logged_sha, updated_at)
+         upstream_repo, log_commits, last_logged_sha, chats, updated_at)
   status: next | active | blocked | paused | shipped
   task_list: CalDAV collection for this project's tasks (default: its name)
   wiki_note: e.g. "wiki/1-projects/Pondering Orb.md"
@@ -275,6 +275,27 @@ Then:
   15 minutes and writes each new commit as a log entry: its subject cut to
   `log_max`, `by: git`, the short sha kept with it. `projects.last_logged_sha`
   stops it logging a commit twice.
+
+## Hermes Studio chats
+
+A project can link any number of chats (`projects.chats`, a list of session
+ids). Orb reads them from Hermes Studio, which already lists both its own
+chats and Hermes Agent's native sessions, so one connection covers both.
+
+| Use | Call |
+| --- | --- |
+| Sign in | `POST /api/auth/login` with `{username, password}` from `HERMES_USER` / `HERMES_PASSWORD`; returns a JWT. Orb keeps it and signs in again when it expires (`HERMES_WEB_UI_AUTH_JWT_EXPIRES_IN` on the Studio side). |
+| Studio chats | `GET /api/studio/sessions?limit=50&offset=0` → `{sessions: [{id, title, source, agent, model, messageCount, startedAt, ...}]}` |
+| Hermes Agent sessions | `GET /api/studio/sessions/hermes?limit=50` |
+| Search | `GET /api/studio/search/sessions?q=...` |
+| One chat | `GET /api/studio/sessions/<id>` → `{session}` |
+
+Requests send `Authorization: Bearer <jwt>`. Use a dedicated Studio user for
+Orb so its access can be limited and revoked.
+
+The project page's Chats panel shows linked chats (title, agent, model,
+message count, last active) and searches the rest to link more. Later, Golem
+can read a linked chat (read only) to answer "what did we decide about X".
 
 ## Uptime
 
