@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { create, patch, remove, useColl, useSettings, getDoc } from "../lib/store";
 import { useUi } from "../lib/ui";
-import { choreState, fmtDate, listOf, logSorted, prioName, prioOf, sortTasks, todayISO } from "../lib/util";
+import { choreState, fmtDate, listOf, logSorted, prioName, prioOf, sortTasks, todayISO, PRIO_LEVELS } from "../lib/util";
 
 export const projHref = (p: { id: string }) => "#p-" + String(p.id).replace(/[^A-Za-z0-9-]/g, "");
 export const useLogMax = () => { const s = useSettings(); return Math.max(20, Math.min(200, Number(s.logMax) || 50)); };
@@ -13,8 +13,15 @@ export function Star({ p }: { p: any }) {
 
 export function PrioChip({ t }: { t: any }) {
   const ui = useUi(), p = prioOf(t);
-  const next = () => { const order = [0, 1, 5, 9]; patch("tasks", t.id, { priority: order[(order.indexOf(p) + 1) % 4] }).catch(ui.error); };
-  return <button className={`prio p${p}`} onClick={next} title={`Priority: ${p ? prioName(p) : "none"}. Click to change.`}>{p ? prioName(p) : "·"}</button>;
+  const pick = (e: React.MouseEvent) => { const r = (e.currentTarget as Element).getBoundingClientRect();
+    ui.menu(r.left, r.bottom + 4, [{ label: "Priority", heading: true }, ...[...PRIO_LEVELS].reverse().map(l => ({ label: `${l.level === p ? "✓ " : ""}${l.name}`, run: () => { if (l.level !== p) patch("tasks", t.id, { priority: l.cal }).catch(ui.error); } }))]); };
+  return <button className={`prio l${p}`} onClick={pick} title={`Priority: ${prioName(p)}. Click to change.`} aria-label={`Priority ${prioName(p)}, change`}>{p ? prioName(p) : "·"}</button>;
+}
+
+/** Priority select for add-task forms. value and onChange use CalDAV numbers. */
+export function PrioSelect({ value, onChange }: { value: number; onChange: (cal: number) => void }) {
+  return <select value={value} onChange={e => onChange(Number(e.target.value))} aria-label="Priority">
+    {[...PRIO_LEVELS].reverse().map(l => <option key={l.level} value={l.cal}>{l.level ? l.name : "No priority"}</option>)}</select>;
 }
 
 export function TaskRows({ tasks, showList }: { tasks: any[]; showList?: boolean }) {

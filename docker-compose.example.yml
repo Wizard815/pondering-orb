@@ -30,6 +30,8 @@ services:
       HERMES_URL: http://hermes-studio:6060
       ARGOS_URL: http://argos:8080
       WIKI_URL: http://llmwiki:27123
+      ALLGLANCE_URL: http://allglance-gateway:8090
+      ALLGLANCE_TOKEN: ${ALLGLANCE_TOKEN:-}
       ORB_PROC: /host/proc
       DOCKER_HOST: tcp://docker-proxy:2375
       WIKI_API_KEY: ${WIKI_API_KEY}

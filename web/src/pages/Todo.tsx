@@ -3,15 +3,15 @@ import type { PageDef } from "./types";
 import type { PanelDef } from "../components/PanelGrid";
 import { create, useColl } from "../lib/store";
 import { useUi } from "../lib/ui";
-import { listOf, sortTasks } from "../lib/util";
-import { TaskRows } from "../components/Common";
+import { listOf, prioOf, sortTasks } from "../lib/util";
+import { TaskRows, PrioSelect } from "../components/Common";
+import { GlanceInbox } from "../components/Glance";
 import { useFetch } from "../lib/useFetch";
 import { post } from "../lib/api";
 import "./projects.css";
 
 const KEY = "orb.todoLists";
 const loadSel = (): string[] => { try { const v = JSON.parse(localStorage.getItem(KEY) || "[]"); return Array.isArray(v) ? v.map(String) : []; } catch { return []; } };
-const PRIO: [number, string][] = [[0, "None"], [1, "High"], [5, "Medium"], [9, "Low"]];
 
 function Lists({ lists, sel, setSel }: { lists: string[]; sel: string[]; setSel: (l: string[]) => void }) {
   const tasks = useColl("tasks");
@@ -31,24 +31,32 @@ function Lists({ lists, sel, setSel }: { lists: string[]; sel: string[]; setSel:
 function Tasks({ lists, shown, def }: { lists: string[]; shown: string[]; def: string }) {
   const ui = useUi(), tasks = useColl("tasks");
   const [title, setTitle] = useState(""), [list, setList] = useState<string | null>(null), [prio, setPrio] = useState("0"), [due, setDue] = useState("");
+  const [min, setMin] = useState(0), [hideDone, setHideDone] = useState(false);
+  const keep = (x: any) => prioOf(x) >= min && (!hideDone || !x.done);
   const add = async (e: React.FormEvent) => {
     e.preventDefault(); const t = title.trim(); if (!t) return;
     const l = (list ?? def).trim() || "Inbox";
     try { await create("tasks", { title: t, list: l, due, done: false, priority: Number(prio) || 0 }); setTitle(""); setDue(""); ui.status(`Added to ${l}.`); } catch (x) { ui.error(x); }
   };
   return <>
-    {shown.map(l => { const items = sortTasks(tasks.filter(x => listOf(x) === l)); return <div key={l}>
+    <div className="row small">
+      <label className="row" style={{ gap: 4 }}>Show<select value={min} onChange={e => setMin(Number(e.target.value))} aria-label="Lowest priority shown">
+        <option value={0}>every priority</option><option value={2}>Medium and up</option><option value={3}>High and up</option><option value={4}>Urgent and up</option><option value={5}>Do now only</option></select></label>
+      <label className="row" style={{ gap: 4 }}><input type="checkbox" checked={hideDone} onChange={e => setHideDone(e.target.checked)} /> Hide done</label>
+      <span className="hint">Sorted by priority, then due date. Click a priority chip to change it.</span>
+    </div>
+    {shown.map(l => { const items = sortTasks(tasks.filter(x => listOf(x) === l && keep(x))); return <div key={l}>
       <h4 className="group-name">{l}</h4>{items.length ? <TaskRows tasks={items} /> : <div className="empty small">Empty list.</div>}</div>; })}
     {!shown.length && <div className="empty">No tasks yet.</div>}
     <form className="row proj-form" onSubmit={add}>
       <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="New task" aria-label="New task" required />
       <input type="text" list="todo-list-names" value={list ?? def} onChange={e => setList(e.target.value)} placeholder="List" aria-label="List" style={{ flex: "0 1 140px" }} />
       <datalist id="todo-list-names">{lists.map(l => <option key={l} value={l} />)}</datalist>
-      <select value={prio} onChange={e => setPrio(e.target.value)} aria-label="Priority">{PRIO.map(([v, n]) => <option key={v} value={v}>{v ? n : "No priority"}</option>)}</select>
+      <PrioSelect value={Number(prio) || 0} onChange={v => setPrio(String(v))} />
       <input type="date" value={due} onChange={e => setDue(e.target.value)} aria-label="Due date" />
       <button className="btn primary" type="submit">Add task</button>
     </form>
-    <p className="hint" style={{ margin: 0 }}>Priority is CalDAV's PRIORITY field: High = 1, Medium = 5, Low = 9.</p>
+    <p className="hint" style={{ margin: 0 }}>Five levels, the same as vikunja: Low, Medium, High, Urgent, Do now. Saved to CalDAV's PRIORITY as 9, 5, 3, 2 and 1, which vikunja reads back as the same level.</p>
   </>;
 }
 
@@ -63,6 +71,7 @@ export const TodoPage: PageDef = {
     const panels: PanelDef[] = [
       { key: "lists", title: "Lists", node: <Lists lists={lists} sel={sel} setSel={setChosen} />, w: 3, h: 10 },
       { key: "tasks", title: "Tasks", node: <Tasks lists={lists} shown={shown} def={sel[0] || lists[0] || "Inbox"} />, w: 9, h: 14 },
+      { key: "dayglance", title: "dayGLANCE tasks", node: <GlanceInbox />, w: 12, h: 8 },
     ];
     return { panels, extra: <CalDavStatus /> };
   },

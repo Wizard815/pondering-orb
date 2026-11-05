@@ -30,6 +30,10 @@ wiki:                # LLMWIKI: reads from the mount, writes over the REST API
   vault: /vault
   area_hubs: { homelab: Homelab, ai: Local AI }
 
+allglance:          # the ALLGlance gateway (dayGLANCE, lastGLANCE, lifeGLANCE)
+  base_url: http://allglance-gateway:8090
+  token_env: ALLGLANCE_TOKEN   # same value as GATEWAY_TOKEN on the gateway
+
 hermes:
   base_url: http://hermes-studio:6060
   user_env: HERMES_USER

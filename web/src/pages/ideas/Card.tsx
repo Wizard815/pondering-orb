@@ -60,7 +60,7 @@ function TasksBody({ i }: { i: Doc }) {
     <div className="hint">{open} open</div>
     <ul className="mc-todo">{items.slice(0, 12).map(x => { const p = prioOf(x); return <li key={x.id}>
       <input type="checkbox" checked={!!x.done} onChange={e => toggle(x, e.target.checked)} aria-label={x.title} />
-      {p ? <span className={"prio p" + p}>{prioName(p)[0]}</span> : null}
+      {p ? <span className={"prio l" + p} title={prioName(p)}>{prioName(p)}</span> : null}
       <span className={x.done ? "done" : ""}>{x.title}</span>
       {x.due && <span className="mono small muted" style={{ marginLeft: "auto" }}>{fmtDate(x.due)}</span>}</li>; })}</ul>
     <form className="mc-add" onSubmit={add}><input type="text" name="t" placeholder={"+ Add a task to " + l} aria-label="Add a task" /></form>

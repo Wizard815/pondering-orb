@@ -3,6 +3,7 @@ import type { PageDef } from "./types";
 import { create, useColl, Doc } from "../lib/store";
 import { useUi } from "../lib/ui";
 import { removeWithUndo } from "../components/Common";
+import { DayPlan, Milestones } from "../components/Glance";
 import { DAY, choreState, fmtDate, isoOf, todayISO } from "../lib/util";
 
 type Item = { date: string; time: string; title: string; kind: "ev" | "uk"; over?: boolean };
@@ -88,6 +89,8 @@ export const CalendarPage: PageDef = {
       { key: "month", title: month.toLocaleDateString(undefined, { month: "long", year: "numeric" }), act: nav, node: <Month month={month} />, w: 8, h: 11 },
       { key: "next", title: "Next 14 days", node: <Next days={14} />, w: 4, h: 11 },
       { key: "add", title: "Add an event", node: <AddEvent />, w: 6, h: 7 },
+      { key: "dayglance", title: "dayGLANCE day", node: <DayPlan />, w: 6, h: 9 },
+      { key: "milestones", title: "Milestones (lifeGLANCE)", node: <Milestones />, w: 6, h: 7 },
     ] };
   },
 };

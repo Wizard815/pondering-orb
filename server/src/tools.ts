@@ -3,8 +3,11 @@ import type { Tool } from "./integrations/llm.js";
 import { STATUSES } from "./records.js";
 
 const today = () => new Date().toISOString().slice(0, 10);
-const prioName = (p: number) => (!p ? "none" : p <= 4 ? "high" : p === 5 ? "medium" : "low");
-const PRIO: Record<string, number> = { high: 1, medium: 5, low: 9, none: 0 };
+// Priority is stored as CalDAV PRIORITY and named on vikunja's five levels,
+// with vikunja's own mapping (low 9, medium 5, high 3, urgent 2, do now 1).
+const LEVELS = ["none", "low", "medium", "high", "urgent", "do_now"];
+const prioName = (p: number) => LEVELS[[0, 5, 4, 3, 3, 2, 1, 1, 1, 1][Math.max(0, Math.min(9, Math.round(Number(p) || 0)))]];
+const PRIO: Record<string, number> = { none: 0, low: 9, medium: 5, high: 3, urgent: 2, do_now: 1, "do now": 1 };
 const byName = (r: Records, name: string) => r.list("projects").find((p: any) => String(p.name).toLowerCase() === String(name || "").toLowerCase()) as any;
 const listOf = (t: any) => t.list || t.project || "Inbox";
 
@@ -35,9 +38,17 @@ export function orbTools(r: Records): Tool[] {
       parameters: { type: "object", properties: { list: { type: "string" }, openOnly: { type: "boolean" } } },
       run: ({ list, openOnly }) => r.list("tasks").filter((t: any) => (!list || listOf(t).toLowerCase() === String(list).toLowerCase()) && (openOnly === false || !t.done))
         .map((t: any) => ({ title: t.title, list: listOf(t), due: t.due || "", done: !!t.done, priority: prioName(t.priority) })) },
-    { name: "orb_add_task", write: true, description: "Add a task to a list. due is optional (YYYY-MM-DD); priority is high, medium, low or none.",
-      parameters: { type: "object", properties: { title: { type: "string" }, list: { type: "string" }, due: { type: "string" }, priority: { type: "string", enum: ["high", "medium", "low", "none"] } }, required: ["title", "list"] },
+    { name: "orb_add_task", write: true, description: "Add a task to a list. due is optional (YYYY-MM-DD); priority is none, low, medium, high, urgent or do_now.",
+      parameters: { type: "object", properties: { title: { type: "string" }, list: { type: "string" }, due: { type: "string" }, priority: { type: "string", enum: LEVELS } }, required: ["title", "list"] },
       run: ({ title, list, due, priority }) => r.create("tasks", { title, list, due: /^\d{4}-\d{2}-\d{2}$/.test(due || "") ? due : "", priority: PRIO[priority] ?? 0, done: false }) },
+    { name: "orb_set_task_priority", write: true, description: "Set an open task's priority by its exact title: none, low, medium, high, urgent or do_now.",
+      parameters: { type: "object", properties: { title: { type: "string" }, list: { type: "string" }, priority: { type: "string", enum: LEVELS } }, required: ["title", "priority"] },
+      run: ({ title, list, priority }) => {
+        if (!(priority in PRIO)) throw new Error(`Priority must be one of ${LEVELS.join(", ")}`);
+        const m = r.list("tasks").filter((t: any) => !t.done && String(t.title).toLowerCase() === String(title).toLowerCase() && (!list || listOf(t).toLowerCase() === String(list).toLowerCase()));
+        if (!m.length) throw new Error(`No open task titled ${title}`); if (m.length > 1) throw new Error("Several tasks match; give the list too");
+        r.patch("tasks", (m[0] as any).id, { priority: PRIO[priority] }); return { title: (m[0] as any).title, priority };
+      } },
     { name: "orb_complete_task", write: true, description: "Mark an open task done by its exact title (give the list when titles repeat). Also writes a log line for its project.",
       parameters: { type: "object", properties: { title: { type: "string" }, list: { type: "string" } }, required: ["title"] },
       run: ({ title, list }, who) => {

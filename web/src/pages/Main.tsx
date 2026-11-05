@@ -3,9 +3,10 @@ import type { PanelDef } from "../components/PanelGrid";
 import { useColl, useSettings } from "../lib/store";
 import { useFetch } from "../lib/useFetch";
 import { Golem } from "../components/Golem";
-import { ChoreRows, LogList, OpenTasks, QuickLog, Star, projHref } from "../components/Common";
+import { DayPlan } from "../components/Glance";
+import { ChoreRows, LogList, OpenTasks, QuickLog, Star, TaskRows, projHref } from "../components/Common";
 import { parseApps, DEFAULT_APPS, App } from "../lib/apps";
-import { fmtDate, isUrl, listOf, logSorted, STATUS_LABEL } from "../lib/util";
+import { fmtDate, isUrl, listOf, logSorted, prioOf, sortTasks, STATUS_LABEL, todayISO } from "../lib/util";
 
 function Favorites() {
   const projects = useColl("projects"), logs = useColl("logs"), tasks = useColl("tasks");
@@ -14,6 +15,12 @@ function Favorites() {
   return <ul className="list">{favs.map(p => { const last = logSorted(logs).find(l => l.project === p.name), n = tasks.filter(t => !t.done && listOf(t) === (p.taskList || p.name)).length;
     return <li key={p.id}><div className="grow"><a href={projHref(p)}><b>{p.name}</b></a> <span className={"small st-" + p.status}>{STATUS_LABEL[p.status] || p.status}</span>
       <div className="small muted">{last ? `${fmtDate(last.date)} · ${last.text}` : "No log yet"}{n ? ` · ${n} open task${n > 1 ? "s" : ""}` : ""}</div></div><Star p={p} /></li>; })}</ul>;
+}
+/** High, Urgent and Do-now tasks across every list, most pressing first. */
+function TopPriority() {
+  const tasks = useColl("tasks");
+  const list = sortTasks(tasks.filter(t => !t.done && prioOf(t) >= 3)).slice(0, 10);
+  return list.length ? <TaskRows tasks={list} showList /> : <div className="empty">Nothing marked High or above.</div>;
 }
 function UptimeMini() {
   const { data, error } = useFetch<{ monitors: any[] }>("/api/uptime", 60000);
@@ -50,6 +57,8 @@ export const MainPage: PageDef = {
       { key: "golem", title: "Golem", node: <Golem />, w: 12, h: 10, minH: 6 },
       { key: "favorites", title: "Favorite projects", node: <Favorites />, w: 4, h: 7 },
       { key: "tasks", title: "Open tasks", node: <OpenTasks />, w: 4, h: 7 },
+      { key: "priority", title: "Top priority", node: <TopPriority />, w: 4, h: 7 },
+      { key: "today", title: "Today in dayGLANCE", node: <DayPlan date={todayISO()} />, w: 4, h: 7 },
       { key: "log", title: "Recent log", node: <><QuickLog /><LogList limit={6} withFilter /></>, w: 4, h: 9 },
       { key: "chores", title: "Chores", node: <><ChoreRows limit={6} /><div className="row"><a className="btn" href="#upkeep">All chores</a></div></>, w: 4, h: 6 },
       { key: "uptime", title: "Uptime", node: <UptimeMini />, w: 4, h: 6 },
@@ -59,6 +68,6 @@ export const MainPage: PageDef = {
       ...groups.flatMap(g => g.apps).map(a => ({ key: "app:" + a.name, title: a.name, node: <AppTiles apps={[a]} />, w: 3, h: 3 })),
     ];
     void s;
-    return { panels, defaults: ["golem", "favorites", "tasks", "log", "chores", "uptime", "upstream", ...groups.slice(0, 1).map(g => "group:" + g.name)] };
+    return { panels, defaults: ["golem", "favorites", "tasks", "priority", "today", "log", "chores", "uptime", "upstream", ...groups.slice(0, 1).map(g => "group:" + g.name)] };
   },
 };
