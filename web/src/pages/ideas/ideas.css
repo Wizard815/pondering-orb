@@ -1,0 +1,4 @@
+/* The board fills its panel; when the panel height is automatic it keeps a usable minimum. */
+.pbody > .mc.ideas-board { height: auto; flex: 1 1 auto; min-height: 440px; }
+.ideas-board .mc-view { min-height: 0; }
+.ideas-board .mc-crumbs > span { white-space: nowrap; }

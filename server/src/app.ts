@@ -15,6 +15,10 @@ import { call, trimSlash } from "./integrations/http.js";
 import { orbTools } from "./tools.js";
 import { mountMcp } from "./mcp.js";
 import { logCommits } from "./pollers.js";
+import { CalDav } from "./integrations/caldav.js";
+import { TaskSync } from "./sync.js";
+import { Wiki } from "./integrations/wiki.js";
+import { Hermes } from "./integrations/hermes.js";
 
 export const VERSION = "0.1.0";
 
@@ -40,6 +44,21 @@ export async function buildApp(o: AppOptions = {}) {
   const records = new Records(store, cfg);
   const auth = new Auth(store, o.password ?? process.env.ORB_PASSWORD ?? "", o.tokens ?? process.env.ORB_API_TOKENS ?? "");
   const upstream = new Upstream(() => cfg().upstream.baseUrl, () => cfg().upstream.headerEnv);
+  const dav = new CalDav(() => cfg().caldav.url, () => ({ user: secret(cfg().caldav.userEnv), pass: secret(cfg().caldav.passwordEnv) }));
+  const sync = new TaskSync(records, dav, cfg);
+  const wiki = new Wiki(() => cfg().wiki.baseUrl, () => secret(cfg().wiki.tokenEnv), () => cfg().wiki.vault);
+  const hermes = new Hermes(() => cfg().hermes.baseUrl, () => ({ user: secret(cfg().hermes.userEnv), pass: secret(cfg().hermes.passwordEnv) }));
+  // The board's five states map onto the wiki's three; only project_status is written.
+  const WIKI_STATUS: Record<string, string> = { next: "active", active: "active", blocked: "active", paused: "paused", shipped: "done" };
+  const lastStatus = new Map((store.list("projects") as any[]).map(p => [p.id, p.status]));
+  records.on("change", (c: Change) => {
+    if (c.coll !== "projects" || c.op !== "set" || !c.doc) return;
+    const p: any = c.doc, before = lastStatus.get(p.id); lastStatus.set(p.id, p.status);
+    if (!p.wikiNote || !before || before === p.status || WIKI_STATUS[before] === WIKI_STATUS[p.status] || !cfg().wiki.baseUrl) return;
+    const ws = WIKI_STATUS[p.status] || "active";
+    wiki.setFront(p.wikiNote, "project_status", ws).then(() => wiki.setFront(p.wikiNote, "updated", new Date().toISOString().slice(0, 10)))
+      .then(() => wiki.log(`[[${p.name}]]: project_status set to ${ws}`)).catch(e => app.log.warn({ err: e.message }, "wiki status update failed"));
+  });
   const tools = () => { const all = orbTools(records); return cfg().golem.canWrite ? all : all.filter(t => !t.write); };
 
   const app: FastifyInstance = Fastify({ logger: o.logger ?? false, bodyLimit: 2 * 1024 * 1024 });
@@ -84,7 +103,7 @@ export async function buildApp(o: AppOptions = {}) {
   app.get("/api/stream", { preHandler: guard }, (req, reply) => {
     reply.raw.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive", "X-Accel-Buffering": "no" });
     reply.raw.write(": connected\n\n");
-    const send = (c: Change) => reply.raw.write(`event: change\ndata: ${JSON.stringify(c)}\n\n`);
+    const send = (c: Change) => reply.raw.write(`event: change\ndata: ${JSON.stringify({ coll: c.coll, id: c.id, op: c.op, doc: c.doc })}\n\n`);
     const beat = setInterval(() => reply.raw.write(": ping\n\n"), 25000);
     records.on("change", send);
     req.raw.on("close", () => { clearInterval(beat); records.off("change", send); });
@@ -159,6 +178,42 @@ export async function buildApp(o: AppOptions = {}) {
     } catch (e: any) { return { ok: false, detail: e.message }; }
   });
 
+  // ---- CalDAV tasks and chores ----
+  app.get("/api/caldav/status", { preHandler: guard }, async () => ({ configured: dav.configured, lists: sync.lists.map(l => l.name), lastSync: sync.lastSync, lastError: sync.lastError, choresList: cfg().caldav.choresList }));
+  app.post("/api/caldav/sync", { preHandler: guard }, async () => sync.pull());
+
+  // ---- LLMWIKI (reads from the read-only mount when present; writes over REST) ----
+  const notePath = (p: unknown, write = false) => {
+    const s = String(p || "");
+    if (!s.endsWith(".md") || s.includes("..") || s.startsWith("/")) throw new HttpError(400, "That isn't a note path.");
+    if (write && (s.startsWith("raw/") || !s.startsWith("wiki/"))) throw new HttpError(403, "Orb only edits notes under wiki/, never raw/.");
+    return s;
+  };
+  app.get("/api/wiki/tree", { preHandler: guard }, async () => ({ mount: await wiki.hasMount(), notes: await wiki.tree() }));
+  app.get("/api/wiki/note", { preHandler: guard }, async (req: any) => wiki.note(notePath(req.query.path)));
+  app.get("/api/wiki/search", { preHandler: guard }, async (req: any) => wiki.search(String(req.query.q || "")));
+  app.post("/api/wiki/section", { preHandler: guard }, async (req: any) => {
+    const { path, heading, text } = req.body || {};
+    if (!["Current state", "Next steps"].includes(heading)) throw new HttpError(400, "Orb edits only Current state and Next steps.");
+    const n = notePath(path, true), title = n.split("/").pop()!.replace(/\.md$/, "");
+    await wiki.replaceSection(n, heading, String(text || ""), `[[${title}]]: edited ${heading}`);
+    return wiki.note(n);
+  });
+  const HUBS: Record<string, string> = { homelab: "Homelab", ai: "Local AI", ...(((base as any).wiki?.areaHubs) || {}) };
+  app.post("/api/wiki/project", { preHandler: guard }, async (req: any) => {
+    const { projectId, area } = req.body || {};
+    const p: any = records.get("projects", String(projectId)); if (!p) throw new HttpError(404, "No such project.");
+    const areas = ["ai", "homelab", "automation", "hardware", "ttrpg", "gaming", "travel", "personal", "knowledge"];
+    if (!areas.includes(area)) throw new HttpError(400, `Area must be one of ${areas.join(", ")}.`);
+    const hub = HUBS[area] || area[0].toUpperCase() + area.slice(1);
+    const r = await wiki.createProject(p.name, area, WIKI_STATUS[p.status] || "active", p.next || "", hub);
+    records.patch("projects", p.id, { wikiNote: r.path, area });
+    return r;
+  });
+
+  // ---- Hermes Studio chats (read only) ----
+  app.get("/api/hermes/sessions", { preHandler: guard }, async (req: any) => hermes.sessions(String(req.query.q || "")));
+
   mountMcp(app, tools, guard, VERSION);
 
   // ---- the web app ----
@@ -168,5 +223,5 @@ export async function buildApp(o: AppOptions = {}) {
     app.setNotFoundHandler((req, reply) => req.url.startsWith("/api/") || req.url.startsWith("/mcp") ? reply.code(404).send({ error: "Not found." }) : reply.sendFile("index.html"));
   }
 
-  return { app, records, store, auth, upstream, cfg };
+  return { app, records, store, auth, upstream, cfg, sync };
 }

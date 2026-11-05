@@ -1,0 +1,7 @@
+/* Projects, Project and To-do pages: small additions to demo.css. */
+.kcard .foot{flex-wrap:wrap}
+.kcard .name a{color:inherit;text-decoration:none}
+.kcard .name a:hover{text-decoration:underline}
+.kcol .empty.small{border:1px dashed var(--line);border-radius:6px;padding:12px 8px;text-align:center}
+.proj-form{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.proj-form input[type=text]{flex:1 1 160px;min-width:0}

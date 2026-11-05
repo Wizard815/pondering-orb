@@ -102,7 +102,7 @@ test("TestPoller_LogsOnlyNewCommits", async () => {
     assert.equal(records.list("logs").length, 0, "first run only remembers the branch tip");
     items = [{ full: "c3", sha: "c3", subject: "third commit with a very long subject line that goes on", date: "2026-11-03T10:00:00Z" }, { full: "c2", sha: "c2", subject: "second", date: "2026-11-02T10:00:00Z" }, ...items];
     await app.inject({ method: "POST", url: "/api/upstream/poll" });
-    const logs = (records.list("logs") as any[]).map(l => l.text);
+    const logs = (records.list("logs") as any[]).sort((a, b) => a.created - b.created).map(l => l.text);
     assert.deepEqual(logs, ["second", "third commit with a very long subject line that g…"]);
     await app.inject({ method: "POST", url: "/api/upstream/poll" });
     assert.equal(records.list("logs").length, 2);

@@ -1,0 +1,93 @@
+import { createHash, randomUUID } from "node:crypto";
+import type { Records, Change } from "./records.js";
+import type { OrbConfig } from "./config.js";
+import { CalDav, Collection } from "./integrations/caldav.js";
+import { parseTodo, writeTodo, rruleDays, daysRrule } from "./integrations/ical.js";
+
+const ORIGIN = "caldav";
+const idFor = (uid: string) => "cd-" + createHash("sha1").update(uid).digest("hex").slice(0, 16);
+const today = () => new Date().toISOString().slice(0, 10);
+const addDays = (iso: string, n: number) => new Date(Date.parse(iso + "T12:00:00Z") + n * 864e5).toISOString().slice(0, 10);
+
+/** Keeps the `tasks` and `chores` records in step with CalDAV.
+ *  - Pull: every task list becomes tasks; the chores list becomes chores.
+ *  - Push: when Orb changes a synced record (done, priority, title, due, a
+ *    chore's Done), the VTODO is rewritten with If-Match; new tasks in a
+ *    CalDAV list are created there; deletes are deleted there.
+ *  Records written by the sync carry origin "caldav" and are not pushed back. */
+export class TaskSync {
+  lists: Collection[] = [];
+  lastSync = 0; lastError = "";
+  private queue: Promise<unknown> = Promise.resolve();
+  constructor(private r: Records, private dav: CalDav, private cfg: () => OrbConfig) {
+    r.on("change", (c: Change) => { if (c.origin !== ORIGIN && (c.coll === "tasks" || c.coll === "chores")) this.queue = this.queue.then(() => this.push(c)).catch(e => { this.lastError = e.message; }); });
+  }
+  private choresName() { return this.cfg().caldav.choresList || "Chores"; }
+
+  async pull() {
+    if (!this.dav.configured) return { lists: 0, tasks: 0 };
+    this.lists = await this.dav.lists();
+    let n = 0;
+    for (const list of this.lists) {
+      const items = await this.dav.todos(list), seen = new Set<string>();
+      const isChores = list.name === this.choresName(), coll = isChores ? "chores" : "tasks";
+      for (const it of items) {
+        const t = parseTodo(it.ics); if (!t || !t.uid) continue;
+        const id = idFor(t.uid); seen.add(id); n++;
+        const caldav = { href: it.href, etag: it.etag, uid: t.uid, list: list.name, ics: it.ics };
+        const data = isChores
+          ? { name: t.summary || "Chore", everyDays: t.rrule ? rruleDays(t.rrule) : 7, lastDone: t.completed || (t.due && t.rrule ? addDays(t.due, -rruleDays(t.rrule)) : ""), due: t.due, caldav }
+          : { title: t.summary || "Untitled", list: list.name, due: t.due, done: t.status === "COMPLETED", priority: t.priority, doneAt: t.completed, caldav };
+        const cur: any = this.r.get(coll, id);
+        if (!cur) this.r.create(coll, data, id, ORIGIN);
+        else if (cur.caldav?.etag !== it.etag) this.r.put(coll, id, { ...strip(cur), ...data }, ORIGIN);
+      }
+      for (const d of this.r.list(coll) as any[]) if (d.caldav?.list === list.name && !seen.has(d.id)) this.r.remove(coll, d.id, ORIGIN);
+    }
+    this.lastSync = Date.now(); this.lastError = "";
+    return { lists: this.lists.length, tasks: n };
+  }
+
+  private async push(c: Change) {
+    if (!this.dav.configured) return;
+    if (c.op === "delete") { const p: any = c.prev; if (p?.caldav?.href) await this.dav.del(p.caldav.href, p.caldav.etag); return; }
+    const d: any = c.doc; if (!d) return;
+    if (c.coll === "tasks") {
+      if (d.caldav?.href) {
+        const ics = writeTodo(d.caldav.ics, { uid: d.caldav.uid, summary: d.title, done: !!d.done, due: d.due || "", priority: Number(d.priority) || 0 });
+        if (ics === d.caldav.ics) return;
+        await this.save(c.coll, d, d.caldav.href, ics, d.caldav.etag);
+      } else {
+        if (!this.lists.length) await this.pull().catch(() => {});
+        const list = this.lists.find(l => l.name === d.list); if (!list) return; // a list that only lives in Orb
+        const uid = randomUUID(), href = list.href.replace(/\/?$/, "/") + uid + ".ics";
+        const ics = writeTodo(null, { uid, summary: d.title, done: !!d.done, due: d.due || "", priority: Number(d.priority) || 0 });
+        await this.save(c.coll, d, href, ics, undefined, uid, list.name);
+      }
+    } else if (c.coll === "chores") {
+      const every = Math.max(1, Number(d.everyDays) || 7), due = addDays(d.lastDone || today(), every);
+      const fields = { summary: d.name, done: false, due, priority: 0, rrule: daysRrule(every), dtstart: due };
+      if (d.caldav?.href) {
+        const ics = writeTodo(d.caldav.ics, { uid: d.caldav.uid, ...fields });
+        if (d.caldav.due === due && ics.replace(/^(LAST-MODIFIED|DTSTAMP):.*$/gm, "") === String(d.caldav.ics).replace(/^(LAST-MODIFIED|DTSTAMP):.*$/gm, "")) return;
+        await this.save(c.coll, d, d.caldav.href, ics, d.caldav.etag, undefined, undefined, due);
+      } else {
+        if (!this.lists.length) await this.pull().catch(() => {});
+        const list = this.lists.find(l => l.name === this.choresName()); if (!list) return;
+        const uid = randomUUID(), href = list.href.replace(/\/?$/, "/") + uid + ".ics";
+        await this.save(c.coll, d, href, writeTodo(null, { uid, ...fields }), undefined, uid, list.name, due);
+      }
+    }
+  }
+  /** PUT, then record the new href/etag. A missing etag in the answer means a
+   *  pull is needed to learn it. 409 (changed elsewhere) also pulls. */
+  private async save(coll: "tasks" | "chores", d: any, href: string, ics: string, etag?: string, uid?: string, list?: string, due?: string) {
+    try {
+      const r = await this.dav.put(href, ics, etag);
+      const caldav = { ...(d.caldav || {}), href, ics, etag: r.etag || "", ...(uid ? { uid } : {}), ...(list ? { list } : {}), ...(due ? { due } : {}) };
+      if (this.r.get(coll, d.id)) this.r.patch(coll, d.id, { caldav }, undefined, ORIGIN);
+      if (!r.etag) await this.pull();
+    } catch (e: any) { if (e.status === 409) await this.pull(); throw e; }
+  }
+}
+function strip(d: any) { const { id: _i, version: _v, ...rest } = d; return rest; }

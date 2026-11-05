@@ -37,8 +37,9 @@ old Plans list is gone; it became task lists.
                         └─▶ /host/proc, docker proxy    System tab
 ```
 
-- One Go binary serves the API, the MCP endpoint and the built web UI.
-- Go 1.26 server, SQLite, one Docker image.
+- One Node.js process (`server/`, TypeScript, Fastify) serves the API, the
+  MCP endpoint and the built web UI (`web/`). Node 22's built-in SQLite holds
+  Orb's data; there are no native modules. One Docker image.
 - **Web UI: React** (Vite + TypeScript). Two reasons: the Main page needs
   draggable, resizable panels, and `react-grid-layout` (MIT) does that well;
   and React has the most widget and chart libraries for dashboards. The demo
@@ -51,19 +52,30 @@ old Plans list is gone; it became task lists.
 
 ## Data model (SQLite)
 
+Orb's own records are JSON documents grouped by collection, the same shapes
+the demo page used, so the web app ported screen by screen:
+
 ```
-projects(id, name, status, next, repo, fav, archived, task_list, wiki_note,
-         upstream_repo, log_commits, last_logged_sha, chats, updated_at)
-  status: next | active | blocked | paused | shipped
-  task_list: CalDAV collection for this project's tasks (default: its name)
-  wiki_note: e.g. "wiki/1-projects/Pondering Orb.md"
-logs(id, project_id, text, by, created_at)     -- text <= settings.log_max
-upkeep(id, name, every_days, last_done)
-layouts(user, page, items_json)                -- per page: [{panel, w, h, hidden}]
-settings(key, value)                           -- log_max, golem, main_lists, links, theme, connections
-cache(source, key, body, fetched_at)           -- last good reply per integration
-outbox(id, target, request_json, tries, error) -- writes waiting for a service
+docs(coll, id, data JSON, version, updated_at)
+  projects  name, status (next|active|blocked|paused|shipped), next, repo, fav,
+            archived, area, taskList, wikiNote, upstreamRepo, logCommits,
+            lastLoggedSha, chats[]
+  logs      date, project, text (<= logMax), by, sha, created
+  tasks     title, list, due, done, doneAt, doneBy, priority (0-9), caldav{}
+  chores    name, everyDays, lastDone, due, caldav{}
+  canvas    the Ideas board's cards;  edges  its arrows
+  events    calendar events kept in Orb
+  layouts   one per page: react-grid-layout positions per screen size,
+            hidden and removed panels
+  settings  "app" (logMax, golem, connections, theme, links, splitRatio,
+            mainLists, pageWidth, golemFont) and "apps" (the apps YAML)
+sessions(token, created_at)                     -- web sign-in sessions
 ```
+
+`tasks.caldav` / `chores.caldav` hold the href, etag, UID and the VTODO text,
+so a write keeps every property Orb doesn't manage. Writes go through one
+place (`server/src/records.ts`), which checks them and sends each change to
+open browsers over `/api/stream`.
 
 `by` records who wrote a log: `you`, `golem`, or the agent token's name.
 
@@ -242,7 +254,7 @@ that hold its secrets, and a **Test** button. Test runs from the server:
 | CalDAV | `PROPFIND`, lists collections that hold VTODOs |
 | UpstreamManager | `GET /api/repos` and `/api/requests` |
 
-**Live app panels** come from small adapters in the Go server. Each adapter
+**Live app panels** (not built yet) come from small adapters in the server. Each adapter
 polls its app, keeps the last result in `cache`, and serves the browser a
 small JSON shape. The browser never sees an app's key.
 
@@ -253,7 +265,7 @@ small JSON shape. The browser never sees an app's key.
 | `upstreammanager` | `GET /api/repos`, `GET /api/requests` | repos behind upstream, requests waiting |
 | `uptimekuma` | status page API (below) | monitors up or down |
 
-New types are one Go file each; Homepage's widget list is a good backlog
+New types are one file each; Homepage's widget list is a good backlog
 (Sonarr, Radarr, qBittorrent, Proxmox, Home Assistant).
 
 ## UpstreamManager (the Upkeep tab)
@@ -270,7 +282,7 @@ LAN; Orb's own chore list stays as one panel on the same tab.
 | Fetch | `POST /api/repo/<id>/fetch` | returns a merge `plan` |
 | Project commits | `GET /api/repo/<id>/commits?view=all&limit=50` | items `{full, sha, date, author, subject}` |
 
-Orb calls these from its Go server, never from the browser. Every POST must
+Orb calls these from its server, never from the browser. Every POST must
 send `Content-Type: application/json`, because UpstreamManager refuses
 anything else to block cross-site requests. Server-to-server calls carry no
 `Origin` header, so they pass that check.
@@ -392,7 +404,7 @@ Settings picks the brain:
   or the Claude API (`https://api.anthropic.com/v1`, Messages API), with a
   model name and the env var that holds the key.
 
-The Go server runs the tool loop with the same tools as the MCP list below,
+The server runs the tool loop with the same tools as the MCP list below,
 plus the LLMWIKI MCP tools (read only) and Argos's `/api/mcp` status tools.
 
 ## REST API
@@ -475,18 +487,34 @@ groups:
 Check the CalDAV URL against your vikunja version; the path differs between
 servers.
 
-## Build order
+## Build status
 
-1. Go server, SQLite, projects, logs and upkeep; React UI with the Main grid;
-   Docker image and compose file.
-2. CalDAV tasks: lists, read, complete, create.
-3. LLMWIKI: project note sections, status mapping, log lines, outbox.
-4. MCP endpoint and named tokens.
-5. Golem with both provider types.
-6. Live panels: UpstreamManager, Plex, SABnzbd; Uptime Kuma tab.
-7. System tab from `/proc` and the Docker proxy; optional btop sidecar.
-8. Miladash and the Ideas tab (see `miladash.md`); the demo's Ideas board
-   is the reference for its look and tools.
+Done in `server/` and `web/` (see the README for running it):
+
+1. Node server, SQLite, records API with checks and live updates; React app
+   with the panel grid (drag, resize, hide, remove, add per page), linked
+   tabs with a slider, themes; Dockerfile and compose file.
+2. CalDAV: task lists and chores pulled every 5 minutes and on "Sync now";
+   done, priority, title, due, new tasks and chore Done written back with
+   If-Match.
+3. LLMWIKI: tree and notes from the read-only mount (or REST), section
+   edits, `project_status` following the board, new project notes from the
+   PROJECT template linked from the area hub, log lines.
+4. MCP endpoint (`POST /mcp`) and named tokens.
+5. Golem over any OpenAI-compatible endpoint, with the same tools.
+6. UpstreamManager (requests with partial approval, daily check, fetch,
+   commits logged per project) and Uptime Kuma.
+7. System from `/proc` and the Docker socket proxy.
+8. The Ideas board in the Milaclone style (cards, columns, nested boards,
+   arrows, to-do and Tasks cards).
+
+Not done yet:
+
+- Live app panels for Plex and SABnzbd (the adapters).
+- The wiki outbox (a failed wiki write is reported, not queued).
+- Mail.
+- Miladash itself (a Milaclone branch); the Ideas tab is Orb's own board.
+- Golem streaming its reply as it types.
 
 ## Open questions
 

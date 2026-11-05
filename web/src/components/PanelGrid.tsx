@@ -35,11 +35,13 @@ export function PanelGrid({ page, panels, defaults, editing }: { page: string; p
     const base: Layouts = {};
     for (const bp of Object.keys(COLS) as (keyof typeof COLS)[]) {
       const cols = COLS[bp], have = new Map((saved.layouts?.[bp] || []).map(l => [l.i, l]));
-      let y = Math.max(0, ...[...have.values()].map(l => l.y + l.h));
+      // Panels without a saved spot are packed left to right, wrapping when a row is full.
+      let y = Math.max(0, ...[...have.values()].map(l => l.y + l.h)), x = 0, rowH = 0;
       base[bp] = shown.map(p => {
         const l = have.get(p.key); if (l) return { ...l, w: Math.min(l.w, cols) };
-        const w = Math.min(cols, bp === "lg" ? p.w || 6 : bp === "md" ? Math.min(8, Math.ceil((p.w || 6) * 8 / 12)) : 1);
-        const item = { i: p.key, x: 0, y, w, h: p.h || 8, minH: p.minH || 3, minW: 1 }; y += item.h; return item;
+        const w = Math.min(cols, bp === "lg" ? p.w || 6 : bp === "md" ? Math.min(8, Math.ceil((p.w || 6) * 8 / 12)) : 1), h = p.h || 8;
+        if (x + w > cols) { y += rowH; x = 0; rowH = 0; }
+        const item = { i: p.key, x, y, w, h, minH: p.minH || 3, minW: 1 }; x += w; rowH = Math.max(rowH, h); return item;
       });
     }
     return base;
