@@ -512,7 +512,6 @@ Not done yet:
 
 - Live app panels for Plex and SABnzbd (the adapters).
 - The wiki outbox (a failed wiki write is reported, not queued).
-- Mail.
 - Miladash itself (a Milaclone branch); the Ideas tab is Orb's own board.
 - Golem streaming its reply as it types.
 

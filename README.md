@@ -17,7 +17,7 @@ Tabs (each one a room of the tower):
 - **Wiki**: preview of the LLMWIKI vault (PARA folders, section edits)
 - **Upkeep**: UpstreamManager's repos, approval requests and daily check,
   plus your chores
-- **Calendar**, **Mail**
+- **Calendar**
 - **Uptime**: monitors as Uptime Kuma reports them
 - **System**: btop-style cores, memory, disks and containers
 - **Settings**: Golem's model endpoint, task lists on Main, log length,
@@ -120,7 +120,7 @@ built so far. [docs/miladash.md](docs/miladash.md) covers the ideas board.
 Golem use the artifact runtime (`window.claude`), so opened as a plain file it
 renders but does not save.
 
-Not built yet: live Plex and SABnzbd panels, mail, the wiki outbox, Miladash
+Not built yet: live Plex and SABnzbd panels, the wiki outbox, Miladash
 itself, and Golem streaming its replies.
 
 ## License
