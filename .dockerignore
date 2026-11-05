@@ -5,5 +5,5 @@ data
 .git
 *.log
 .env
-index.html
+demo
 docs

@@ -23,4 +23,14 @@ groups:
         rune: Up
         url: http://upstream-manager:5000
         description: Upstreams, branches, approval requests
+  # Live panels: give an app a widget (plex or sabnzbd) and the name of the
+  # environment variable that holds its key on the Orb server.
+  # - name: Media
+  #   apps:
+  #     - name: Plex
+  #       url: http://plex:32400/web
+  #       widget: { type: plex, url: http://plex:32400, key_env: PLEX_TOKEN }
+  #     - name: SABnzbd
+  #       url: http://sabnzbd:8085
+  #       widget: { type: sabnzbd, url: http://sabnzbd:8085, key_env: SABNZBD_API_KEY }
 `;

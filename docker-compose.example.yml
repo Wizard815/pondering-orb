@@ -38,6 +38,8 @@ services:
       CALDAV_USER: ${CALDAV_USER}
       CALDAV_PASSWORD: ${CALDAV_PASSWORD}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      PLEX_TOKEN: ${PLEX_TOKEN:-}                    # live panels: named by key_env in the apps YAML
+      SABNZBD_API_KEY: ${SABNZBD_API_KEY:-}
       HERMES_USER: ${HERMES_USER}
       HERMES_PASSWORD: ${HERMES_PASSWORD}
     volumes:
@@ -59,6 +61,18 @@ services:
     volumes:
       - ./uptime-kuma:/app/data
     networks: [orb]
+
+  # Optional: real btop as a web terminal for the System tab.
+  #   docker compose --profile btop up -d
+  # then set Settings → btop terminal to http://<host>:7681
+  btop:
+    build: ./docker/btop
+    container_name: orb-btop
+    profiles: [btop]
+    restart: unless-stopped
+    pid: host                                        # see the host's processes, not just this container's
+    ports:
+      - "7681:7681"
 
   docker-proxy:
     image: tecnativa/docker-socket-proxy:latest      # pin a version you have tested

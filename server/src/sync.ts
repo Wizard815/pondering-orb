@@ -3,6 +3,7 @@ import type { Records, Change } from "./records.js";
 import type { OrbConfig } from "./config.js";
 import { CalDav, Collection } from "./integrations/caldav.js";
 import { parseTodo, writeTodo, rruleDays, daysRrule } from "./integrations/ical.js";
+import type { Outbox } from "./outbox.js";
 
 const ORIGIN = "caldav";
 const idFor = (uid: string) => "cd-" + createHash("sha1").update(uid).digest("hex").slice(0, 16);
@@ -19,8 +20,19 @@ export class TaskSync {
   lists: Collection[] = [];
   lastSync = 0; lastError = "";
   private queue: Promise<unknown> = Promise.resolve();
-  constructor(private r: Records, private dav: CalDav, private cfg: () => OrbConfig) {
-    r.on("change", (c: Change) => { if (c.origin !== ORIGIN && (c.coll === "tasks" || c.coll === "chores")) this.queue = this.queue.then(() => this.push(c)).catch(e => { this.lastError = e.message; }); });
+  constructor(private r: Records, private dav: CalDav, private cfg: () => OrbConfig, private outbox?: Outbox) {
+    r.on("change", (c: Change) => { if (c.origin !== ORIGIN && (c.coll === "tasks" || c.coll === "chores")) this.queue = this.queue.then(() => this.push(c)).catch(e => this.failed(c, e)); });
+    // A retry pushes the record as it is now (or the delete), not the stale change.
+    outbox?.on("caldav", async (p: { coll: "tasks" | "chores"; id: string; op: "set" | "delete"; prev?: any }) => {
+      if (p.op === "delete") return this.push({ coll: p.coll, id: p.id, op: "delete", prev: p.prev } as Change);
+      const doc = this.r.get(p.coll, p.id); if (!doc) return;
+      await this.push({ coll: p.coll, id: p.id, op: "set", doc } as Change);
+    });
+  }
+  private failed(c: Change, e: any) {
+    this.lastError = e?.message || String(e);
+    const name = (c.doc as any)?.title || (c.doc as any)?.name || (c.prev as any)?.title || (c.prev as any)?.name || c.id;
+    this.outbox?.add("caldav", `${c.op === "delete" ? "Delete" : "Save"} “${name}” in CalDAV`, { coll: c.coll, id: c.id, op: c.op, prev: c.prev }, this.lastError, `${c.coll}:${c.id}`);
   }
   private choresName() { return this.cfg().caldav.choresList || "Chores"; }
 
@@ -58,7 +70,7 @@ export class TaskSync {
         if (ics === d.caldav.ics) return;
         await this.save(c.coll, d, d.caldav.href, ics, d.caldav.etag);
       } else {
-        if (!this.lists.length) await this.pull().catch(() => {});
+        if (!this.lists.length) await this.pull(); // unreachable: throws, so the change is queued
         const list = this.lists.find(l => l.name === d.list); if (!list) return; // a list that only lives in Orb
         const uid = randomUUID(), href = list.href.replace(/\/?$/, "/") + uid + ".ics";
         const ics = writeTodo(null, { uid, summary: d.title, done: !!d.done, due: d.due || "", priority: Number(d.priority) || 0 });
@@ -72,7 +84,7 @@ export class TaskSync {
         if (d.caldav.due === due && ics.replace(/^(LAST-MODIFIED|DTSTAMP):.*$/gm, "") === String(d.caldav.ics).replace(/^(LAST-MODIFIED|DTSTAMP):.*$/gm, "")) return;
         await this.save(c.coll, d, d.caldav.href, ics, d.caldav.etag, undefined, undefined, due);
       } else {
-        if (!this.lists.length) await this.pull().catch(() => {});
+        if (!this.lists.length) await this.pull(); // unreachable: throws, so the change is queued
         const list = this.lists.find(l => l.name === this.choresName()); if (!list) return;
         const uid = randomUUID(), href = list.href.replace(/\/?$/, "/") + uid + ".ics";
         await this.save(c.coll, d, href, writeTodo(null, { uid, ...fields }), undefined, uid, list.name, due);

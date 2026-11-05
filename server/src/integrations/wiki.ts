@@ -4,7 +4,7 @@ import { parse as parseYaml } from "yaml";
 import { call, trimSlash } from "./http.js";
 import { HttpError } from "../records.js";
 
-export type Note = { path: string; title: string; type?: string; area?: string; project_status?: string; status?: string; tags?: string[]; updated?: string; body: string };
+export type Note = { path: string; title: string; type?: string; area?: string; project_status?: string; status?: string; tags?: string[]; updated?: string; related?: string[]; body: string };
 
 /** The LLMWIKI vault. Reads come from the read-only vault mount when it's
  *  there (fast, sees every file); every write goes through the Obsidian Local
@@ -58,6 +58,20 @@ export class Wiki {
     await this.setFront(path, "updated", today());
     await this.log(log);
   }
+  /** Add [[links]] to a note's `related` front-matter. Only notes that exist
+   *  are added, existing entries are never removed, and the edit is logged. */
+  async addRelated(path: string, titles: string[]) {
+    const n = await this.note(path), existing = n.related || [];
+    const known = new Set((await this.tree()).map(x => x.title));
+    const have = new Set(existing.map(r => r.replace(/^\[\[|\]\]$/g, "")));
+    const add = titles.filter(t => t && t !== n.title && known.has(t) && !have.has(t));
+    if (!add.length) return { added: [], related: existing };
+    const related = [...existing, ...add.map(t => `[[${t}]]`)];
+    await this.setFront(path, "related", related);
+    await this.setFront(path, "updated", today());
+    await this.log(`[[${n.title}]]: related ${add.map(t => `[[${t}]]`).join(", ")}`);
+    return { added: add, related };
+  }
   async setFront(path: string, key: string, value: unknown) {
     await this.patch(path, { Operation: "replace", "Target-Type": "frontmatter", Target: key, "Content-Type": "application/json" }, JSON.stringify(value));
   }
@@ -108,5 +122,7 @@ function split(text: string) {
 }
 function meta(path: string, fm: Record<string, any>) {
   const title = String(fm.title || path.split("/").pop()!.replace(/\.md$/, ""));
-  return { path, title, type: fm.type, area: fm.area, project_status: fm.project_status, status: fm.status, tags: Array.isArray(fm.tags) ? fm.tags.map(String) : [], updated: fm.updated ? String(fm.updated).slice(0, 10) : undefined };
+  // An unquoted [[Link]] in YAML parses as a nested list; turn it back into the link.
+  const related = Array.isArray(fm.related) ? fm.related.map((r: any) => Array.isArray(r) ? `[[${r.flat(Infinity).join("")}]]` : String(r)) : [];
+  return { path, title, type: fm.type, area: fm.area, project_status: fm.project_status, status: fm.status, tags: Array.isArray(fm.tags) ? fm.tags.map(String) : [], related, updated: fm.updated ? String(fm.updated).slice(0, 10) : undefined };
 }

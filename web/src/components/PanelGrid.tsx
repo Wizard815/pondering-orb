@@ -1,4 +1,4 @@
-import { ReactNode, useMemo, useRef } from "react";
+import { ReactNode, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Responsive, WidthProvider, Layout, Layouts } from "react-grid-layout";
 import { useColl, put } from "../lib/store";
 import { useUi } from "../lib/ui";
@@ -28,6 +28,11 @@ export function PanelGrid({ page, panels, defaults, editing }: { page: string; p
   const hidden = new Set(saved.hidden || []);
   const shown = panels.filter(p => !removed.has(p.key) && (editing || !hidden.has(p.key)));
   const latest = useRef<Layouts>({});
+  // Panels without a saved layout get a height that fits their content (in
+  // grid rows), measured after they render, so pages don't open full of
+  // half-empty tall panels. Once you resize a panel its size is saved instead.
+  const [fit, setFit] = useState<Record<string, number>>({});
+  const root = useRef<HTMLDivElement>(null);
   // Which breakpoint is showing, from the column count the grid reports.
   const bp = useRef<keyof typeof COLS>(innerWidth >= BREAKPOINTS.lg ? "lg" : innerWidth >= BREAKPOINTS.md ? "md" : "sm");
 
@@ -39,13 +44,32 @@ export function PanelGrid({ page, panels, defaults, editing }: { page: string; p
       let y = Math.max(0, ...[...have.values()].map(l => l.y + l.h)), x = 0, rowH = 0;
       base[bp] = shown.map(p => {
         const l = have.get(p.key); if (l) return { ...l, w: Math.min(l.w, cols) };
-        const w = Math.min(cols, bp === "lg" ? p.w || 6 : bp === "md" ? Math.min(8, Math.ceil((p.w || 6) * 8 / 12)) : 1), h = p.h || 8;
+        const w = Math.min(cols, bp === "lg" ? p.w || 6 : bp === "md" ? Math.min(8, Math.ceil((p.w || 6) * 8 / 12)) : 1), h = fit[p.key] ?? p.h ?? 8;
         if (x + w > cols) { y += rowH; x = 0; rowH = 0; }
         const item = { i: p.key, x, y, w, h, minH: p.minH || 3, minW: 1 }; x += w; rowH = Math.max(rowH, h); return item;
       });
     }
     return base;
-  }, [JSON.stringify(saved.layouts), shown.map(p => p.key).join(","), editing]);
+  }, [JSON.stringify(saved.layouts), shown.map(p => p.key).join(","), editing, JSON.stringify(fit)]);
+
+  useLayoutEffect(() => {
+    if (!root.current) return;
+    const savedKeys = new Set((saved.layouts?.[bp.current] || []).map(l => l.i));
+    const next: Record<string, number> = {};
+    root.current.querySelectorAll<HTMLElement>(".gp[data-pk]").forEach(el => {
+      const k = el.dataset.pk!; if (savedKeys.has(k)) return;
+      const panel = el.querySelector<HTMLElement>(".panel"), body = el.querySelector<HTMLElement>(".pbody"); if (!panel || !body) return;
+      // The body stretches to fill the panel, so measure where its content
+      // ends rather than its own height (which never shrinks).
+      const top = body.getBoundingClientRect().top - body.scrollTop, kids = [...body.children] as HTMLElement[];
+      const content = kids.length ? Math.max(...kids.map(c => c.getBoundingClientRect().bottom)) - top + parseFloat(getComputedStyle(body).paddingBottom || "0") : 0;
+      const px = panel.offsetHeight - body.clientHeight + content;
+      const def = panels.find(p => p.key === k);
+      const rows = Math.max(def?.minH || 3, Math.min(def?.h || 18, Math.ceil((px + MARGIN[1]) / (ROW + MARGIN[1]))));
+      if (fit[k] !== rows) next[k] = rows;
+    });
+    if (Object.keys(next).length) setFit(f => ({ ...f, ...next }));
+  });
 
   const save = (patch: Partial<Saved>) => put("layouts", page, { layouts: saved.layouts || layouts, hidden: [...hidden], removed: [...removed], known: keys, ...patch }).catch(ui.error);
   const onContext = (e: React.MouseEvent) => {
@@ -73,7 +97,7 @@ export function PanelGrid({ page, panels, defaults, editing }: { page: string; p
     save({ layouts: { ...layouts, ...(saved.layouts || {}), [b]: cur.map(l => (l.i === k ? { ...l, w: Math.min(w, COLS[b]) } : l)) } });
   };
 
-  return <div className={editing ? "editing" : ""} onContextMenu={onContext} style={{ minHeight: editing ? 240 : undefined, paddingBottom: editing ? 80 : 0 }}>
+  return <div ref={root} className={editing ? "editing" : ""} onContextMenu={onContext} style={{ minHeight: editing ? 240 : undefined, paddingBottom: editing ? 80 : 0 }}>
     {editing && <div className="tray" style={{ marginBottom: 12 }}><span className="small">Editing. Drag a panel by its title, drag the gold corner to resize. Right-click a panel to hide or remove it; right-click empty space to add one.</span></div>}
     <Grid className="layout" layouts={layouts} breakpoints={BREAKPOINTS} cols={COLS} rowHeight={ROW} margin={MARGIN} containerPadding={[0, 0]}
       isDraggable={editing} isResizable={editing} draggableHandle=".gp > .panel > h3" compactType="vertical"

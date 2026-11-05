@@ -9,6 +9,7 @@ import { applyAppearance } from "./lib/theme";
 import { choreState } from "./lib/util";
 import { ProjectPage } from "./pages/Project";
 import { EditButton } from "./components/EditButton";
+import { OutboxPill } from "./components/Outbox";
 
 function useHash() {
   const [h, setH] = useState(location.hash.slice(1));
@@ -25,6 +26,7 @@ function Summary() {
     {blocked > 0 && <span className="pill bad"><i />{blocked} blocked</span>}
     {over ? <span className="pill bad"><i />{over} overdue</span> : <span className="pill ok"><i />Chores on track</span>}
     {soon > 0 && <span className="pill warn"><i />{soon} due soon</span>}
+    <OutboxPill />
   </div>;
 }
 

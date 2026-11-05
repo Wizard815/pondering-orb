@@ -61,8 +61,9 @@ The app is two parts in one repo:
   MCP endpoint and the web app.
 - `web/`: React 18 + Vite + TypeScript.
 
-`index.html` at the root is the original single-page demo, kept as the design
-reference.
+`demo/index.html` is the original single-page demo (a claude.ai artifact). It
+is kept for history only; the React app is the reference now and has moved on
+from it.
 
 ### With Docker
 
@@ -83,6 +84,7 @@ Open `http://<host>:8095`. Put secrets in `.env` next to the compose file:
 | `HERMES_USER`, `HERMES_PASSWORD` | a Hermes Studio user for Orb |
 | `ALLGLANCE_TOKEN` | the ALLGlance gateway's `GATEWAY_TOKEN` |
 | `OPENROUTER_API_KEY` (or any name) | frontier model key, named in Settings → Golem |
+| `PLEX_TOKEN`, `SABNZBD_API_KEY` (or any name) | keys for live app panels, named by `key_env` in the apps YAML |
 
 With neither `ORB_PASSWORD` nor `ORB_API_TOKENS` set, Orb is open to anyone
 who can reach the port. That is only for a private LAN, and the server warns
@@ -91,7 +93,8 @@ about it when it starts.
 `docker compose up` starts only Orb and a read-only Docker socket proxy. Apps
 you already run (Hermes Studio, Argos, LLMWIKI, UpstreamManager, CalDAV,
 Uptime Kuma) are reached by address. A bundled Uptime Kuma starts only with
-`docker compose --profile uptime up -d`.
+`docker compose --profile uptime up -d`, and real btop as a web terminal for
+the System tab with `docker compose --profile btop up -d`.
 
 ### For development
 
@@ -116,12 +119,12 @@ from other apps, the API, the MCP tools, CalDAV, the wiki rules and what is
 built so far. [docs/miladash.md](docs/miladash.md) covers the ideas board.
 [docs/allglance.md](docs/allglance.md) covers ALLGlance and the task priority scale.
 
-`index.html` is the demo built as a claude.ai artifact. Its storage and
+`demo/index.html` is the demo built as a claude.ai artifact. Its storage and
 Golem use the artifact runtime (`window.claude`), so opened as a plain file it
 renders but does not save.
 
-Not built yet: live Plex and SABnzbd panels, the wiki outbox, Miladash
-itself, and Golem streaming its replies.
+Left out for now: Mail (kept on the `mail` branch), writing tasks through to
+ALLGlance's dayGLANCE, and several users with their own logins.
 
 ## License
 

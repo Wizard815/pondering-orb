@@ -37,6 +37,24 @@ function docker(host: string, path: string): Promise<any> {
 }
 export async function containers(host: string) {
   if (!host) return [];
-  const list = await docker(host, "/containers/json?all=1");
-  return (list as any[]).map(c => ({ name: (c.Names?.[0] || "").replace(/^\//, ""), state: c.State, status: c.Status, image: c.Image }));
+  const list = (await docker(host, "/containers/json?all=1")) as any[];
+  // One stats snapshot per running container (one-shot, no streaming), 8 at a time.
+  const out = list.map(c => ({ id: c.Id as string, name: (c.Names?.[0] || "").replace(/^\//, ""), state: c.State, status: c.Status, image: c.Image, cpu: null as number | null, memMiB: null as number | null, memPct: null as number | null }));
+  const running = out.filter(c => c.state === "running");
+  for (let i = 0; i < running.length; i += 8) {
+    await Promise.all(running.slice(i, i + 8).map(async c => {
+      try { Object.assign(c, statsOf(await docker(host, `/containers/${c.id}/stats?stream=false&one-shot=false`))); } catch { /* stats not allowed or container gone */ }
+    }));
+  }
+  return out.map(({ id: _id, ...c }) => c).sort((a, b) => (b.cpu ?? -1) - (a.cpu ?? -1));
+}
+/** docker stats arithmetic: CPU % of the whole host, memory without page cache. */
+export function statsOf(s: any) {
+  const cpuDelta = (s.cpu_stats?.cpu_usage?.total_usage ?? 0) - (s.precpu_stats?.cpu_usage?.total_usage ?? 0);
+  const sysDelta = (s.cpu_stats?.system_cpu_usage ?? 0) - (s.precpu_stats?.system_cpu_usage ?? 0);
+  const cpus = s.cpu_stats?.online_cpus || s.cpu_stats?.cpu_usage?.percpu_usage?.length || 1;
+  const cpu = sysDelta > 0 && cpuDelta >= 0 ? Math.round((cpuDelta / sysDelta) * cpus * 1000) / 10 : 0;
+  const m = s.memory_stats || {}, cache = m.stats?.inactive_file ?? m.stats?.total_inactive_file ?? m.stats?.cache ?? 0;
+  const used = Math.max(0, (m.usage ?? 0) - cache);
+  return { cpu, memMiB: Math.round(used / 1048576), memPct: m.limit ? Math.round((used / m.limit) * 1000) / 10 : null };
 }

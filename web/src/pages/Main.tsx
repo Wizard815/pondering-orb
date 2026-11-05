@@ -4,6 +4,7 @@ import { useColl, useSettings } from "../lib/store";
 import { useFetch } from "../lib/useFetch";
 import { Golem } from "../components/Golem";
 import { DayPlan } from "../components/Glance";
+import { LiveWidget } from "../components/LiveWidget";
 import { ChoreRows, LogList, OpenTasks, QuickLog, Star, TaskRows, projHref } from "../components/Common";
 import { parseApps, DEFAULT_APPS, App } from "../lib/apps";
 import { fmtDate, isUrl, listOf, logSorted, prioOf, sortTasks, STATUS_LABEL, todayISO } from "../lib/util";
@@ -65,9 +66,9 @@ export const MainPage: PageDef = {
       { key: "upstream", title: "UpstreamManager", node: <UpstreamMini />, w: 4, h: 6 },
       { key: "system", title: "System", node: <SystemMini />, w: 4, h: 6 },
       ...groups.map(g => ({ key: "group:" + g.name, title: g.name, node: <AppTiles apps={g.apps} />, w: 6, h: 5 })),
-      ...groups.flatMap(g => g.apps).map(a => ({ key: "app:" + a.name, title: a.name, node: <AppTiles apps={[a]} />, w: 3, h: 3 })),
+      ...groups.flatMap(g => g.apps).map(a => ({ key: "app:" + a.name, title: a.name, node: a.widget ? <><AppTiles apps={[a]} /><LiveWidget name={a.name} /></> : <AppTiles apps={[a]} />, w: a.widget ? 4 : 3, h: a.widget ? 6 : 3 })),
     ];
     void s;
-    return { panels, defaults: ["golem", "favorites", "tasks", "priority", "today", "log", "chores", "uptime", "upstream", ...groups.slice(0, 1).map(g => "group:" + g.name)] };
+    return { panels, defaults: ["golem", "favorites", "tasks", "priority", "today", "log", "chores", "uptime", "upstream", ...groups.slice(0, 1).map(g => "group:" + g.name), ...groups.flatMap(g => g.apps).filter(a => a.widget).map(a => "app:" + a.name)] };
   },
 };

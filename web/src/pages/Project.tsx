@@ -123,6 +123,23 @@ function Chats({ p }: { p: any }) {
     {rest.length ? <ul className="list">{rest.map(c => row(c, false))}</ul> : <div className="empty small">{data ? "No other chats match." : "Loading chats…"}</div>}</>;
 }
 
+const noteTitle = (path: string) => path.split("/").pop()!.replace(/\.md$/, "");
+/** The note's `related` links: shows them, and adds other projects' notes.
+ *  Orb only adds links to notes that exist and never removes any. */
+function Related({ p }: { p: any }) {
+  const ui = useUi(), projects = useColl("projects"), [pick, setPick] = useState("");
+  const { data, reload, error } = useFetch<{ related?: string[] }>(`/api/wiki/note?path=${encodeURIComponent(p.wikiNote)}`, 0);
+  const related = (data?.related || []).map(r => r.replace(/^\[\[|\]\]$/g, ""));
+  const options = projects.filter(x => x.id !== p.id && x.wikiNote && !related.includes(noteTitle(x.wikiNote)));
+  if (error) return <div className="hint">Related notes: {error}</div>;
+  return <div className="row small">
+    <span>Related:</span>{related.length ? related.map(r => <span key={r} className="chip">{r}</span>) : <span className="muted">none</span>}
+    {options.length > 0 && <><select value={pick} onChange={e => setPick(e.target.value)} aria-label="Add a related project note"><option value="">Add a project note…</option>
+      {options.map(x => <option key={x.id} value={noteTitle(x.wikiNote)}>{x.name}</option>)}</select>
+      <button className="btn" disabled={!pick} onClick={async () => { try { const r = await post<{ added: string[] }>("/api/wiki/related", { path: p.wikiNote, titles: [pick] }); ui.status(r.added.length ? `Added [[${r.added[0]}]] to related.` : "That note is already related, or doesn't exist in the wiki."); setPick(""); reload(); } catch (x) { ui.error(x); } }}>Add</button></>}
+  </div>;
+}
+
 function WikiNote({ p }: { p: any }) {
   const ui = useUi(), [val, setVal] = useState<string | null>(null);
   const save = async (e: React.FormEvent) => {
@@ -139,6 +156,7 @@ function WikiNote({ p }: { p: any }) {
       <button className="btn" type="submit">{p.wikiNote ? "Change" : "Link note"}</button>
       {p.wikiNote && <button className="btn sm" type="button" title="Unlink this wiki note" onClick={unlink}>Unlink</button>}
     </form>
+    {p.wikiNote && <Related p={p} />}
     <p className="hint" style={{ margin: 0 }}>{p.wikiNote ? <>Open it on the <a href="#wiki">Wiki</a> tab. Moving this project on the board updates the note's project_status.</> : <>Paste a note path, or create one by giving the project a wiki area in New project.</>}</p>
   </>;
 }

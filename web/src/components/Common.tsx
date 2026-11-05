@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { create, patch, remove, useColl, useSettings, getDoc } from "../lib/store";
+import { post } from "../lib/api";
 import { useUi } from "../lib/ui";
 import { choreState, fmtDate, listOf, logSorted, prioName, prioOf, sortTasks, todayISO, PRIO_LEVELS } from "../lib/util";
 
@@ -47,9 +48,16 @@ export function ChoreRows({ limit = 0 }: { limit?: number }) {
   let list = chores.map(c => ({ c, s: choreState(c) })).sort((a, b) => a.s.due - b.s.due);
   if (limit) list = list.filter(x => x.s.cls !== "ok").slice(0, limit);
   if (!list.length) return <div className="empty">{limit ? "All chores done. Nothing due." : "No chores yet. Add backups, updates, disk scrubs."}</div>;
-  const done = (c: any) => { const before = c.lastDone || ""; patch("chores", c.id, { lastDone: todayISO() }).then(() => ui.undo(`${c.name} done.`, () => patch("chores", c.id, { lastDone: before }))).catch(ui.error); };
+  const done = (c: any) => {
+    const before = c.lastDone || "";
+    if (c.action === "upstream-daily") ui.status(`Running UpstreamManager's daily check for “${c.name}”…`);
+    post<{ result: any }>(`/api/chores/${encodeURIComponent(c.id)}/done`).then(r => {
+      const res = r.result?.results; const note = Array.isArray(res) ? ` Daily check: ${res.length} repo${res.length === 1 ? "" : "s"} checked.` : "";
+      ui.undo(`${c.name} done.${note}`, () => patch("chores", c.id, { lastDone: before }));
+    }).catch(ui.error);
+  };
   return <>{list.map(({ c, s }) => <div key={c.id} data-id={c.id} className={"uk " + (c.lastDone ? s.cls : "soon")}><span className="stripe" />
-    <div><div className="n">{c.name}</div><div className="m">{!c.lastDone ? "never done" : s.left < 0 ? `${-s.left} day${s.left === -1 ? "" : "s"} overdue` : s.left === 0 ? "due today" : `due in ${s.left} day${s.left === 1 ? "" : "s"}`} · every {c.everyDays}d · last {c.lastDone ? fmtDate(c.lastDone) : "never"}</div></div>
+    <div><div className="n">{c.name}{c.action === "upstream-daily" && <span className="chip" title="Done runs UpstreamManager's daily check">runs daily check</span>}</div><div className="m">{!c.lastDone ? "never done" : s.left < 0 ? `${-s.left} day${s.left === -1 ? "" : "s"} overdue` : s.left === 0 ? "due today" : `due in ${s.left} day${s.left === 1 ? "" : "s"}`} · every {c.everyDays}d · last {c.lastDone ? fmtDate(c.lastDone) : "never"}</div></div>
     <button className="btn" onClick={() => done(c)}>Done</button></div>)}</>;
 }
 
@@ -102,6 +110,9 @@ export async function removeWithUndo(ui: ReturnType<typeof useUi>, coll: Paramet
   const before = getDoc(coll, id); if (!before) return;
   await remove(coll, id);
   const { id: _i, version: _v, ...data } = before;
+  // A deleted CalDAV task or chore no longer exists on the server: restore it
+  // without its old address so the sync writes it back as a new to-do.
+  if (coll === "tasks" || coll === "chores") delete (data as any).caldav;
   ui.undo(msg, () => create(coll, { ...data, id }));
 }
 export async function patchWithUndo(ui: ReturnType<typeof useUi>, coll: Parameters<typeof patch>[0], id: string, p: Record<string, any>, msg: string) {
