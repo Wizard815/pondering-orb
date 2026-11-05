@@ -338,7 +338,10 @@ input[type=search]{background:var(--inset);border:1px solid var(--line);border-r
 /* ideas board */
 .mc{display:flex;gap:0;height:max(520px, calc(100vh - 300px));border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--inset)}
 .mc-rail{display:flex;flex-direction:column;gap:2px;padding:6px;background:var(--panel);border-right:1px solid var(--line)}
-.mc-rail .tool{width:36px;height:34px;border:1px solid transparent;border-radius:6px;background:none;font-size:1rem;color:var(--muted)}
+.mc-rail{overflow-y:auto}
+.mc-rail .tool{width:58px;padding:6px 2px 5px;border:1px solid transparent;border-radius:7px;background:none;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:2px}
+.mc-rail .tool .ti{font-size:1.25rem;line-height:1}
+.mc-rail .tool .tl{font-size:.68rem;letter-spacing:.02em}
 .mc-rail .tool:hover{color:var(--ink);background:var(--inset)}
 .mc-rail .tool.on{color:var(--gold);border-color:var(--gold);background:var(--gold-soft)}
 .mc-main{flex:1;min-width:0;display:flex;flex-direction:column}
@@ -387,6 +390,31 @@ input[type=search]{background:var(--inset);border:1px solid var(--line);border-r
 .req.approved{border-left-color:var(--ok)} .req.denied{border-left-color:var(--line-hi)} .req.failed{border-left-color:var(--bad)}
 .rtab td{vertical-align:top;padding:6px 10px 6px 0}
 
+/* board extras */
+.ph{color:var(--muted);font-style:italic;font-weight:400}
+.mc-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.mc-prog{height:4px;background:var(--line);border-radius:2px;overflow:hidden}
+.mc-prog span{display:block;height:100%;background:var(--ok)}
+.mc-todo li{position:relative}
+.mc-item-t{flex:1;min-width:0;overflow-wrap:anywhere;cursor:text}
+.mc-x{border:0;background:none;color:var(--muted);padding:0 2px;line-height:1;opacity:0}
+.mc-todo li:hover .mc-x,.mc-x:focus-visible{opacity:1}
+.mc-x:hover{color:var(--bad)}
+.mc-add input,.mc-itemform input{width:100%;font-size:.85rem;padding:3px 7px;background:transparent;border:1px dashed var(--line);border-radius:4px}
+.mc-add input:focus,.mc-itemform input:focus{border-style:solid;background:var(--inset)}
+/* golem markdown */
+.msg{font-size:var(--golem-fs,.95rem)}
+.msg.golem{white-space:normal}
+.mdc{display:flex;flex-direction:column;gap:6px}
+.mdc p,.mdc ul,.mdc ol,.mdc blockquote{margin:0}
+.mdc ul,.mdc ol{padding-left:1.3em;display:flex;flex-direction:column;gap:2px}
+.mdc .ch{font-family:var(--f-display);font-weight:600;color:var(--gold);margin-top:4px}
+.mdc code{font-family:var(--f-mono);font-size:.86em;background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:0 4px}
+.mdc pre.cb{margin:0;background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:8px 10px;overflow-x:auto;white-space:pre}
+.mdc pre.cb code{border:0;padding:0;background:none}
+.mdc blockquote{border-left:3px solid var(--line-hi);padding-left:8px;color:var(--muted)}
+.mdc hr{border:0;border-top:1px solid var(--line);width:100%}
+
 /* golem */
 .golem{display:flex;flex-direction:column;gap:10px}
 .golem-head{display:flex;align-items:center;gap:10px}
@@ -395,7 +423,7 @@ input[type=search]{background:var(--inset);border:1px solid var(--line);border-r
 .golem-face::before{left:8px}.golem-face::after{right:8px}
 .golem-face.busy::before,.golem-face.busy::after{background:var(--gold);box-shadow:0 0 8px var(--gold)}
 .chat{display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto;padding-right:4px}
-.msg{padding:8px 11px;border-radius:8px;max-width:92%;white-space:pre-wrap;overflow-wrap:anywhere;font-size:.94rem}
+.msg{padding:8px 11px;border-radius:8px;max-width:92%;white-space:pre-wrap;overflow-wrap:anywhere;font-size:var(--golem-fs,.95rem)}
 .msg.user{align-self:flex-end;background:var(--gold-soft);border:1px solid var(--line)}
 .msg.golem{align-self:flex-start;background:var(--inset);border:1px solid var(--line)}
 .msg .did{display:block;font-family:var(--f-mono);font-size:.72rem;color:var(--arcane);margin-top:4px}
@@ -451,7 +479,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
   let db = null;
   let savedChat = [];
   try { savedChat = JSON.parse(localStorage.getItem("orb.golem") || "[]"); if (!Array.isArray(savedChat)) savedChat = []; } catch { savedChat = []; }
-  const UI = { tab:"main", noteId:null, noteDraft:null, calMonth:new Date(new Date().getFullYear(), new Date().getMonth(), 1), logLimit:15, logFilter:"", configuring:false, yamlDraft:null, yamlMsg:"", confirmDel:null, dragId:null, projectId:null, moving:null, todoLists:[], wikiPath:null, wikiEdit:null, editing:false, room:null, items:[], rooms:{}, split:null, dragTab:null, pendingLog:"", lastLogProject:"", showArchived:false, wikiQ:"", wikiTag:"", connTest:{}, mcBoard:"root", mcTool:"select", mcFrom:null, mcEditNext:null,
+  const UI = { tab:"main", noteId:null, noteDraft:null, calMonth:new Date(new Date().getFullYear(), new Date().getMonth(), 1), logLimit:15, logFilter:"", configuring:false, yamlDraft:null, yamlMsg:"", confirmDel:null, dragId:null, projectId:null, moving:null, todoLists:[], wikiPath:null, wikiEdit:null, editing:false, room:null, items:[], rooms:{}, split:null, dragTab:null, pendingLog:"", lastLogProject:"", showArchived:false, wikiQ:"", wikiTag:"", connTest:{}, mcBoard:"root", mcTool:"select", mcFrom:null, mcEditNext:null, mcFresh:null, mcItemEdit:null, mcFocusAdd:null,
     golem:{busy:false, text:"", status:"", msgs:savedChat.slice(-30)} };
 
   const TABS = [
@@ -470,7 +498,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
 
   const WIDGETS = {
     golem:{label:"Golem", wide:true}, favorites:{label:"Favorite projects"}, tasks:{label:"Open tasks"}, apps:{label:"All apps"}, uptime:{label:"Uptime"},
-    week:{label:"Next 7 days"}, upkeep:{label:"Upkeep due"}, projects:{label:"Active projects"}, ideas:{label:"Ideas brewing"},
+    week:{label:"Next 7 days"}, upkeep:{label:"Chores"}, projects:{label:"Active projects"}, ideas:{label:"Ideas brewing"},
     system:{label:"System"}, log:{label:"Recent log"}, mail:{label:"Mail"}
   };
   const DEFAULT_MAIN = ["golem","favorites","tasks","app:Plex","app:SABnzbd","uptime","log","group:The Tower"];
@@ -556,9 +584,11 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
         ${compact?"":spark(h.cpuHistory)}</div>`).join("") +
       (st.reportedAt ? `<div class="hint">Reported ${esc(ago(st.reportedAt))}</div>` : "");
   }
+  const choresList = () => conn().caldav.choresList || "Chores";
+  const choresBadge = () => `<div class="row small"><span class="chip" title="Chores are recurring CalDAV to-dos">☰ CalDAV list: ${esc(choresList())}</span></div>`;
   function upkeepHTML(limit){
     let list = upkeepSorted(); if (limit) list = list.filter(x=>x.s.cls!=="ok").slice(0,limit);
-    if (!list.length) return `<div class="empty">${limit?"All wards hold. Nothing due.":"No checks yet. Add backups, updates, disk scrubs."}</div>`;
+    if (!list.length) return `<div class="empty">${limit?"All chores done. Nothing due.":"No chores yet. Add backups, updates, disk scrubs."}</div>`;
     return list.map(({u,s})=>{
       const msg = s.left<0 ? `${-s.left} day${s.left===-1?"":"s"} overdue` : s.left===0 ? "due today" : `due in ${s.left} day${s.left===1?"":"s"}`;
       return `<div class="uk ${s.cls}"><span class="stripe"></span><div><div class="n">${esc(u.name)}</div><div class="m">${msg} · every ${esc(u.everyDays)}d · last ${u.lastDone?esc(fmtDate(u.lastDone)):"never"}</div></div>
@@ -835,13 +865,13 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
 
   function golemHTML(){
     const g = UI.golem, st = settings();
-    const msgs = g.msgs.length ? g.msgs.map(m=>`<div class="msg ${m.role==="user"?"user":"golem"}">${esc(m.content)}${m.did&&m.did.length?`<span class="did">${m.did.map(esc).join(" · ")}</span>`:""}</div>`).join("")
+    const msgs = g.msgs.length ? g.msgs.map(m=>`<div class="msg ${m.role==="user"?"user":"golem"}">${m.role==="user"?esc(m.content):`<div class="mdc">${mdChat(m.content)}</div>`}${m.did&&m.did.length?`<span class="did">${m.did.map(esc).join(" · ")}</span>`:""}</div>`).join("")
       : `<div class="msg golem">Golem stands ready. Ask what to work on, or tell me what you did and I will log it.</div>`;
     return `<div class="golem">
       <div class="golem-head"><span class="golem-face ${g.busy?"busy":""}" aria-hidden="true"></span>
         <div class="grow"><div class="hint" id="golem-status">${esc(g.status)}</div></div>
         ${g.msgs.length?`<button class="btn" data-act="golem-clear">Clear</button>`:""}<a class="btn" href="#config">Settings</a></div>
-      <div class="chat" id="chat" aria-live="polite">${msgs}<div class="msg golem" id="golem-live" ${g.busy?"":"hidden"}>${esc(g.live||"…")}</div></div>
+      <div class="chat" id="chat" aria-live="polite">${msgs}<div class="msg golem" id="golem-live" ${g.busy?"":"hidden"}><div class="mdc">${mdChat(g.live||"…")}</div></div></div>
       ${g.msgs.length?"":`<div class="chips">${["What should I work on next?","Log: fixed the Argos watcher tests","What upkeep is overdue?","Summarize this week's logs"].map(q=>`<button data-act="golem-chip" data-q="${esc(q)}">${esc(q)}</button>`).join("")}</div>`}
       <form data-form="golem"><textarea id="golem-in" name="q" rows="1" placeholder="Speak to the Golem" aria-label="Message to Golem">${esc(g.text)}</textarea><button class="btn primary" type="submit" ${g.busy?"disabled":""}>Send</button></form>
     </div>`;
@@ -851,7 +881,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     golem:()=>golemHTML(),
     favorites:()=>favoritesHTML(),
     week:()=>agendaHTML(7),
-    upkeep:()=>upkeepHTML(5),
+    upkeep:()=>choresBadge() + upkeepHTML(6) + `<div class="row"><a class="btn" href="#upkeep">All chores</a></div>`,
     projects:()=>projectCards(),
     tasks:()=>tasksHTML("", 6),
     ideas:()=>ideasCompact(),
@@ -938,7 +968,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
         P("requests","Approval requests", requestsHTML(), {w:7}),
         P("daily","Daily check", dailyHTML(), {w:5}),
         P("repos","Repositories", reposHTML(), {w:12}),
-        P("chores","Chores", `${upkeepHTML(0)}<form class="row" data-form="upkeep"><input type="text" name="name" placeholder="Chore (e.g. test a restore)" aria-label="Chore" required>
+        P("chores","Chores", `${choresBadge()}${upkeepHTML(0)}<form class="row" data-form="upkeep"><input type="text" name="name" placeholder="Chore (e.g. test a restore)" aria-label="Chore" required>
           <select name="every" aria-label="How often"><option value="1">Daily</option><option value="7" selected>Weekly</option><option value="30">Monthly</option><option value="90">Quarterly</option></select>
           <button class="btn primary" type="submit">Add chore</button></form>`, {w:7}),
         P("how","How this connects", `<ul class="small" style="margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px">
@@ -946,7 +976,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
           <li>Requests: <span class="mono">GET /api/requests</span>; Approve or Deny sends <span class="mono">POST /api/request/&lt;id&gt;/decide</span>.</li>
           <li>Daily check: <span class="mono">POST /api/run-daily</span>. Fetch: <span class="mono">POST /api/repo/&lt;id&gt;/fetch</span>.</li>
           <li>Project commits: <span class="mono">GET /api/repo/&lt;id&gt;/commits</span>.</li>
-          <li>Chores are Orb's own list; UpstreamManager doesn't keep them.</li></ul>`, {w:5})
+          <li>Chores are recurring to-dos in your CalDAV list “${esc(choresList())}” (set in Settings → Connections). Done completes this round and moves the due date on by the repeat rule.</li></ul>`, {w:5})
       ]};
     },
     ideas(){
@@ -1004,7 +1034,9 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     config(){
       const st = settings(), g = st.golem, draft = UI.yamlDraft ?? S.yaml ?? "", lists = taskLists();
       return { panels: [
-        P("golem","Golem", `<form data-form="golem-cfg" class="editor"><div class="radio">
+        P("golem","Golem", `<div class="setting"><div><div>Chat text size</div><div class="d">Size of the messages in Golem's chat.</div></div>
+            <select data-act="set-golemfont" aria-label="Golem chat text size">${[["s","Small"],["m","Normal"],["l","Large"],["xl","Extra large"]].map(([k,l])=>`<option value="${k}" ${(st.golemFont||"m")===k?"selected":""}>${l}</option>`).join("")}</select></div>
+          <form data-form="golem-cfg" class="editor"><div class="radio">
             <label><input type="radio" name="provider" value="local" ${g.provider!=="frontier"?"checked":""}> <span><b>Local, OpenAI-compatible</b> <span class="d">Argos, llama-server, Ollama or anything serving /v1.</span></span></label>
             <div class="row" style="padding-left:24px"><input type="url" name="localUrl" value="${esc(g.local.baseUrl)}" aria-label="Local base URL" style="flex:1 1 220px"><input type="text" name="localModel" value="${esc(g.local.model)}" placeholder="model name" aria-label="Local model"></div>
             <label><input type="radio" name="provider" value="frontier" ${g.provider==="frontier"?"checked":""}> <span><b>Frontier API</b> <span class="d">OpenRouter or the Claude API.</span></span></label>
@@ -1105,7 +1137,12 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
   }
 
   // ---------- menus and popups ----------
-  function closeMenu(){ document.querySelectorAll(".cmenu,.pop").forEach(n=>n.remove()); }
+  function closeFloating(){ document.querySelectorAll(".cmenu,.pop").forEach(n=>n.remove()); }
+  function closeMenu(){
+    closeFloating();
+    const fresh = UI.mcFresh; UI.mcFresh = null;
+    if (fresh){ const it = S.canvas.find(x=>x._id===fresh); if (it && mcIsEmpty(it)) mcDelete(it).catch(()=>{}); }
+  }
   function placeFloating(el, x, y){
     document.body.appendChild(el);
     const r = el.getBoundingClientRect(), vw = innerWidth, vh = innerHeight;
@@ -1113,7 +1150,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     el.style.top = Math.max(8, Math.min(y, vh - r.height - 8)) + "px";
   }
   function openMenu(x, y, items){
-    closeMenu();
+    closeFloating();
     const m = document.createElement("div"); m.className = "cmenu"; m.setAttribute("role","menu");
     items.forEach(it=>{
       if (it === "-"){ const s = document.createElement("div"); s.className = "sep"; m.appendChild(s); return; }
@@ -1126,7 +1163,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     placeFloating(m, x, y); const first = m.querySelector("button:not([disabled])"); first && first.focus();
   }
   function openPop(anchor, html){
-    closeMenu();
+    closeFloating();
     const p = document.createElement("div"); p.className = "pop"; p.innerHTML = html;
     const r = anchor.getBoundingClientRect();
     placeFloating(p, r.left, r.bottom + 6);
@@ -1241,8 +1278,9 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
   const EDITABLE = [["bg","Background"],["panel","Panels"],["inset","Insets"],["line","Borders"],["ink","Text"],["muted","Quiet text"],["gold","Accent"],["arcane","Second accent"],["orb-mid","Orb glow"]];
   const theme = () => ({mode:"auto", preset:"night", custom:{}, ...(settings().theme||{})});
   const PAGE_W = {fit:"none", wide:"1680px", comfortable:"1240px"};
+  const GOLEM_FS = {s:".86rem", m:".95rem", l:"1.06rem", xl:"1.2rem"};
   let widthKey = "";
-  function applyWidth(){ const w = settings().pageWidth || "fit"; if (w===widthKey) return; widthKey = w; document.documentElement.style.setProperty("--page-w", PAGE_W[w] || "none"); }
+  function applyWidth(){ const w = settings().pageWidth || "fit"; document.documentElement.style.setProperty("--golem-fs", GOLEM_FS[settings().golemFont||"m"]); if (w===widthKey) return; widthKey = w; document.documentElement.style.setProperty("--page-w", PAGE_W[w] || "none"); }
   let themeKey = "";
   function applyTheme(){
     const th = theme(), key = JSON.stringify(th); if (key === themeKey) return; themeKey = key;
@@ -1270,11 +1308,11 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
   const CONN_DEFS = [
     {id:"uptime", name:"Uptime Kuma", fields:[["baseUrl","Base URL"],["slug","Status page slug"],["keyEnv","Metrics key variable (optional)"]], test:c=>`GET ${c.baseUrl}/api/status-page/${c.slug} and /api/status-page/heartbeat/${c.slug}, then list the monitors it finds.`},
     {id:"wiki", name:"LLMWIKI", fields:[["baseUrl","REST API URL"],["keyEnv","API key variable"],["vaultPath","Vault folder in the container (read only)"]], test:c=>`GET ${c.baseUrl}/ with the key from ${c.keyEnv}, and check that ${c.vaultPath} holds the vault's .md files.`},
-    {id:"caldav", name:"CalDAV tasks", fields:[["url","CalDAV URL"],["userEnv","User variable"],["passEnv","Password variable"]], test:c=>`PROPFIND ${c.url||"(set a URL)"} and list the collections that hold tasks.`},
+    {id:"caldav", name:"CalDAV tasks", fields:[["url","CalDAV URL"],["userEnv","User variable"],["passEnv","Password variable"],["choresList","List that holds chores"]], test:c=>`PROPFIND ${c.url||"(set a URL)"} and list the collections that hold tasks.`},
     {id:"upstream", name:"UpstreamManager", fields:[["baseUrl","Base URL"]], test:c=>`GET ${c.baseUrl}/api/repos and /api/requests.`},
     {id:"hermes", name:"Hermes Studio", fields:[["baseUrl","Base URL"],["userEnv","User variable"],["passEnv","Password variable"]], test:c=>`POST ${c.baseUrl}/api/auth/login, then GET /api/studio/sessions?limit=5 and /api/studio/sessions/hermes?limit=5 with the token.`}
   ];
-  const CONN_DEFAULT = {uptime:{baseUrl:"http://uptime-kuma:3001", slug:"orb", keyEnv:""}, wiki:{baseUrl:"http://llmwiki:27123", keyEnv:"WIKI_API_KEY", vaultPath:"/vault"}, caldav:{url:"", userEnv:"CALDAV_USER", passEnv:"CALDAV_PASSWORD"}, upstream:{baseUrl:"http://upstream-manager:5000"}, hermes:{baseUrl:"http://hermes-studio:6060", userEnv:"HERMES_USER", passEnv:"HERMES_PASSWORD"}};
+  const CONN_DEFAULT = {uptime:{baseUrl:"http://uptime-kuma:3001", slug:"orb", keyEnv:""}, wiki:{baseUrl:"http://llmwiki:27123", keyEnv:"WIKI_API_KEY", vaultPath:"/vault"}, caldav:{url:"", userEnv:"CALDAV_USER", passEnv:"CALDAV_PASSWORD", choresList:"Chores"}, upstream:{baseUrl:"http://upstream-manager:5000"}, hermes:{baseUrl:"http://hermes-studio:6060", userEnv:"HERMES_USER", passEnv:"HERMES_PASSWORD"}};
   const conn = () => { const c = settings().conn || {}; return Object.fromEntries(Object.entries(CONN_DEFAULT).map(([k,v])=>[k, {...v, ...(c[k]||{})}])); };
   function connectionsHTML(){
     const c = conn();
@@ -1349,7 +1387,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
 
   // ---------- ideas board (Miladash / Milaclone style) ----------
   const MC_TYPES = {
-    note:{label:"Note", icon:"✎", w:220}, idea:{label:"Idea", icon:"✧", w:240}, todo:{label:"To-do", icon:"☑", w:220},
+    note:{label:"Note", icon:"✎", w:220}, idea:{label:"Idea", icon:"✧", w:240}, todo:{label:"To-do", icon:"☑", w:230}, tasks:{label:"Tasks", icon:"☰", w:250},
     link:{label:"Link", icon:"↗", w:220}, column:{label:"Column", icon:"▥", w:250}, board:{label:"Board", icon:"▣", w:190}, comment:{label:"Comment", icon:"❝", w:200}
   };
   const MC_COLORS = [["","Plain"],["gold","Gold"],["arcane","Teal"],["ok","Green"],["warn","Amber"],["bad","Red"],["muted","Grey"]];
@@ -1365,28 +1403,46 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
   }
   function mcInner(i){
     const t = i.type;
-    if (t==="idea") return `<div class="mc-top"><span class="chip st-${esc(i.stage||"thought")}">${esc(STAGE_LABEL[i.stage]||"Thought")}</span>${i.promoted?`<span class="chip ok">Promoted</span>`:""}</div><div class="mc-title">${esc(i.title||"Untitled idea")}</div>${i.text?`<div class="mc-text">${esc(i.text)}</div>`:""}`;
-    if (t==="todo") return `<div class="mc-title">${esc(i.title||"To-do")}</div><ul class="mc-todo">${(i.items||[]).map((x,k)=>`<li><input type="checkbox" data-act="mc-todo" data-id="${esc(i._id)}" data-i="${k}" ${x.done?"checked":""} aria-label="${esc(x.t)}"><span class="${x.done?"done":""}">${esc(x.t)}</span></li>`).join("")}</ul>`;
-    if (t==="link") return `<div class="mc-title">${esc(i.title||i.url||"Link")}</div>${isUrl(i.url)?`<a href="${esc(i.url)}" target="_blank" rel="noopener" class="mc-url">${esc(i.url)}</a>`:""}`;
-    if (t==="board"){ const n = mcItems(i._id).length; return `<div class="mc-bicon">▣</div><div class="mc-title">${esc(i.title||"Board")}</div><div class="hint">${n} card${n===1?"":"s"} · double-click to open</div>`; }
-    if (t==="comment") return `<div class="mc-text">${esc(i.text||"")}</div>`;
+    const ttl = (v, ph) => v ? `<div class="mc-title">${esc(v)}</div>` : `<div class="mc-title ph">${ph}</div>`;
+    if (t==="idea") return `<div class="mc-top"><span class="chip st-${esc(i.stage||"thought")}">${esc(STAGE_LABEL[i.stage]||"Thought")}</span>${i.promoted?`<span class="chip ok">Promoted</span>`:""}</div>${ttl(i.title,"Untitled idea")}${i.text?`<div class="mc-text">${esc(i.text)}</div>`:""}`;
+    if (t==="todo"){
+      const items = i.items||[], done = items.filter(x=>x.done).length;
+      return `<div class="mc-head">${ttl(i.title,"To-do")}${items.length?`<span class="mono small muted">${done}/${items.length}</span>`:""}</div>
+        ${items.length?`<div class="mc-prog"><span style="width:${Math.round(done/items.length*100)}%"></span></div>`:""}
+        <ul class="mc-todo">${items.map((x,k)=>UI.mcItemEdit && UI.mcItemEdit.id===i._id && UI.mcItemEdit.k===k
+          ? `<li><form data-form="mc-itemsave" data-id="${esc(i._id)}" data-k="${k}" class="mc-itemform"><input type="text" name="t" id="mc-itemedit" value="${esc(x.t)}" aria-label="Edit item"></form></li>`
+          : `<li><input type="checkbox" data-act="mc-todo" data-id="${esc(i._id)}" data-i="${k}" ${x.done?"checked":""} aria-label="${esc(x.t)}"><span class="mc-item-t ${x.done?"done":""}" data-item="${k}" title="Double-click to edit">${esc(x.t)}</span><button class="mc-x" data-act="mc-item-del" data-id="${esc(i._id)}" data-i="${k}" aria-label="Remove ${esc(x.t)}">×</button></li>`).join("")}</ul>
+        <form data-form="mc-additem" data-id="${esc(i._id)}" class="mc-add"><input type="text" name="t" id="mc-add-${esc(i._id)}" placeholder="+ Add an item" aria-label="Add an item"></form>`;
+    }
+    if (t==="tasks"){
+      const l = i.list, items = l ? sortTasks(S.tasks.filter(x=>listOf(x)===l)) : [], open = items.filter(x=>!x.done).length;
+      if (!l) return `${ttl("","Tasks")}<div class="hint">Double-click to choose a CalDAV list.</div>`;
+      return `<div class="mc-head"><div class="mc-title">${esc(i.title||l)}</div><span class="chip" title="CalDAV list">☰ ${esc(l)}</span></div>
+        <div class="hint">${open} open</div>
+        <ul class="mc-todo">${items.slice(0,12).map(x=>`<li><input type="checkbox" data-act="task-toggle" data-id="${esc(x._id)}" ${x.done?"checked":""} aria-label="${esc(x.title)}"><span class="${x.done?"done":""}">${esc(x.title)}</span>${x.due?`<span class="mono small muted" style="margin-left:auto">${esc(fmtDate(x.due))}</span>`:""}</li>`).join("")}</ul>
+        <form data-form="mc-addtask" data-list="${esc(l)}" class="mc-add"><input type="text" name="t" placeholder="+ Add a task to ${esc(l)}" aria-label="Add a task"></form>`;
+    }
+    if (t==="link") return `${ttl(i.title||(i.url&&i.url!=="https://"?i.url:""),"Link")}${isUrl(i.url)?`<a href="${esc(i.url)}" target="_blank" rel="noopener" class="mc-url">${esc(i.url)}</a>`:""}`;
+    if (t==="board"){ const n = mcItems(i._id).length; return `<div class="mc-bicon">▣</div>${ttl(i.title,"Untitled board")}<div class="hint">${n} card${n===1?"":"s"} · double-click to open</div>`; }
+    if (t==="comment") return i.text ? `<div class="mc-text">${esc(i.text)}</div>` : `<div class="mc-text ph">Empty comment</div>`;
+    if (!i.title && !i.text) return `<div class="mc-text ph">Empty note</div>`;
     return `${i.title?`<div class="mc-title">${esc(i.title)}</div>`:""}<div class="mc-text md">${md(i.text||"")}</div>`;
   }
   function mcCard(i, inCol){
     const c = i.color ? `var(--${i.color})` : "var(--line-hi)";
     const pos = inCol ? "" : `left:${Math.round(i.x||0)}px;top:${Math.round(i.y||0)}px;width:${Math.round(i.w||MC_TYPES[i.type]?.w||220)}px;`;
     const kids = i.type==="column" ? S.canvas.filter(k=>k.parent===i._id).sort((a,b)=>(a.order||0)-(b.order||0)) : [];
-    const body = i.type==="column" ? `<div class="mc-title mc-colhead">${esc(i.title||"Column")}</div><div class="mc-col" data-col="${esc(i._id)}">${kids.map(k=>mcCard(k,true)).join("") || `<div class="hint mc-empty">Drop cards here</div>`}</div>` : mcInner(i);
+    const body = i.type==="column" ? `<div class="mc-title mc-colhead ${i.title?"":"ph"}">${esc(i.title||"Untitled column")}</div><div class="mc-col" data-col="${esc(i._id)}">${kids.map(k=>mcCard(k,true)).join("") || `<div class="hint mc-empty">Drop cards here</div>`}</div>` : mcInner(i);
     return `<article class="mc-card t-${esc(i.type)} ${inCol?"in-col":""} ${UI.mcFrom===i._id?"linking":""}" data-mc="${esc(i._id)}" style="${pos}--c:${c}">${body}${inCol?"":`<span class="mc-rz" data-mcrz aria-hidden="true"></span>`}</article>`;
   }
   function boardHTML(){
     const b = mcBoardId(), items = mcItems(b), cam = mcCam(b), tool = UI.mcTool || "select";
     const loose = items.filter(i=>!i.parent || !S.canvas.some(c=>c._id===i.parent));
-    const rail = [["select","Select and move (V)","⬚"],...["note","idea","todo","link","column","board","comment"].map(k=>[k, MC_TYPES[k].label, MC_TYPES[k].icon]),["connect","Connect two cards","⟶"]];
+    const rail = [["select","Select","⬚","Select and move (V)"],...["note","idea","todo","tasks","link","column","board","comment"].map(k=>[k, MC_TYPES[k].label, MC_TYPES[k].icon, k==="todo"?"To-do checklist on the board (T)":k==="tasks"?"Show a CalDAV task list on the board":MC_TYPES[k].label]),["connect","Connect","⟶","Connect two cards with an arrow"]];
     return `<div class="mc">
-      <aside class="mc-rail" role="toolbar" aria-label="Board tools">${rail.map(([k,l,ic])=>`<button class="tool ${tool===k?"on":""}" data-act="mc-tool" data-t="${k}" title="${esc(l)}" aria-label="${esc(l)}" aria-pressed="${tool===k}">${ic}</button>`).join("")}</aside>
+      <aside class="mc-rail" role="toolbar" aria-label="Board tools">${rail.map(([k,l,ic,tip])=>`<button class="tool ${tool===k?"on":""}" data-act="mc-tool" data-t="${k}" title="${esc(tip)}" aria-pressed="${tool===k}"><span class="ti" aria-hidden="true">${ic}</span><span class="tl">${esc(l)}</span></button>`).join("")}</aside>
       <div class="mc-main">
-        <div class="mc-bar">${mcCrumbs()}<span class="hint">${tool==="select"?"Drag cards, drag empty space to pan, Ctrl + scroll to zoom. Double-click to edit; right-click for more.":tool==="connect"?(UI.mcFrom?"Now click the card to connect to. Esc cancels.":"Click the card the arrow starts from."):`Click the board to place a ${MC_TYPES[tool].label.toLowerCase()}.`}</span>
+        <div class="mc-bar">${mcCrumbs()}<span class="hint">${tool==="select"?"Drag cards, drag empty space or hold the middle mouse button to pan, Ctrl + scroll to zoom. Double-click to edit; right-click for more.":tool==="connect"?(UI.mcFrom?"Now click the card to connect to. Esc cancels.":"Click the card the arrow starts from."):`Click the board to place a ${MC_TYPES[tool].label.toLowerCase()}.`}</span>
           <span class="mc-zoom"><button class="btn" data-act="mc-zoom" data-d="-1" aria-label="Zoom out">−</button><span class="mono small">${Math.round(cam.z*100)}%</span><button class="btn" data-act="mc-zoom" data-d="1" aria-label="Zoom in">+</button><button class="btn" data-act="mc-fit">Fit</button></span></div>
         <div class="mc-view tool-${tool}" id="mc-view" data-board="${esc(b)}">
           <div class="mc-world" id="mc-world" style="transform:translate(${cam.x}px,${cam.y}px) scale(${cam.z})">
@@ -1417,16 +1473,19 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
   async function mcCreate(type, at){
     if (!need()) return;
     const b = mcBoardId(), base = {board:b, type, x:Math.round(at.x), y:Math.round(at.y), w:MC_TYPES[type].w, color:"", updated:todayISO()};
-    const extra = type==="idea" ? {title:"New idea", text:"", stage:"thought"} : type==="todo" ? {title:"To-do", items:[{t:"First thing", done:false}]} : type==="link" ? {title:"", url:"https://"} : type==="column" ? {title:"Column"} : type==="board" ? {title:"New board"} : type==="comment" ? {text:"Comment"} : {title:"", text:"New note"};
-    try { const ref = await db.collection("canvas").add({...base, ...extra}); UI.mcTool = "select"; UI.mcEditNext = ref.id; } catch(e){ fail(e); }
+    const extra = type==="idea" ? {title:"", text:"", stage:"thought"} : type==="todo" ? {title:"", items:[]} : type==="tasks" ? {title:"", list:""} : type==="link" ? {title:"", url:""} : type==="comment" ? {text:""} : type==="note" ? {title:"", text:""} : {title:""};
+    try { const ref = await db.collection("canvas").add({...base, ...extra}); UI.mcTool = "select"; UI.mcEditNext = ref.id; UI.mcFresh = ref.id; } catch(e){ fail(e); }
   }
+  const mcIsEmpty = i => !String(i.title||"").trim() && !String(i.text||"").trim() && !(i.items||[]).length && !i.list && !(i.url && i.url!=="https://") && !S.canvas.some(k=>k.parent===i._id || (k.board||"root")===i._id);
+  const MC_PH = {note:"Title (optional)", idea:"New idea", todo:"To-do", tasks:"Card title (optional)", link:"Link title", column:"New column", board:"New board"};
   function mcEdit(id, anchor){
     const i = S.canvas.find(x=>x._id===id); if (!i) return;
     const f = [];
-    if (i.type!=="comment") f.push(`<label class="small">Title<input type="text" name="title" value="${esc(i.title||"")}"></label>`);
-    if (["note","idea","comment"].includes(i.type)) f.push(`<label class="small">${i.type==="idea"?"Why it matters":"Text"}<textarea name="text" rows="4">${esc(i.text||"")}</textarea></label>`);
-    if (i.type==="link") f.push(`<label class="small">URL<input type="url" name="url" value="${esc(i.url||"")}"></label>`);
-    if (i.type==="todo") f.push(`<label class="small">Items, one per line (start with [x] when done)<textarea name="items" rows="5">${esc((i.items||[]).map(x=>(x.done?"[x] ":"")+x.t).join("\n"))}</textarea></label>`);
+    if (i.type!=="comment") f.push(`<label class="small">Title<input type="text" name="title" value="${esc(i.title||"")}" placeholder="${esc(MC_PH[i.type]||"Title")}"></label>`);
+    if (["note","idea","comment"].includes(i.type)) f.push(`<label class="small">${i.type==="idea"?"Why it matters":"Text"}<textarea name="text" rows="4" placeholder="${i.type==="idea"?"One line on why":"Write something"}">${esc(i.text||"")}</textarea></label>`);
+    if (i.type==="link") f.push(`<label class="small">URL<input type="url" name="url" value="${esc(i.url||"")}" placeholder="https://"></label>`);
+    if (i.type==="todo") f.push(`<label class="small">Items, one per line (start with [x] when done)<textarea name="items" rows="5" placeholder="First thing&#10;Second thing">${esc((i.items||[]).map(x=>(x.done?"[x] ":"")+x.t).join("\n"))}</textarea></label>`);
+    if (i.type==="tasks") f.push(`<label class="small">CalDAV list<input type="text" name="list" list="mc-lists" value="${esc(i.list||"")}" placeholder="Choose or type a list"><datalist id="mc-lists">${taskLists().map(l=>`<option value="${esc(l)}">`).join("")}</datalist></label>`);
     if (i.type==="idea") f.push(`<label class="small">Stage<select name="stage">${STAGES.map(s=>`<option value="${s}" ${s===i.stage?"selected":""}>${STAGE_LABEL[s]}</option>`).join("")}</select></label>`);
     openPop(anchor, `<form data-form="mc-edit" class="pop-form" style="min-width:min(320px,86vw)"><input type="hidden" name="id" value="${esc(id)}"><div class="mh" style="padding:0">${esc(MC_TYPES[i.type].label)}</div>${f.join("")}
       <div class="row"><button class="btn primary" type="submit">Save</button><button class="btn" type="button" data-act="pop-close">Cancel</button></div></form>`);
@@ -1481,7 +1540,14 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
   }
   // pointer: drag cards, pan, resize, place, connect
   document.addEventListener("pointerdown", e => {
-    const view = e.target.closest && e.target.closest("#mc-view"); if (!view || UI.editing || e.button > 0) return;
+    const view = e.target.closest && e.target.closest("#mc-view"); if (!view || UI.editing) return;
+    if (e.button === 1){
+      e.preventDefault(); const b0 = mcBoardId(), c0 = mcCam(b0), x0 = c0.x, y0 = c0.y, sx0 = e.clientX, sy0 = e.clientY, world = $("mc-world"); UI.moving = "mc"; view.classList.add("panning");
+      const mv = ev => { c0.x = x0 + ev.clientX - sx0; c0.y = y0 + ev.clientY - sy0; world.style.transform = `translate(${c0.x}px,${c0.y}px) scale(${c0.z})`; };
+      const up = () => { removeEventListener("pointermove", mv); removeEventListener("pointerup", up); view.classList.remove("panning"); UI.moving = null; mcCams[b0] = c0; saveCam(); };
+      addEventListener("pointermove", mv); addEventListener("pointerup", up); return;
+    }
+    if (e.button > 0) return;
     if (e.target.closest("input,button,a,select,textarea")) return;
     const b = mcBoardId(), cam = mcCam(b), tool = UI.mcTool || "select", card = e.target.closest(".mc-card"), rz = e.target.closest("[data-mcrz]");
     if (tool==="connect"){
@@ -1520,7 +1586,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     };
     const up = async ev => {
       removeEventListener("pointermove", mv); removeEventListener("pointerup", up); UI.moving = null;
-      if (!moved){ render(); return; }
+      if (!moved) return;
       const under = document.elementFromPoint(ev.clientX, ev.clientY), col = it.type!=="column" && it.type!=="board" && under && under.closest(".mc-col");
       if (!need()){ render(); return; }
       try {
@@ -1541,10 +1607,15 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
   });
   document.addEventListener("dblclick", e => {
     const view = e.target.closest && e.target.closest("#mc-view"); if (!view || UI.editing) return;
+    const itemT = e.target.closest(".mc-item-t");
+    if (itemT){ const c = itemT.closest(".mc-card"); UI.mcItemEdit = {id:c.dataset.mc, k:Number(itemT.dataset.item)}; render(); const inp = $("mc-itemedit"); if (inp){ inp.focus(); inp.select(); inp.addEventListener("blur", ()=>{ if (UI.mcItemEdit) inp.form.requestSubmit(); }, {once:true}); } return; }
+    if (e.target.closest(".mc-add,.mc-itemform")) return;
     const card = e.target.closest(".mc-card");
     if (card){ const i = S.canvas.find(x=>x._id===card.dataset.mc); if (!i) return; if (i.type==="board"){ UI.mcBoard = i._id; render(); } else mcEdit(i._id, card); return; }
     mcCreate("note", mcAt(e.clientX, e.clientY));
   });
+  document.addEventListener("mousedown", e => { if (e.button === 1 && e.target.closest && e.target.closest("#mc-view")) e.preventDefault(); });
+  document.addEventListener("auxclick", e => { if (e.button === 1 && e.target.closest && e.target.closest("#mc-view")) e.preventDefault(); });
   document.addEventListener("wheel", e => {
     const view = e.target.closest && e.target.closest("#mc-view"); if (!view) return;
     e.preventDefault();
@@ -1692,6 +1763,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     }
     $("main").innerHTML = `<div class="room">${html}</div>`;
     if ($("mc-edges")) requestAnimationFrame(mcDrawEdges);
+    if (UI.mcFocusAdd){ const a = $("mc-add-"+UI.mcFocusAdd); UI.mcFocusAdd = null; if (a) a.focus(); }
     if (UI.mcEditNext){ const el = document.querySelector(`[data-mc="${CSS.escape(UI.mcEditNext)}"]`); if (el){ const id = UI.mcEditNext; UI.mcEditNext = null; setTimeout(()=>mcEdit(id, el), 0); } }
     if (active && $(active) && /^(yaml|golem-in|logmax|wiki-sec|wiki-q|chat-q)$/.test(active)){ const el = $(active); el.focus(); try { if (caret!=null) el.setSelectionRange(caret, caret); } catch {} }
   }
@@ -1772,6 +1844,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
       case "chat-link": { if(!need())return; const pr = S.projects.find(z=>z._id===id); if (pr) db.doc("projects/"+id).update({chats:[...new Set([...(pr.chats||[]), el.dataset.c])]}).catch(fail); break; }
       case "chat-unlink": { if(!need())return; const pr = S.projects.find(z=>z._id===id); if (pr) db.doc("projects/"+id).update({chats:(pr.chats||[]).filter(x=>x!==el.dataset.c)}).catch(fail); break; }
       case "mc-tool": UI.mcTool = el.dataset.t; UI.mcFrom = null; render(); break;
+      case "mc-item-del": { if(!need())return; const it = S.canvas.find(z=>z._id===id); if (it) db.doc("canvas/"+id).update({items:(it.items||[]).filter((x,k)=>k!==Number(el.dataset.i))}).catch(fail); break; }
       case "mc-open": UI.mcBoard = id; UI.mcFrom = null; render(); break;
       case "mc-zoom": { const b = mcBoardId(), cam = mcCam(b), v = $("mc-view"); const z = Math.max(.3, Math.min(2.2, cam.z * (Number(el.dataset.d)>0?1.2:1/1.2))); if (v){ const px = v.clientWidth/2, py = v.clientHeight/2; cam.x = px-(px-cam.x)*z/cam.z; cam.y = py-(py-cam.y)*z/cam.z; } cam.z = z; mcCams[b] = cam; saveCam(); render(); break; }
       case "mc-fit": mcFit(); break;
@@ -1809,6 +1882,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     if (act === "mc-todo"){ if(!need())return; const it = S.canvas.find(z=>z._id===el.dataset.id); if (it){ const items = (it.items||[]).map((x,k)=>k===Number(el.dataset.i)?{...x, done:el.checked}:x); db.doc("canvas/"+it._id).update({items}).catch(fail); } }
     if (act === "proj-repo"){ if(!need())return; db.doc("projects/"+el.dataset.id).update({upstreamRepo:el.value, lastLoggedSha:""}).catch(fail); }
     if (act === "proj-logcommits"){ if(!need())return; db.doc("projects/"+el.dataset.id).update({logCommits:el.checked}).catch(fail); }
+    if (act === "set-golemfont"){ saveSettings({golemFont:el.value}); }
     if (act === "set-width"){ saveSettings({pageWidth:el.value}); }
     if (act === "show-archived"){ UI.showArchived = el.checked; render(); }
     if (act === "pick-project"){ const n = $("pick-new"); if (n){ n.hidden = el.value!=="__new"; if (!n.hidden) n.focus(); } }
@@ -1833,9 +1907,15 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
         case "mc-edit": {
           const it = S.canvas.find(z=>z._id===v.id); if (!it) return; const up = {updated:todayISO()};
           if ("title" in v) up.title = v.title.trim(); if ("text" in v) up.text = v.text; if ("url" in v) up.url = v.url.trim(); if ("stage" in v) up.stage = v.stage;
+          if ("list" in v) up.list = v.list.trim();
           if ("items" in v) up.items = v.items.split("\n").map(l=>l.trim()).filter(Boolean).map(l=>({t:l.replace(/^\[x\]\s*/i,""), done:/^\[x\]/i.test(l)}));
-          closeMenu(); await db.doc("canvas/"+it._id).update(up); return;
+          UI.mcFresh = null; closeMenu();
+          if (mcIsEmpty({...it, ...up})){ await mcDelete(it); setStatus("Nothing was typed, so the card was removed."); return; }
+          await db.doc("canvas/"+it._id).update(up); return;
         }
+        case "mc-additem": { const t = (v.t||"").trim(); if (!t) return; const it = S.canvas.find(z=>z._id===f.dataset.id); if (!it) return; UI.mcFocusAdd = it._id; await db.doc("canvas/"+it._id).update({items:[...(it.items||[]), {t, done:false}]}); return; }
+        case "mc-itemsave": { const it = S.canvas.find(z=>z._id===f.dataset.id); if (!it) return; const k = Number(f.dataset.k), t = (v.t||"").trim(); const items = (it.items||[]).map((x,j)=>j===k?{...x, t}:x).filter((x,j)=>j!==k || t); UI.mcItemEdit = null; await db.doc("canvas/"+it._id).update({items}); render(); return; }
+        case "mc-addtask": { const t = (v.t||"").trim(); if (!t) return; await db.collection("tasks").add({title:t, list:f.dataset.list, due:"", done:false}); return; }
         case "edge-label": closeMenu(); await db.doc("edges/"+v.id).update({label:(v.label||"").trim()}); return;
         case "req-decide": {
           const d = e.submitter && e.submitter.value === "deny" ? "deny" : "approve", rid = f.dataset.id, doc = UM().requests; if (!doc) return;
@@ -1898,6 +1978,32 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     await wikiLog(`[[${n.title}]]: project_status set to ${ws}${ws==="done"?" (the vault's maintain workflow moves it to 4-archive)":""}`);
   }
 
+  function mdChat(src){
+    const parts = String(src||"").split(/```/);
+    return parts.map((seg, n) => {
+      if (n % 2){ const code = seg.replace(/^[a-z0-9_-]*\n/i, ""); return `<pre class="cb"><code>${esc(code.replace(/\n$/,""))}</code></pre>`; }
+      const inline = t => esc(t)
+        .replace(/`([^`]+)`/g, "<code>$1</code>")
+        .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/__([^_]+)__/g, "<b>$1</b>")
+        .replace(/(^|[^*\w])\*([^*\n]+)\*(?!\*)/g, "$1<i>$2</i>").replace(/(^|\W)_([^_\n]+)_(?=\W|$)/g, "$1<i>$2</i>")
+        .replace(/~~([^~]+)~~/g, "<s>$1</s>")
+        .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+        .replace(/\[\[([^\]]+)\]\]/g, '<span class="wl">$1</span>');
+      let out = "", list = null;
+      const close = () => { if (list){ out += `</${list}>`; list = null; } };
+      for (const line of seg.split("\n")){
+        const h = line.match(/^(#{1,4})\s+(.*)/), ul = line.match(/^\s*[-*•]\s+(.*)/), ol = line.match(/^\s*(\d+)[.)]\s+(.*)/), q = line.match(/^>\s?(.*)/);
+        if (ul){ if (list!=="ul"){ close(); out += "<ul>"; list = "ul"; } out += `<li>${inline(ul[1])}</li>`; continue; }
+        if (ol){ if (list!=="ol"){ close(); out += "<ol>"; list = "ol"; } out += `<li>${inline(ol[2])}</li>`; continue; }
+        close();
+        if (h) out += `<div class="ch">${inline(h[2])}</div>`;
+        else if (q) out += `<blockquote>${inline(q[1])}</blockquote>`;
+        else if (/^\s*(---|\*\*\*)\s*$/.test(line)) out += "<hr>";
+        else if (line.trim()) out += `<p>${inline(line)}</p>`;
+      }
+      close(); return out;
+    }).join("");
+  }
   // ---------- golem ----------
   function persistChat(){ try { localStorage.setItem("orb.golem", JSON.stringify(UI.golem.msgs.slice(-30))); } catch {} }
   const clip = (t, n) => { t = String(t||"").replace(/\s+/g," ").trim(); return t.length>n ? t.slice(0,n-1).trimEnd()+"…" : t; };
@@ -1964,7 +2070,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
       const history = g.msgs.slice(-12).map(m=>({role:m.role==="user"?"user":"assistant", content:m.content}));
       history[0] = history[0].role==="user" ? {role:"user", content:intro+"\n\n"+history[0].content} : history[0];
       if (history[0].role!=="user") history.unshift({role:"user", content:intro});
-      const onText = ({text}) => { g.live = text; const el = $("golem-live"); if (el){ el.hidden = false; el.textContent = text; scrollChat(); } };
+      const onText = ({text}) => { g.live = text; const el = $("golem-live"); if (el){ el.hidden = false; el.innerHTML = `<div class="mdc">${mdChat(text)}</div>`; scrollChat(); } };
       let res;
       try { res = await sample(history, {modelTier:"default", cache:false, tools:golemTools(did), onText}); }
       catch(e){ if (e && e.code==="tools_unavailable") res = await sample(history.map((m,i)=>i===history.length-1?{...m, content:m.content+"\n\nDashboard data: "+JSON.stringify({projects:S.projects.map(p=>({name:p.name,status:p.status,next:p.next})), logs:logSorted().slice(0,30).map(l=>l.date+" "+l.project+": "+l.text), upkeep:S.upkeep.map(u=>({name:u.name, daysLeft:upkeepState(u).left}))})}:m), {modelTier:"default", cache:false, onText}); else throw e; }
