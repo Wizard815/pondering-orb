@@ -503,7 +503,6 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     {id:"todo", label:"To-do", title:"Task Ledger", flavor:"CalDAV task lists. Pick the lists you want to see."},
     {id:"wiki", label:"Wiki", title:"Library", flavor:"Your LLMWIKI vault, sorted by PARA."},
     {id:"calendar", label:"Calendar", title:"Star Chart", flavor:"Events, task due dates and upkeep by day."},
-    {id:"mail", label:"Mail", title:"Raven Post", flavor:"Your inbox, once the ravens are allowed in."},
     {id:"upkeep", label:"Upkeep", title:"Wards", flavor:"UpstreamManager: repos, upstream syncs and approval requests, plus your own chores."},
     {id:"uptime", label:"Uptime", title:"Watchtower", flavor:"Every service, as Uptime Kuma sees it."},
     {id:"system", label:"System", title:"Engine Room", flavor:"Cores, memory, disks and containers, btop style."},
@@ -513,7 +512,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
   const WIDGETS = {
     golem:{label:"Golem", wide:true}, favorites:{label:"Favorite projects"}, tasks:{label:"Open tasks"}, apps:{label:"All apps"}, uptime:{label:"Uptime"},
     week:{label:"Next 7 days"}, upkeep:{label:"Chores"}, projects:{label:"Active projects"}, ideas:{label:"Ideas brewing"},
-    system:{label:"System"}, log:{label:"Recent log"}, mail:{label:"Mail"}
+    system:{label:"System"}, log:{label:"Recent log"}
   };
   const DEFAULT_MAIN = ["golem","favorites","tasks","app:Plex","app:SABnzbd","uptime","log","group:The Tower"];
   const widgetKeys = () => [...Object.keys(WIDGETS), ...CFG.groups.map(g=>"group:"+g.name), ...allApps().map(a=>"app:"+a.name)];
@@ -870,11 +869,7 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
       return isUrl(a.url) && (compact || !a.links.length) ? `<a class="app" href="${esc(a.url)}" target="_blank" rel="noopener">${inner}</a>` : `<div class="app">${inner}</div>`;
     }).join("")}</div>`).join("");
   }
-  function sealedMail(){
-    return `<div class="sealed"><h4>The ravens are not allowed in yet</h4>
-      <p class="small" style="margin:0">Gmail is installed on your claude.ai account but not connected. Once it is connected, this room can list unread threads and flag mail about your stack.</p>
-      <ol class="small"><li>In claude.ai, open Settings, then Connectors, and connect Gmail.</li><li>Ask Claude to wire the Mail room to it.</li></ol></div>`;
-  }
+
 
   function ideasCompact(){
     const list = S.canvas.filter(i=>i.type==="idea" && !i.promoted);
@@ -907,7 +902,6 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
     system:()=>hostsHTML(true),
     log:()=>logForm() + logHTML(6, true, false),
     uptime:()=>uptimeHTML(true),
-    mail:()=>`<div class="empty">Gmail is not connected yet. <a href="#mail">See the Mail room</a>.</div>`,
     apps:()=>appsHTML(true)
   };
 
@@ -980,7 +974,6 @@ input[type=number]{background:var(--inset);border:1px solid var(--line);border-r
         P("linking","Linking a real calendar", `<ol class="small" style="margin:0;padding-left:1.2em"><li>In the container, events and task due dates come from your CalDAV server.</li><li>Google Calendar can join through a claude.ai connector for this demo.</li></ol>`, {w:6})
       ]};
     },
-    mail(){ return { extra:`<span class="pill warn"><i></i>Gmail not connected</span>`, panels:[P("mail","Mail", sealedMail(), {w:12})] }; },
     upkeep(){
       const base = umBase();
       return { extra:`<span class="pill ${umExample()?"warn":"ok"}" title="Orb reads and acts on UpstreamManager through its API at ${esc(base)}"><i></i>${umExample()?"Demo copy of":"Live from"} UpstreamManager</span>${isUrl(base)?`<a class="btn" href="${esc(base)}" target="_blank" rel="noopener">Open UpstreamManager</a>`:""}<a class="btn" href="#config">Connection settings</a>`, panels: [
