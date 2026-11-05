@@ -6,6 +6,7 @@ import { get, post } from "../lib/api";
 import { PRESETS, EDITABLE } from "../lib/theme";
 import { parseApps, DEFAULT_APPS } from "../lib/apps";
 import { listOf } from "../lib/util";
+import { OutboxPanel } from "../components/Outbox";
 
 const CONNS: { id: string; name: string; fields: [string, string][]; note?: string }[] = [
   { id: "upstream", name: "UpstreamManager", fields: [["baseUrl", "Base URL (on its own computer, e.g. http://192.168.1.20:5000)"]], note: "Start it there with HOST=0.0.0.0 and allow only this server in its firewall." },
@@ -91,7 +92,15 @@ export const SettingsPage: PageDef = {
       { key: "logs", title: "Logs", node: <form className="setting" onSubmit={e => { e.preventDefault(); const v = Number(new FormData(e.currentTarget).get("logmax")); saveSettings({ logMax: Math.max(20, Math.min(200, v || 50)) }).then(() => ui.status("Log length saved.")); }}>
           <div><label htmlFor="logmax">Log entry length</label><div className="d">Most characters in one entry, for you, Golem and agents. 20 to 200.</div></div>
           <div className="row"><input type="number" id="logmax" name="logmax" min={20} max={200} defaultValue={s.logMax || 50} key={s.logMax} /><button className="btn" type="submit">Save</button></div></form>, w: 6, h: 4 },
+      { key: "digest", title: "Daily digest in the wiki", node: <>
+          <div className="setting"><div><div>Note my log activity in the wiki</div><div className="d">The wiki's daily log always lists Orb's edits to wiki notes. Turn this on to also add one line each day for the day before, such as “Orb, 2026-11-04: 4 log entries (3 on [[Pondering Orb]], 1 on [[Argos]])”. The text of your entries isn't copied.</div></div>
+            <input type="checkbox" checked={!!s.wikiDigest} onChange={e => saveSettings({ wikiDigest: e.target.checked }).catch(ui.error)} aria-label="Note my log activity in the wiki" /></div>
+          <div className="row"><button className="btn" onClick={async () => { try { const r = await post<{ written: string }>("/api/wiki/digest", {}); ui.status(r.written ? `Wrote the digest for ${r.written}.` : "Nothing to write."); } catch (x) { ui.error(x); } }}>Write yesterday's digest now</button></div></>, w: 6, h: 5 },
+      { key: "btop", title: "btop terminal", node: <form className="setting" onSubmit={e => { e.preventDefault(); saveSettings({ btopUrl: String(new FormData(e.currentTarget).get("btop") || "").trim() }).then(() => ui.status("Saved. The System tab shows btop when this is set.")).catch(ui.error); }}>
+          <div><label htmlFor="btopurl">btop address</label><div className="d">The ttyd sidecar from the compose file (profile btop), e.g. http://your-server:7681. Leave empty to hide it.</div></div>
+          <div className="row"><input type="url" id="btopurl" name="btop" defaultValue={s.btopUrl || ""} key={s.btopUrl} placeholder="http://your-server:7681" /><button className="btn" type="submit">Save</button></div></form>, w: 6, h: 4 },
       { key: "lists", title: "Task lists on Main", node: <MainLists />, w: 6, h: 5 },
+      { key: "outbox", title: "Waiting to sync", node: <OutboxPanel />, w: 6, h: 6 },
       { key: "apps", title: "Apps", node: <AppsYaml />, w: 12, h: 11 },
     ] };
   },

@@ -20,6 +20,14 @@ export class Hermes {
     if (!r.ok) throw new HttpError(502, `Hermes Studio answered ${r.status}.`);
     return r.body;
   }
+  /** One chat's newest messages as plain text (for Golem, read only). */
+  async session(id: string, limit = 20) {
+    const r = await this.get(`/api/studio/sessions/${encodeURIComponent(id)}`);
+    const s = r?.session || r || {};
+    const msgs: any[] = s.messages || s.history || [];
+    const text = (c: any): string => typeof c === "string" ? c : Array.isArray(c) ? c.map(p => (typeof p === "string" ? p : p?.text || "")).join(" ") : c?.text || "";
+    return { id, title: s.title || "", messages: msgs.slice(-limit).map(m => ({ role: m.role || m.type || "", text: text(m.content ?? m.text).slice(0, 1500) })).filter(m => m.text) };
+  }
   async sessions(q = "") {
     const [studio, agent] = await Promise.all([
       this.get(q ? `/api/studio/search/sessions?q=${encodeURIComponent(q)}` : "/api/studio/sessions?limit=100").catch(() => ({ sessions: [] })),

@@ -73,18 +73,16 @@ function Repos({ repos, error, base, onDone }: { repos: any[] | null; error: str
 }
 
 function Chores() {
-  const ui = useUi(), chores = useColl("chores"), [name, setName] = useState(""), [every, setEvery] = useState("7");
-  // Same order ChoreRows uses, so a right-clicked row maps back to its chore.
-  const sorted = chores.map(c => ({ c, s: choreState(c) })).sort((a, b) => a.s.due - b.s.due).map(x => x.c);
+  const ui = useUi(), chores = useColl("chores"), [name, setName] = useState(""), [every, setEvery] = useState("7"), [daily, setDaily] = useState(false);
   const onContext = (e: React.MouseEvent) => {
-    const row = (e.target as Element).closest(".uk"); if (!row) return;
-    const i = [...(e.currentTarget.querySelectorAll(".uk"))].indexOf(row), c = sorted[i]; if (!c) return;
+    const row = (e.target as Element).closest(".uk") as HTMLElement | null; if (!row) return;
+    const c = chores.find(x => x.id === row.dataset.id); if (!c) return;
     e.preventDefault();
     ui.menu(e.clientX, e.clientY, [{ label: c.name, heading: true }, { label: "Delete chore", danger: true, run: () => removeWithUndo(ui, "chores", c.id, `Deleted ${c.name}.`).catch(ui.error) }]);
   };
   const add = async (e: React.FormEvent) => {
     e.preventDefault(); const n = name.trim(); if (!n) return;
-    try { await create("chores", { name: n, everyDays: Number(every) || 7, lastDone: "" }); setName(""); ui.status(`Added ${n}.`); } catch (x) { ui.error(x); }
+    try { await create("chores", { name: n, everyDays: Number(every) || 7, lastDone: "", ...(daily ? { action: "upstream-daily" } : {}) }); setName(""); setDaily(false); ui.status(`Added ${n}.`); } catch (x) { ui.error(x); }
   };
   return <>
     <div className="chores-list" onContextMenu={onContext}><ChoreRows /></div>
@@ -92,6 +90,7 @@ function Chores() {
     <form className="row" onSubmit={add}>
       <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Chore (e.g. test a restore)" aria-label="Chore" required style={{ flex: "1 1 160px" }} />
       <select value={every} onChange={e => setEvery(e.target.value)} aria-label="How often"><option value="1">Daily</option><option value="7">Weekly</option><option value="30">Monthly</option><option value="90">Quarterly</option></select>
+      <label className="small row" style={{ gap: 4 }} title="Pressing Done runs UpstreamManager's daily check first"><input type="checkbox" checked={daily} onChange={e => setDaily(e.target.checked)} /> Runs UpstreamManager's daily check</label>
       <button className="btn primary" type="submit">Add chore</button>
     </form>
   </>;

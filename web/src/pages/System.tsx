@@ -1,10 +1,11 @@
+import { useSettings } from "../lib/store";
 import type { PageDef } from "./types";
 import type { PanelDef } from "../components/PanelGrid";
 import { useFetch } from "../lib/useFetch";
 
 type Host = {
   name: string; cpu: number; cores: number[]; cpuHistory: number[]; mem: number; memTotalGiB?: number;
-  disks: { mount: string; pct: number }[]; uptimeDays: number; containers: { name: string; state: string; status: string; image: string }[]; dockerError?: string;
+  disks: { mount: string; pct: number }[]; uptimeDays: number; containers: { name: string; state: string; status: string; image: string; cpu?: number | null; memMiB?: number | null; memPct?: number | null }[]; dockerError?: string;
 };
 
 const heat = (v: number) => (v >= 90 ? "var(--bad)" : v >= 70 ? "var(--warn)" : "var(--ok)");
@@ -43,8 +44,11 @@ function Containers({ h }: { h: Host }) {
   const cs = h.containers || [];
   return <div className="btop1">
     {h.dockerError && <div className="err-inline">Docker: {h.dockerError}</div>}
-    {cs.length ? <div style={{ overflowX: "auto" }}><table className="ctab"><thead><tr><th>name</th><th>state</th><th>status</th><th>image</th></tr></thead>
-      <tbody>{cs.map(c => <tr key={c.name}><td>{c.name}</td><td className={c.state === "running" ? "st-active" : "st-blocked"}>{c.state}</td><td className="small">{c.status}</td><td className="small muted">{c.image}</td></tr>)}</tbody></table></div>
+    {cs.length ? <div style={{ overflowX: "auto" }}><table className="ctab"><thead><tr><th>name</th><th>state</th><th>cpu</th><th>mem</th><th>status</th><th>image</th></tr></thead>
+      <tbody>{cs.map(c => <tr key={c.name}><td>{c.name}</td><td className={c.state === "running" ? "st-active" : "st-blocked"}>{c.state}</td>
+        <td className={"mono" + ((c.cpu ?? 0) >= 80 ? " st-blocked" : (c.cpu ?? 0) >= 40 ? " st-paused" : "")}>{c.cpu != null ? `${c.cpu}%` : ""}</td>
+        <td className="mono" title={c.memPct != null ? `${c.memPct}% of its limit` : ""}>{c.memMiB != null ? (c.memMiB >= 1024 ? `${(c.memMiB / 1024).toFixed(1)} GiB` : `${c.memMiB} MiB`) : ""}</td>
+        <td className="small">{c.status}</td><td className="small muted">{c.image}</td></tr>)}</tbody></table></div>
       : !h.dockerError && <div className="empty small">No containers reported. Set DOCKER_HOST to a read-only Docker socket proxy to list them.</div>}
   </div>;
 }
@@ -55,6 +59,7 @@ const cpuRows = (n: number) => Math.max(4, Math.ceil((120 + Math.ceil(n / 6) * 1
 export const SystemPage: PageDef = {
   id: "system", label: "System", title: "Engine Room", flavor: "Cores, memory, disks and containers, btop style.",
   usePanels: () => {
+    const btopUrl: string = (useSettings().btopUrl || "").trim();
     const { data, error } = useFetch<{ hosts: Host[] }>("/api/system", 3000);
     const hosts = data?.hosts || [];
     if (!hosts.length) return { panels: [{ key: "none", title: "Hosts", node: <div className="empty">{error || "Reading…"}</div>, w: 12, h: 4 }] };
@@ -64,6 +69,7 @@ export const SystemPage: PageDef = {
       panels.push({ key: "ctr:" + h.name, title: `${h.name} · containers`, node: <Containers h={h} />, w: 7, h: 5 });
     });
     hosts.forEach(h => panels.push({ key: "cpu:" + h.name, title: `${h.name} · cpu ${h.cpu}% · up ${h.uptimeDays}d`, node: <Cpu h={h} />, w: 12, h: cpuRows(h.cores.length) }));
+    if (btopUrl) panels.push({ key: "btop", title: "btop (live terminal)", w: 12, h: 16, node: <iframe src={btopUrl} title="btop" style={{ width: "100%", height: "100%", minHeight: 420, border: 0, borderRadius: 6, background: "#000" }} /> });
     return { panels, extra: error ? <span className="pill bad" title={error}><i />Last read failed</span> : undefined };
   },
 };

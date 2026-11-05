@@ -388,7 +388,9 @@ page. Two options, and Orb can offer both:
    table.
 2. **Real btop.** A sidecar running `ttyd` with btop (`pid: host`) serves a
    web terminal that the System tab embeds. Exactly btop, but read-only
-   viewing only.
+   viewing only. Start it with `docker compose --profile btop up -d`
+   (built from `docker/btop`) and set Settings → btop terminal to
+   `http://<host>:7681`.
 
 Don't mount `/var/run/docker.sock` into Orb directly: it gives root on the
 host. Put `docker-socket-proxy` in between with read-only access
@@ -426,7 +428,14 @@ GET    /api/wiki/:path               note sections (cached when the wiki is down
 PATCH  /api/wiki/:path/:heading      replace one section
 GET    /api/widgets/:app             live panel data
 GET    /api/uptime   GET /api/system
-POST   /api/golem                    {messages} -> streamed reply (SSE)
+POST   /api/golem                    {messages} -> {text, did}
+POST   /api/golem/stream             {messages} -> SSE: text, tool, done, error
+GET    /api/outbox                   writes waiting to retry
+POST   /api/outbox/retry             retry them now
+DELETE /api/outbox/:id               drop one
+POST   /api/wiki/related             {path, titles}  add related links
+POST   /api/chores/:id/done          mark done (runs its action first)
+POST   /api/wiki/digest              write a day's digest line
 ```
 
 ## MCP tools (POST /mcp)
@@ -508,12 +517,33 @@ Done in `server/` and `web/` (see the README for running it):
 8. The Ideas board in the Milaclone style (cards, columns, nested boards,
    arrows, to-do and Tasks cards).
 
-Not done yet:
+9. A retry queue (outbox) for CalDAV pushes and background wiki writes: a
+   failed write waits and retries every 2, 4, 8 … up to 60 minutes. The
+   header shows a "waiting to sync" pill; Settings lists the queue with
+   Retry now and Drop.
+10. CalDAV discovery: with only the server URL set, Orb finds the task lists
+    through `current-user-principal` and `calendar-home-set`.
+11. Live panels for Plex (now playing) and SABnzbd (queue), from an app's
+    `widget:` in the apps YAML. Keys come from the env var named in
+    `key_env`.
+12. Golem streams its reply, can be stopped, and reads (never writes) the
+    wiki (`wiki_search`, `wiki_read`) and a project's linked Hermes chats.
+13. Wiki `related` links from a project's note panel (add only).
+14. Chores can run UpstreamManager's daily check when marked done.
+15. Daily digest: an optional line in the day's wiki log summing up Orb's
+    log entries (Settings → Daily digest).
+16. Containers show CPU and memory; real btop through the `btop` compose
+    profile (ttyd, read only), embedded on the System tab.
+17. Panels without a saved size open at the height of their content.
 
-- Live app panels for Plex and SABnzbd (the adapters).
-- The wiki outbox (a failed wiki write is reported, not queued).
-- Miladash itself (a Milaclone branch); the Ideas tab is Orb's own board.
-- Golem streaming its reply as it types.
+Not done, on purpose:
+
+- Mail: dropped for now; the demo's Mail room is kept on the `mail` branch.
+- Writing tasks through to dayGLANCE and other ALLGlance work: waiting on
+  ALLGlance, which is still being tested.
+- Several users with their own logins and layouts: Orb is single user.
+- Miladash itself lives in `milaclone-mcp` (see docs/miladash.md); the Ideas
+  tab is Orb's own board.
 
 ## Open questions
 
