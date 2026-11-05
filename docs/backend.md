@@ -88,6 +88,26 @@ or anything else that speaks the standard.
 This removes the earlier gap in the ALLGlance gateway (no update tool): Orb
 talks CalDAV directly to the server the GLANCE apps already sync with.
 
+### Chores
+
+Chores are recurring to-dos in one CalDAV list (`caldav.chores_list`,
+default "Chores"), so the GLANCE apps and phones see them too.
+
+- Each chore is a `VTODO` with `RRULE` (for example `FREQ=DAILY;INTERVAL=7`)
+  and a `DUE` date. "Every N days" in Orb maps to that rule.
+- **Done** completes the current round: Orb sets `COMPLETED` and
+  `LAST-MODIFIED`, then moves `DTSTART`/`DUE` forward by one interval and keeps
+  `STATUS:NEEDS-ACTION`, the "complete and roll forward" pattern most CalDAV
+  task apps use. The PUT carries `If-Match` like any other task update.
+- Overdue and due-soon colours come from `DUE`. A Chores panel can sit on
+  Main as well as the Upkeep tab.
+
+### Task lists on the Ideas board
+
+A **Tasks** card on the board shows one CalDAV list live (tick, add) next to
+the ideas it belongs to. A **To-do** card is a checklist that lives only on
+the board.
+
 ## LLMWIKI (notes)
 
 The vault lives in the `llmwiki` container. Orb is on `ai_net`, so it uses
