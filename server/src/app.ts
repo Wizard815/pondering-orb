@@ -22,6 +22,8 @@ import { Wiki, notePath, isNoteName } from "./integrations/wiki.js";
 import { Hermes } from "./integrations/hermes.js";
 import { AllGlance } from "./integrations/allglance.js";
 import { Outbox } from "./outbox.js";
+import { dailyApi } from "./daily.js";
+import { marketApi } from "./market.js";
 import { today, localDay, isDay, timeZone } from "./dates.js";
 
 export const VERSION = "0.1.0";
@@ -142,6 +144,8 @@ export async function buildApp(o: AppOptions = {}) {
    *  send the CalDAV login wherever it points. Agents sign their own logs. */
   const writable = (req: any, c: string, id?: string) => {
     if (c === "settings" && who(req) !== "you") throw new HttpError(403, "Only a signed-in person can change settings.");
+    // The brief, research and stock picks are written by Orb; only you decide on a pick.
+    if ((c === "daily" || c === "picks" || c === "research") && who(req) !== "you") throw new HttpError(403, "Only a signed-in person can change these.");
     const raw = req.body ?? {};
     if (typeof raw !== "object" || Array.isArray(raw)) throw new HttpError(400, "Send a JSON object.");
     const body: Record<string, any> = { ...raw };
@@ -176,6 +180,9 @@ export async function buildApp(o: AppOptions = {}) {
     for (const l of records.list("logs") as any[]) if (l.project === old) { records.patch("logs", l.id, { project: name }); logs++; }
     return { project, logs, taskList: taskList || "" };
   });
+
+  const daily = dailyApi(app, { records, dav, cfg, guard, who });
+  const market = marketApi(app, { records, cfg, guard, who });
 
   // ---- live updates (Server-Sent Events) ----
   app.get("/api/stream", { preHandler: guard }, (req, reply) => {
@@ -386,5 +393,5 @@ export async function buildApp(o: AppOptions = {}) {
     app.setNotFoundHandler((req, reply) => req.url.startsWith("/api/") || req.url.startsWith("/mcp") ? reply.code(404).send({ error: "Not found." }) : reply.sendFile("index.html"));
   }
 
-  return { app, records, store, auth, upstream, cfg, sync, outbox, writeDigest };
+  return { app, records, store, auth, upstream, cfg, sync, outbox, writeDigest, daily, market };
 }

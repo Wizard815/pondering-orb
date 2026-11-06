@@ -7,6 +7,7 @@ import { PRESETS, EDITABLE } from "../lib/theme";
 import { parseApps, DEFAULT_APPS } from "../lib/apps";
 import { getZone, listOf } from "../lib/util";
 import { OutboxPanel } from "../components/Outbox";
+import { useFetch } from "../lib/useFetch";
 
 const CONNS: { id: string; name: string; fields: [string, string][]; note?: string }[] = [
   { id: "upstream", name: "UpstreamManager", fields: [["baseUrl", "Base URL (on its own computer, e.g. http://192.168.1.20:5000)"]], note: "Start it there with HOST=0.0.0.0 and allow only this server in its firewall." },
@@ -97,6 +98,8 @@ export const SettingsPage: PageDef = {
           <div className="setting"><div><div>Note my log activity in the wiki</div><div className="d">The wiki's daily log always lists Orb's edits to wiki notes. Turn this on to also add one line each day for the day before, such as “Orb, 2026-11-04: 4 log entries (3 on [[Pondering Orb]], 1 on [[Argos]])”. The text of your entries isn't copied.</div></div>
             <input type="checkbox" checked={!!s.wikiDigest} onChange={e => saveSettings({ wikiDigest: e.target.checked }).catch(ui.error)} aria-label="Note my log activity in the wiki" /></div>
           <div className="row"><button className="btn" onClick={async () => { try { const r = await post<{ written: string }>("/api/wiki/digest", {}); ui.status(r.written ? `Wrote the digest for ${r.written}.` : "Nothing to write."); } catch (x) { ui.error(x); } }}>Write yesterday's digest now</button></div></>, w: 6, h: 5 },
+      { key: "daily", title: "Daily page", node: <DailySettingsForm />, w: 6, h: 12 },
+      { key: "market", title: "Stock picks", node: <MarketSettingsForm />, w: 6, h: 14 },
       { key: "btop", title: "btop terminal", node: <form className="setting" onSubmit={e => { e.preventDefault(); (() => { const u = String(new FormData(e.currentTarget).get("btop") || "").trim(); if (u && !/^https?:\/\//i.test(u)) return Promise.reject(new Error("The btop address must start with http:// or https://.")); return saveSettings({ btopUrl: u }); })().then(() => ui.status("Saved. The System tab shows btop when this is set.")).catch(ui.error); }}>
           <div><label htmlFor="btopurl">btop address</label><div className="d">The ttyd sidecar from the compose file (profile btop), e.g. http://your-server:7681. Leave empty to hide it.</div></div>
           <div className="row"><input type="url" id="btopurl" name="btop" defaultValue={s.btopUrl || ""} key={s.btopUrl} placeholder="http://your-server:7681" /><button className="btn" type="submit">Save</button></div></form>, w: 6, h: 4 },
@@ -106,3 +109,41 @@ export const SettingsPage: PageDef = {
     ] };
   },
 };
+
+const lines = (v: FormDataEntryValue | null) => String(v || "").split(/[\n,]+/).map(x => x.trim()).filter(Boolean);
+
+function DailySettingsForm() {
+  const ui = useUi(), d = useSettings().daily || {};
+  const feeds: string[] = d.feeds || ["https://feeds.npr.org/1001/rss.xml", "https://feeds.bbci.co.uk/news/world/rss.xml", "https://www.cnbc.com/id/100003114/device/rss/rss.html"];
+  return <form className="editor" key={JSON.stringify(d)} onSubmit={e => { e.preventDefault(); const f = new FormData(e.currentTarget);
+    saveSettings({ daily: { location: String(f.get("location") || "").trim(), units: f.get("units") === "C" ? "C" : "F", feeds: lines(f.get("feeds")), watchlist: lines(f.get("watchlist")).map(x => x.toUpperCase()),
+      briefOn: !!f.get("briefOn"), briefHour: Number(f.get("briefHour")) || 7 } }).then(() => ui.status("Daily page saved.")).catch(ui.error); }}>
+    <div className="row"><label className="small" style={{ flex: 1 }}>Location (for weather)<input type="text" name="location" defaultValue={d.location || ""} placeholder="Chicago, US  or  41.88,-87.63" /></label>
+      <label className="small">Units<select name="units" defaultValue={d.units || "F"}><option value="F">°F</option><option value="C">°C</option></select></label></div>
+    <label className="small">News feeds (RSS or Atom, one per line)<textarea name="feeds" rows={4} defaultValue={feeds.join("\n")} /></label>
+    <label className="small">Watchlist (tickers, comma or line separated)<input type="text" name="watchlist" defaultValue={(d.watchlist || ["SPY", "QQQ", "DIA"]).join(", ")} /></label>
+    <div className="row"><label className="small row" style={{ gap: 4 }}><input type="checkbox" name="briefOn" defaultChecked={d.briefOn !== false} /> Write the morning brief each day after</label>
+      <input type="number" name="briefHour" min={0} max={23} defaultValue={d.briefHour ?? 7} aria-label="Hour" style={{ width: 64 }} /><span className="small">:00 ({getZone() || "server time"})</span></div>
+    <div className="hint">The brief is written by Golem's model (Settings → Golem) from the weather, news, prices, your tasks, chores and every CalDAV calendar. Weather from Open-Meteo and prices from Yahoo/Stooq need no keys.</div>
+    <div className="row"><button className="btn primary" type="submit">Save</button></div>
+  </form>;
+}
+
+function MarketSettingsForm() {
+  const ui = useUi(), m = useSettings().market || {}, { data: st } = useFetch<any>("/api/market/status", 0);
+  const strategy = m.strategy || "Long-only US stocks for a personal account. Prefer liquid, well-known companies with a clear, recent, verifiable catalyst. Avoid penny stocks, leveraged ETFs and anything that needs a story to be true.";
+  return <form className="editor" key={JSON.stringify(m)} onSubmit={e => { e.preventDefault(); const f = new FormData(e.currentTarget);
+    saveSettings({ market: { on: !!f.get("on"), hour: Number(f.get("hour")) || 8, weekdaysOnly: !!f.get("weekdaysOnly"), maxPicks: Number(f.get("maxPicks")) || 5, notional: Number(f.get("notional")) || 100,
+      index: String(f.get("index") || "SPY").trim().toUpperCase(), avoid: lines(f.get("avoid")).map(x => x.toUpperCase()), strategy: String(f.get("strategy") || "").trim() } }).then(() => ui.status("Stock picks saved.")).catch(ui.error); }}>
+    <div className="row"><label className="small row" style={{ gap: 4 }}><input type="checkbox" name="on" defaultChecked={!!m.on} /> Run the research each day after</label>
+      <input type="number" name="hour" min={0} max={23} defaultValue={m.hour ?? 8} aria-label="Hour" style={{ width: 64 }} /><span className="small">:00</span>
+      <label className="small row" style={{ gap: 4 }}><input type="checkbox" name="weekdaysOnly" defaultChecked={m.weekdaysOnly !== false} /> weekdays only</label></div>
+    <div className="row"><label className="small">Picks per day<input type="number" name="maxPicks" min={1} max={10} defaultValue={m.maxPicks ?? 5} style={{ width: 70 }} /></label>
+      <label className="small">Default amount ($)<input type="number" name="notional" min={1} defaultValue={m.notional ?? 100} style={{ width: 90 }} /></label>
+      <label className="small">Compare with<input type="text" name="index" defaultValue={m.index || "SPY"} style={{ width: 80 }} /></label></div>
+    <label className="small">Never pick (tickers)<input type="text" name="avoid" defaultValue={(m.avoid || []).join(", ")} /></label>
+    <label className="small">Strategy (goes into every research pass and verdict)<textarea name="strategy" rows={3} defaultValue={strategy} /></label>
+    <div className="hint">Verdicts come from {st?.jev ? <b>Jev</b> : <>Golem's model; put a TypeSafe AI key in <code>JEV_API_KEY</code> in <code>.env</code> to use Jev</>}. Research uses Golem's model with news search and page reading (public sites only). Orb never places orders.</div>
+    <div className="row"><button className="btn primary" type="submit">Save</button></div>
+  </form>;
+}

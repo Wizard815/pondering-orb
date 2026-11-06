@@ -9,7 +9,9 @@ import { UpkeepPage } from "./Upkeep";
 import { UptimePage } from "./Uptime";
 import { SystemPage } from "./System";
 import { SettingsPage } from "./Settings";
+import { DailyPage } from "./Daily";
+import { PicksPage } from "./Picks";
 
 /** Tabs, in order. */
-export const PAGES: PageDef[] = [MainPage, ProjectsPage, IdeasPage, TodoPage, WikiPage, CalendarPage, UpkeepPage, UptimePage, SystemPage, SettingsPage];
+export const PAGES: PageDef[] = [MainPage, DailyPage, ProjectsPage, IdeasPage, TodoPage, WikiPage, CalendarPage, PicksPage, UpkeepPage, UptimePage, SystemPage, SettingsPage];
 export const pageById = (id: string) => PAGES.find(p => p.id === id);

@@ -6,7 +6,7 @@ import { badTimeZone, timeZone } from "./dates.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const dataDir = process.env.ORB_DATA || "/data";
-const { app, auth, records, upstream, cfg, sync, outbox, writeDigest } = await buildApp({
+const { app, auth, records, upstream, cfg, sync, outbox, writeDigest, daily, market } = await buildApp({
   dataFile: resolve(dataDir, "orb.db"),
   webDir: process.env.ORB_WEB || resolve(here, "../../web/dist"),
   logger: true,
@@ -33,5 +33,10 @@ setInterval(() => { outbox.flush().then(r => { if (r.done || r.failed) app.log.i
 // Yesterday's digest in the wiki log, when turned on (checked hourly, written once a day).
 setInterval(() => { writeDigest().catch(e => app.log.warn({ err: e.message }, "digest failed")); }, 3600000).unref();
 setTimeout(() => { writeDigest().catch(() => {}); }, 20000).unref();
+
+// The morning brief (Daily page) once its hour has passed, and the stock
+// research run on market days; both are checked every five minutes.
+setInterval(() => { daily.morningTick().catch(e => app.log.warn({ err: e.message }, "morning brief failed")); market.tick().catch(e => app.log.warn({ err: e.message }, "market research failed")); }, 5 * 60000).unref();
+setTimeout(() => { daily.morningTick().catch(() => {}); }, 30000).unref();
 
 for (const sig of ["SIGINT", "SIGTERM"] as const) process.on(sig, async () => { await app.close(); process.exit(0); });

@@ -113,3 +113,32 @@ export function rruleDays(rrule: string) {
   return ({ DAILY: 1, WEEKLY: 7, MONTHLY: 30, YEARLY: 365 } as Record<string, number>)[p.FREQ] * n || 7;
 }
 export const daysRrule = (days: number) => days % 7 === 0 ? `FREQ=WEEKLY;INTERVAL=${days / 7}` : days % 30 === 0 ? `FREQ=MONTHLY;INTERVAL=${days / 30}` : `FREQ=DAILY;INTERVAL=${days}`;
+
+export type CalEvent = { uid: string; title: string; start: string; end: string; allDay: boolean; location: string; calendar?: string };
+/** A DTSTART/DTEND value → ISO: "2026-11-06" for a date, an instant for a UTC
+ *  time, and the wall-clock time for a floating or TZID time. */
+function evTime(line: string): { iso: string; allDay: boolean } {
+  const i = line.indexOf(":"), params = line.slice(0, i), v = line.slice(i + 1).trim();
+  const d = /^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})(Z)?)?$/.exec(v);
+  if (!d) return { iso: "", allDay: false };
+  if (!d[4] || /VALUE=DATE(?!-)/i.test(params)) return { iso: `${d[1]}-${d[2]}-${d[3]}`, allDay: true };
+  if (d[7]) return { iso: new Date(Date.UTC(+d[1], +d[2] - 1, +d[3], +d[4], +d[5], +d[6])).toISOString(), allDay: false };
+  return { iso: `${d[1]}-${d[2]}-${d[3]}T${d[4]}:${d[5]}:${d[6]}`, allDay: false };
+}
+/** Every VEVENT in a calendar file (an expanded REPORT gives one per instance). */
+export function parseEvents(ics: string): CalEvent[] {
+  const out: CalEvent[] = [];
+  for (const m of unfold(ics).matchAll(/BEGIN:VEVENT\r?\n([\s\S]*?)END:VEVENT/g)) {
+    const props: Record<string, string> = {}; let sub = 0;
+    for (const line of m[1].split(/\r?\n/)) {
+      if (/^BEGIN:/.test(line)) { sub++; continue; } if (/^END:/.test(line)) { sub--; continue; } if (sub) continue;
+      const name = line.split(/[:;]/)[0].toUpperCase(); if (!(name in props) && line.includes(":")) props[name] = line;
+    }
+    if (/STATUS:CANCELLED/i.test(props.STATUS || "")) continue;
+    const s = evTime(props.DTSTART || ""), e = props.DTEND ? evTime(props.DTEND) : s;
+    if (!s.iso) continue;
+    const val = (k: string) => { const l = props[k] || ""; return unesc(l.slice(l.indexOf(":") + 1)); };
+    out.push({ uid: val("UID"), title: val("SUMMARY") || "(no title)", start: s.iso, end: e.iso, allDay: s.allDay, location: val("LOCATION") });
+  }
+  return out;
+}
