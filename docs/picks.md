@@ -41,17 +41,54 @@ Each run (by hand, or on market days after the hour you set):
    - direction over 20 trading days: up / flat / down (±3%)
    - conviction: weak / fair / strong / overwhelming
 
-   With `JEV_API_KEY` set these go to **Jev** (TypeSafe AI's decision model,
-   `POST https://api.typesafe.ai/v1/systemone`), which answers each with a
-   choice, probabilities and a confidence. Without it, or if Jev fails,
-   Golem's model answers the same questions as strict JSON. An answer that
-   isn't one of the options counts as skip / flat, never as a buy.
-5. **Your call**: each pick waits on the Picks tab. Enter an amount, then
-   *I'm buying* or *Pass*. *Open on Robinhood* opens the stock there.
+   The **decision model runs on your own servers** (Settings → Stock picks →
+   Decision model):
+   - *OpenAI-compatible model*: Argos, llama-server, Ollama or any `/v1`
+     endpoint. It gets the state and the questions and must answer as strict
+     JSON. Leave the address empty to use Golem's endpoint.
+   - *Jev-format service*: a self-hosted service that speaks Jev's request
+     format (`POST {model, state, questions}` → `{answers: {id: {choice,
+     probabilities, confidence}}}`), at the URL you give.
 
-Orb **never places orders**. Robinhood has no public trading API for stocks,
-and the unofficial libraries break its terms and can get the account locked.
-Buy on Robinhood yourself.
+   An answer that isn't one of the options counts as skip / flat, never as a
+   buy, and a model that doesn't answer leaves the pick at skip.
+5. **Your call**: each pick waits on the Picks tab. Enter an amount, then
+   *I'm buying* or *Pass*.
+6. **The order** (optional): with Robinhood connected and orders turned on,
+   a pick you're buying gets *Place a $N order on Robinhood…*.
+
+## Robinhood
+
+Robinhood lets agents trade through its **Trading MCP server**
+(`https://agent.robinhood.com/mcp/trading`), in a separate **agentic account**
+that you open and fund. Orb connects to it as an agent:
+
+1. Settings → Robinhood → **Connect Robinhood**. Orb finds Robinhood's
+   sign-in server, registers itself, and sends you to Robinhood to approve
+   it (OAuth with PKCE). Robinhood sends you back to Orb, so open Orb by the
+   address you want it to return to (behind a tunnel, its https address).
+2. Pick the **order tool** and the **account tool** from the tools Robinhood
+   offers (Orb guesses both), set the **per-order** and **per-day** caps, and
+   turn on **Let Orb place orders**. It is off until you do.
+3. On a pick you're buying, *Place a $N order…* shows the exact call Orb
+   will make (tool and arguments, filled in from the tool's schema). Edit it
+   if Robinhood needs more, then **Send this order**.
+
+The server checks every order, whatever the page sends:
+
+- only you, signed in; Golem and API-token agents never get these tools;
+- only for a pick you said *I'm buying* to, for that pick's ticker, and only
+  a buy (sell on Robinhood);
+- within the per-order cap, and the day's total within the daily cap;
+- written to `orders` before it is sent, with Robinhood's answer after.
+  Orders can't be edited or deleted through the API.
+
+The Picks tab also shows the agentic account through the account tool. Tokens
+stay in Orb's database, outside every collection the API serves.
+
+Turn on Robinhood's own **Trade approvals** for a second check. Robinhood
+says agents can misread instructions or act on stale data, and you carry the
+risk of every order they place.
 
 ### History and scorecard
 

@@ -21,7 +21,7 @@ function Research() {
   return <>
     <div className="row"><button className="btn primary" disabled={busy} onClick={run}>{busy ? "Researching…" : r ? "Run research again" : "Run today's research"}</button>
       {r && <span className={"pill " + (r.status === "failed" ? "bad" : r.status === "done" ? "ok" : "")}><i />{STEP[r.status] || r.status}{r.finishedAt ? ` · ${ago(r.finishedAt)}` : ""}</span>}
-      <span className="hint">Verdicts by {st?.jev ? "Jev (TypeSafe AI)" : "Golem's model (set JEV_API_KEY to use Jev)"}.</span></div>
+      <span className="hint">Verdicts by {st?.decider ? (st.decider.usesGolem ? "Golem's model" : `${st.decider.kind === "jev" ? "your Jev-format service" : "your decision model"}${st.decider.model ? ` (${st.decider.model})` : ""}`) : "…"}.</span></div>
     {r?.error && <div className="err-inline small">{r.error}</div>}
     {r?.newsReport && <details><summary className="small">Market news report</summary><Markdown text={r.newsReport} /></details>}
     {r?.stockReport && <details><summary className="small">Stock news report</summary><Markdown text={r.stockReport} /></details>}
@@ -61,17 +61,57 @@ function PickCard({ p }: { p: any }) {
     {p.catalyst && <div className="hint">Catalyst: {p.catalyst}</div>}
     <div className="verdict small">
       <div>Action <Probs a={v.action} /></div><div>5 days <Probs a={v.direction_5d} /></div><div>20 days <Probs a={v.direction_20d} /></div>
-      <div className="hint">by {p.verdict?.source === "jev" ? "Jev" : "Golem's model"}{p.verdict?.error ? ` · ${p.verdict.error}` : ""}</div></div>
+      <div className="hint">by {p.verdict?.source === "jev" ? "Jev-format model" : "decision model"}{p.verdict?.model ? ` ${p.verdict.model}` : ""}{p.verdict?.error ? ` · ${p.verdict.error}` : ""}</div></div>
     {p.sources?.length > 0 && <div className="small">{p.sources.map((u: string, k: number) => <a key={k} href={u} target="_blank" rel="noopener noreferrer" className="src">{new URL(u).hostname.replace(/^www\./, "")}</a>)}</div>}
     <Decide p={p} />
+    {p.decision === "yes" && <OrderStep p={p} />}
   </div>;
+}
+
+/** Place the order through Robinhood's Trading MCP: Orb fills in the order,
+ *  you see exactly what will be sent, and confirm. */
+function OrderStep({ p }: { p: any }) {
+  const ui = useUi(), orders = useColl("orders").filter(o => o.pickId === p.id).sort((a, b) => b.at - a.at);
+  const open = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    const anchor = e.currentTarget;
+    try { const pv = await post<any>("/api/robinhood/order/preview", { pickId: p.id, amount: p.amount }); ui.pop(anchor, <OrderForm p={p} pv={pv} />); } catch (x) { ui.error(x); }
+  };
+  return <div className="row small">
+    {orders[0] ? <span className={"pill " + (orders[0].isError ? "bad" : "ok")} title={orders[0].result}><i />{orders[0].isError ? "order failed" : `order sent · $${orders[0].dollars}`} {ago(orders[0].at)}</span> : null}
+    {(!orders[0] || orders[0].isError) && <button className="btn" onClick={open} disabled={!p.amount}>{p.amount ? `Place a $${p.amount} order on Robinhood…` : "Set an amount to place an order"}</button>}
+    {orders[0] && !orders[0].isError && <span className="hint">Check it in Robinhood's agentic account.</span>}
+  </div>;
+}
+function OrderForm({ p, pv }: { p: any; pv: any }) {
+  const ui = useUi(), [text, setText] = useState(JSON.stringify(pv.args, null, 2)), [err, setErr] = useState("");
+  let args: any = null; try { args = JSON.parse(text); } catch { /* shown below */ }
+  return <form className="pop-form" style={{ minWidth: "min(380px,90vw)" }} onSubmit={e => { e.preventDefault(); if (!args) return setErr("That isn't valid JSON.");
+    oneAtATime(e.currentTarget, async () => { try { await post("/api/robinhood/order", { pickId: p.id, tool: pv.tool, args, confirm: true }); ui.close(); ui.status(`Order for ${p.symbol} sent to Robinhood.`); } catch (x: any) { setErr(x?.message || String(x)); } }); }}>
+    <div className="mh" style={{ padding: 0 }}>Buy {p.symbol} on Robinhood</div>
+    <div className="small">Orb will call <b className="mono">{pv.tool}</b> with exactly this. Price now about {money(pv.price)}. Caps: {money(pv.maxOrder)} per order, {money(pv.maxDay)} a day.</div>
+    {pv.warnings?.map((w: string, k: number) => <div key={k} className="err-inline small">{w}</div>)}
+    <textarea rows={8} className="mono" value={text} onChange={e => setText(e.target.value)} aria-label="Order arguments" />
+    {!pv.tradingOn && <div className="err-inline small">Placing orders is off. Turn it on in <a href="#config">Settings → Robinhood</a>.</div>}
+    {err && <div className="err">{err}</div>}
+    <div className="row"><button className="btn primary" type="submit" disabled={!pv.tradingOn || !args}>Send this order</button><button className="btn" type="button" onClick={ui.close}>Cancel</button></div>
+  </form>;
+}
+
+function Account() {
+  const { data: st } = useFetch<any>("/api/robinhood/status", 0);
+  const { data, error, reload } = useFetch<any>(st?.connected && st?.accountTool ? "/api/robinhood/account" : null, 5 * 60000);
+  if (!st) return <div className="hint">…</div>;
+  if (!st.connected) return <div className="empty">Robinhood isn't connected. <a href="#config">Settings → Robinhood</a></div>;
+  if (!st.accountTool) return <div className="empty">Pick the account tool in <a href="#config">Settings → Robinhood</a>.</div>;
+  return <>{error ? <div className="err-inline small">{error}</div> : data ? <pre className="small" style={{ whiteSpace: "pre-wrap", margin: 0 }}>{data.text}</pre> : <div className="hint">Reading the account…</div>}
+    <div className="row small"><button className="btn" onClick={reload}>Refresh</button><span className="hint">{st.tradingOn ? `Orders on · $${Number(st.spentToday).toFixed(2)} of $${st.maxDay} today` : "Orders off"}</span></div></>;
 }
 
 function Today() {
   const day = todayISO(), picks = useColl("picks").filter(p => p.date === day || p.decision === "pending").sort((a, b) => String(b.date).localeCompare(a.date));
   if (!picks.length) return <div className="empty">No picks waiting. Run the research to get today's.</div>;
   return <>{picks.map(p => <PickCard key={p.id} p={p} />)}
-    <div className="hint">Not financial advice. Verdicts are a model's guess and are often wrong: check the scorecard before trusting them. Orb never places orders; buy on Robinhood yourself.</div></>;
+    <div className="hint">Not financial advice. Verdicts are a model's guess and are often wrong: check the scorecard before trusting them. Orders go to Robinhood only when you confirm them.</div></>;
 }
 
 function History() {
@@ -100,7 +140,7 @@ function Scorecard() {
     : <div className="small">{n}-day direction: <b>{Math.round(d.accuracy * 100)}%</b> right over {d.n} (always “flat” would get {Math.round(d.alwaysFlat * 100)}%, momentum {Math.round(d.momentum * 100)}%). Brier {d.brier} (lower is better; 0.667 is a uniform guess).</div>;
   return <>
     <div className="row small"><span className="tag">{data.picks} picks</span><span className="tag">{data.pending} waiting</span><span className="tag">{data.yes} bought</span><span className="tag">{data.no} passed</span>
-      <span className="hint">{data.sources.jev} by Jev, {data.sources.llm} by Golem's model</span></div>
+      <span className="hint">{data.sources.jev} by a Jev-format model, {data.sources.llm} by an OpenAI-compatible one</span></div>
     <table className="tbl"><thead><tr><th>After</th><th className="num">Scored</th><th className="num">Bought: P/L</th><th className="num">Passed: would have</th><th className="num">“Buy” verdicts avg</th></tr></thead>
       <tbody>{data.horizons.map((h: any) => <tr key={h.days}><td>{h.days} trading day{h.days === 1 ? "" : "s"}</td><td className="num">{h.scored}</td>
         <td className={"num " + (h.yesPnl >= 0 ? "up" : "down")}>{money(h.yesPnl)}</td><td className={"num " + (h.noWouldHave >= 0 ? "up" : "down")}>{money(h.noWouldHave)}</td>
@@ -118,6 +158,7 @@ export const PicksPage: PageDef = {
       { key: "today", title: "Picks waiting for you", node: <Today />, w: 7, h: 16 },
       { key: "score", title: "Scorecard", node: <Scorecard />, w: 5, h: 10 },
       { key: "history", title: "History", node: <History />, w: 12, h: 10 },
+      { key: "account", title: "Robinhood agentic account", node: <Account />, w: 5, h: 7 },
     ],
   }),
 };

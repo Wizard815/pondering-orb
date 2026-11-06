@@ -24,6 +24,7 @@ import { AllGlance } from "./integrations/allglance.js";
 import { Outbox } from "./outbox.js";
 import { dailyApi } from "./daily.js";
 import { marketApi } from "./market.js";
+import { robinhoodApi } from "./robinhood.js";
 import { today, localDay, isDay, timeZone } from "./dates.js";
 
 export const VERSION = "0.1.0";
@@ -145,6 +146,7 @@ export async function buildApp(o: AppOptions = {}) {
   const writable = (req: any, c: string, id?: string) => {
     if (c === "settings" && who(req) !== "you") throw new HttpError(403, "Only a signed-in person can change settings.");
     // The brief, research and stock picks are written by Orb; only you decide on a pick.
+    if (c === "orders") throw new HttpError(403, "Orders are written by Orb when you place one.");
     if ((c === "daily" || c === "picks" || c === "research") && who(req) !== "you") throw new HttpError(403, "Only a signed-in person can change these.");
     const raw = req.body ?? {};
     if (typeof raw !== "object" || Array.isArray(raw)) throw new HttpError(400, "Send a JSON object.");
@@ -165,7 +167,13 @@ export async function buildApp(o: AppOptions = {}) {
     if (m && !Number.isInteger(v)) throw new HttpError(400, "If-Match must be a record version, like \"3\".");
     const c = coll(req.params.coll); return records.patch(c, req.params.id, writable(req, c, req.params.id), v);
   });
-  app.delete("/api/c/:coll/:id", { preHandler: guard }, async (req: any, reply) => { records.remove(coll(req.params.coll), req.params.id); reply.code(204).send(); });
+  app.delete("/api/c/:coll/:id", { preHandler: guard }, async (req: any, reply) => {
+    const c = coll(req.params.coll);
+    // Deletes follow the same rules as writes (an agent can't remove settings, picks or orders).
+    if (c === "orders") throw new HttpError(403, "Orders are kept as a record.");
+    if (["settings", "daily", "picks", "research"].includes(c) && who(req) !== "you") throw new HttpError(403, "Only a signed-in person can delete these.");
+    records.remove(c, req.params.id); reply.code(204).send();
+  });
 
   /** Rename a project. Logs are filed by project name, so they move with it;
    *  a task list named after the project keeps its name (it lives in CalDAV)
@@ -183,6 +191,7 @@ export async function buildApp(o: AppOptions = {}) {
 
   const daily = dailyApi(app, { records, dav, cfg, guard, who });
   const market = marketApi(app, { records, cfg, guard, who });
+  robinhoodApi(app, { records, store, guard, who });
 
   // ---- live updates (Server-Sent Events) ----
   app.get("/api/stream", { preHandler: guard }, (req, reply) => {

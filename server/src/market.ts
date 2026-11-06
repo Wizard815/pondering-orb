@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { Records } from "./records.js";
 import { HttpError } from "./records.js";
 import type { OrbConfig } from "./config.js";
-import { secret } from "./config.js";
+import { okEnvName, secret } from "./config.js";
 import { chat, type Tool } from "./integrations/llm.js";
 import { newsSearch, quote, cleanSymbol, type Bar } from "./integrations/daily.js";
 import { indicators, readPage } from "./integrations/research.js";
@@ -10,24 +10,26 @@ import { askJev, askLlm, type Question, type Verdict } from "./integrations/jev.
 import { today } from "./dates.js";
 
 /** Stock picks: a daily news research pass and a stock-news pass, a list of
- *  candidates from both, a verdict per ticker (Jev, or Golem's model), then
- *  you approve or decline with an amount. Every pick, taken or not, is
- *  tracked afterwards so you can see what would have happened, and that
- *  record goes back into the next verdicts.
+ *  candidates from both, a verdict per ticker from your self-hosted decision
+ *  model, then you approve or decline with an amount. Every pick, taken or
+ *  not, is tracked afterwards so you can see what would have happened, and
+ *  that record goes back into the next verdicts.
  *
- *  Orb never places orders. Robinhood has no public trading API for stocks,
- *  and the unofficial ones break its terms and can lock the account, so an
- *  approved pick links to the stock on Robinhood for you to buy there. */
+ *  Nothing here trades. Orders go through robinhood.ts, only when you
+ *  confirm one for a pick you approved. */
 export const PROMPT_VERSION = "picks-v1";
 export const HORIZONS = [1, 5, 20, 60]; // trading days after the pick
-export type MarketSettings = { on: boolean; hour: number; weekdaysOnly: boolean; maxPicks: number; notional: number; index: string; avoid: string[]; strategy: string };
-export const MARKET_DEFAULTS: MarketSettings = { on: false, hour: 8, weekdaysOnly: true, maxPicks: 5, notional: 100, index: "SPY", avoid: [],
+/** The decision model: self-hosted. kind "openai" with an empty baseUrl uses Golem's endpoint. */
+export type Decider = { kind: "openai" | "jev"; baseUrl: string; model: string; keyEnv: string };
+export type MarketSettings = { on: boolean; hour: number; weekdaysOnly: boolean; maxPicks: number; notional: number; index: string; avoid: string[]; strategy: string; decider: Decider };
+export const MARKET_DEFAULTS: MarketSettings = { on: false, hour: 8, weekdaysOnly: true, maxPicks: 5, notional: 100, index: "SPY", avoid: [], decider: { kind: "openai", baseUrl: "", model: "", keyEnv: "" },
   strategy: "Long-only US stocks for a personal account. Prefer liquid, well-known companies with a clear, recent, verifiable catalyst. Avoid penny stocks, leveraged ETFs and anything that needs a story to be true." };
 export const marketSettings = (records: Records): MarketSettings => {
   const s: any = (records.get("settings", "app") as any)?.market || {};
   return { ...MARKET_DEFAULTS, ...s, on: !!s.on, hour: Math.max(0, Math.min(23, Math.round(+s.hour) || MARKET_DEFAULTS.hour)), weekdaysOnly: s.weekdaysOnly !== false,
     maxPicks: Math.max(1, Math.min(10, Math.round(+s.maxPicks) || 5)), notional: Math.max(1, +s.notional || 100), index: cleanSymbol(s.index) || "SPY",
-    avoid: Array.isArray(s.avoid) ? s.avoid.map(cleanSymbol).filter(Boolean) : [], strategy: String(s.strategy || MARKET_DEFAULTS.strategy).slice(0, 2000) };
+    avoid: Array.isArray(s.avoid) ? s.avoid.map(cleanSymbol).filter(Boolean) : [], strategy: String(s.strategy || MARKET_DEFAULTS.strategy).slice(0, 2000),
+    decider: { kind: s.decider?.kind === "jev" ? "jev" : "openai", baseUrl: /^https?:\/\//.test(s.decider?.baseUrl || "") ? String(s.decider.baseUrl).trim() : "", model: String(s.decider?.model || "").trim(), keyEnv: okEnvName(s.decider?.keyEnv) ? s.decider.keyEnv : "" } };
 };
 
 /** The questions every candidate gets. The bands decide what counts as
@@ -80,10 +82,12 @@ export function marketApi(app: FastifyInstance, deps: { records: Records; cfg: (
     const headlines = (await newsSearch(`${c.symbol} stock`, 8).catch(() => [])).map(n => ({ title: n.title, source: n.source, date: n.published ? new Date(n.published).toISOString().slice(0, 10) : "" }));
     const state = { as_of: ind?.as_of || day, symbol: q.symbol, name: q.name, price: +q.price.toFixed(2), strategy: s.strategy, thesis: c.thesis, catalyst: c.catalyst, indicators: ind,
       index: { symbol: s.index, ...(indicators(idx) || {}) }, headlines, track_record: trackRecord() };
-    const qs = questions(state.as_of), key = secret("JEV_API_KEY");
+    const qs = questions(state.as_of), d = s.decider, key = secret(d.keyEnv);
     let verdict: Verdict;
-    try { verdict = key ? await askJev(key, state, qs, FALLBACK) : await askLlm(golem(), state, qs, FALLBACK); }
-    catch (e: any) { verdict = key ? { ...(await askLlm(golem(), state, qs, FALLBACK)), error: `Jev failed (${e.message}); Golem's model answered.` } : { answers: {}, source: "llm", model: "", error: e.message }; }
+    try {
+      if (d.kind === "jev") { if (!d.baseUrl) throw new HttpError(400, "Set the decision model's URL in Settings → Stock picks."); verdict = await askJev(d.baseUrl, key, state, qs, FALLBACK, d.model); }
+      else verdict = await askLlm(d.baseUrl ? { baseUrl: d.baseUrl, model: d.model, key } : golem(), state, qs, FALLBACK);
+    } catch (e: any) { verdict = { answers: Object.fromEntries(Object.entries(qs).map(([id, q]) => [id, { choice: (FALLBACK as any)[id], probabilities: Object.fromEntries(Object.keys(q.criteria).map(l => [l, l === (FALLBACK as any)[id] ? 1 : 0])), confidence: 0 }])), source: d.kind === "jev" ? "jev" : "llm", model: d.model, error: `No verdict: ${e.message}. Counted as skip.` }; }
     return { q, state, verdict };
   }
 
@@ -193,7 +197,7 @@ export function marketApi(app: FastifyInstance, deps: { records: Records; cfg: (
   });
   app.post("/api/market/outcomes", { preHandler: guard }, async () => updateOutcomes());
   app.get("/api/market/scorecard", { preHandler: guard }, async () => scorecard());
-  app.get("/api/market/status", { preHandler: guard }, async () => ({ running, jev: !!secret("JEV_API_KEY"), settings: marketSettings(records) }));
+  app.get("/api/market/status", { preHandler: guard }, async () => { const s = marketSettings(records); return { running, decider: { ...s.decider, keySet: !!secret(s.decider.keyEnv), usesGolem: s.decider.kind === "openai" && !s.decider.baseUrl }, settings: s }; });
   app.get("/api/market/chart/:symbol", { preHandler: guard }, async (req: any) => { const q = await quote(req.params.symbol); return { symbol: q.symbol, name: q.name, price: q.price, history: q.history.slice(-130) }; });
 
   let lastOutcomes = 0;

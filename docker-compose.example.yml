@@ -42,7 +42,7 @@ services:
       PLEX_TOKEN: ${PLEX_TOKEN:-}                    # live panels: named by key_env in the apps YAML
       SABNZBD_API_KEY: ${SABNZBD_API_KEY:-}
       TIINGO_API_KEY: ${TIINGO_API_KEY:-}            # optional: stock prices (free key)
-      JEV_API_KEY: ${JEV_API_KEY:-}                  # optional: Jev (TypeSafe AI) for stock-pick verdicts
+      DECIDER_KEY: ${DECIDER_KEY:-}                  # optional: key for your self-hosted decision model
       HERMES_USER: ${HERMES_USER:-}
       HERMES_PASSWORD: ${HERMES_PASSWORD:-}
     volumes:

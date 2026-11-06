@@ -2,12 +2,17 @@ import { call } from "./http.js";
 import { chat } from "./llm.js";
 import { HttpError } from "../records.js";
 
-/** Jev (TypeSafe AI's "System One" decision model) answers typed questions
- *  about a JSON state: for each question, one choice from a fixed list, with
- *  probabilities and a confidence. "Jev judges, code executes": the model only
- *  picks; amounts, limits and the final say stay with code and with you.
- *  Without a Jev key, Golem's model answers the same questions as strict JSON. */
-export const JEV = { endpoint: "https://api.typesafe.ai/v1/systemone", model: "jev-latest" };
+/** The decision model answers typed questions about a JSON state: for each
+ *  question, one choice from a fixed list, with probabilities and a
+ *  confidence. "The model judges, code executes": it only picks; amounts,
+ *  limits and the final say stay with code and with you.
+ *
+ *  Two kinds, both on your own servers:
+ *  - "jev": a self-hosted service that speaks Jev's request format
+ *    (POST {model, state, questions} -> {answers}), at the URL you give;
+ *  - "openai": any OpenAI-compatible model (Argos, llama-server, Ollama),
+ *    asked the same questions and made to answer as strict JSON. */
+export const JEV = { model: "jev-latest" };
 export type Question = { instructions: string; criteria: Record<string, string> };
 export type Answer = { choice: string; probabilities: Record<string, number>; confidence: number };
 export type Verdict = { answers: Record<string, Answer>; source: "jev" | "llm"; model: string; error?: string };
@@ -30,10 +35,10 @@ function check(qs: Record<string, Question>, raw: Record<string, any>, fallback:
   return out;
 }
 
-export async function askJev(key: string, state: unknown, qs: Record<string, Question>, fallback: Record<string, string>, model = JEV.model): Promise<Verdict> {
+export async function askJev(url: string, key: string, state: unknown, qs: Record<string, Question>, fallback: Record<string, string>, model = JEV.model): Promise<Verdict> {
   const questions = Object.fromEntries(Object.entries(qs).map(([id, q]) => [id, { type: "choice", instructions: q.instructions, criteria: q.criteria }]));
-  const r = await call(JEV.endpoint, { method: "POST", timeoutMs: 30000, headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify({ model, state, questions }) });
-  if (!r.ok) throw new HttpError(502, `Jev answered ${r.status}: ${typeof r.body === "string" ? r.body.slice(0, 160) : r.body?.error?.message || r.body?.error || ""}`);
+  const r = await call(url, { method: "POST", timeoutMs: 60000, headers: { ...(key ? { Authorization: `Bearer ${key}` } : {}), "Content-Type": "application/json" }, body: JSON.stringify({ model: model || JEV.model, state, questions }) });
+  if (!r.ok) throw new HttpError(502, `The decision model answered ${r.status}: ${typeof r.body === "string" ? r.body.slice(0, 160) : r.body?.error?.message || r.body?.error || ""}`);
   return { answers: check(qs, r.body?.answers || {}, fallback), source: "jev", model: r.body?.model || model };
 }
 
