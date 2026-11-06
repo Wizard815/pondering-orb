@@ -29,3 +29,7 @@ div:not(.editing) > .react-grid-layout .react-resizable-handle { display: none; 
 @media (max-width: 640px) {
   nav.tabs { -webkit-mask-image: linear-gradient(to right, #000 85%, transparent); mask-image: linear-gradient(to right, #000 85%, transparent); padding-right: 24px }
 }
+.month .cell .more { background: none; border: 0; padding: 0; color: var(--arcane); font: inherit; font-size: .72rem; cursor: pointer; text-align: left }
+.month .cell .more:hover, .month .cell .more:focus-visible { text-decoration: underline }
+.mc-card:focus-visible { outline: 2px solid var(--arcane); outline-offset: 2px }
+.divider:focus-visible { outline: 2px solid var(--arcane) }

@@ -3,7 +3,7 @@ import type { PageDef } from "./types";
 import type { PanelDef } from "../components/PanelGrid";
 import { create, useColl } from "../lib/store";
 import { useUi } from "../lib/ui";
-import { listOf, oneAtATime, prioOf, sortTasks } from "../lib/util";
+import { listOf, oneAtATime, prioOf, sortTasks, zoneOpt } from "../lib/util";
 import { TaskRows, PrioSelect } from "../components/Common";
 import { GlanceInbox } from "../components/Glance";
 import { useFetch } from "../lib/useFetch";
@@ -82,6 +82,6 @@ function CalDavStatus() {
   const ui = useUi(), { data, error, reload } = useFetch<{ configured: boolean; lists: string[]; lastSync: number; lastError: string }>("/api/caldav/status", 60000), [busy, setBusy] = useState(false);
   if (error) return null;
   if (data && !data.configured) return <a className="pill warn" href="#config"><i />CalDAV not set up: tasks stay in Orb</a>;
-  return <span className="row">{data && <span className={"pill " + (data.lastError ? "bad" : "ok")} title={data.lastError || ""}><i />{data.lastError ? "CalDAV sync failed" : `CalDAV: ${data.lists.length} lists${data.lastSync ? " · synced " + new Date(data.lastSync).toLocaleTimeString() : ""}`}</span>}
+  return <span className="row">{data && <span className={"pill " + (data.lastError ? "bad" : "ok")} title={data.lastError || ""}><i />{data.lastError ? "CalDAV sync failed" : `CalDAV: ${data.lists.length} lists${data.lastSync ? " · synced " + new Date(data.lastSync).toLocaleTimeString(undefined, zoneOpt()) : ""}`}</span>}
     <button className="btn" disabled={busy} onClick={async () => { setBusy(true); try { const r = await post<{ lists: number; tasks: number }>("/api/caldav/sync"); ui.status(`Synced ${r.tasks} to-dos from ${r.lists} lists.`); } catch (x) { ui.error(x); } finally { reload(); setBusy(false); } }}>Sync now</button></span>;
 }

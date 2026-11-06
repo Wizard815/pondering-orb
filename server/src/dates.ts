@@ -1,3 +1,8 @@
+/** The zone every "today" uses: TZ from .env (passed by compose), else the
+ *  system's. An unknown TZ falls back to UTC, and the server says so. */
+export const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+export const badTimeZone = () => !!process.env.TZ && !Intl.DateTimeFormat().resolvedOptions().timeZone;
+
 /** Calendar days in the server's own time zone (set TZ in the container).
  *  toISOString() would give UTC days, which roll over at the wrong hour. */
 export function localDay(d: Date | number = new Date()): string {

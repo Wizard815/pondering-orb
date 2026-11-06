@@ -1,11 +1,11 @@
 import { useState } from "react";
 import type { PageDef } from "./types";
 import type { PanelDef } from "../components/PanelGrid";
-import { create, useColl } from "../lib/store";
+import { create, patch, useColl } from "../lib/store";
 import { useUi } from "../lib/ui";
 import { post } from "../lib/api";
 import { useFetch } from "../lib/useFetch";
-import { ago, choreState, clip } from "../lib/util";
+import { ago, choreState, clip, oneAtATime } from "../lib/util";
 import { ChoreRows, projHref, removeWithUndo } from "../components/Common";
 import { Requests, UmRequest } from "./upkeep/Requests";
 import { GlanceChores } from "../components/Glance";
@@ -72,21 +72,38 @@ function Repos({ repos, error, base, onDone }: { repos: any[] | null; error: str
     })}</tbody></table></div></>;
 }
 
+/** Edit a chore: name, how often (any number of days) and its action. */
+function ChoreEdit({ c }: { c: any }) {
+  const ui = useUi(), [name, setName] = useState(c.name || ""), [every, setEvery] = useState(String(c.everyDays || 7)), [last, setLast] = useState(c.lastDone || ""), [daily, setDaily] = useState(c.action === "upstream-daily"), [err, setErr] = useState("");
+  return <form className="pop-form" onSubmit={e => { e.preventDefault(); const n = name.trim(), d = Math.round(Number(every)); if (!n) return setErr("A chore needs a name.");
+    if (!(d >= 1 && d <= 3650)) return setErr("How often is 1 to 3650 days.");
+    oneAtATime(e.currentTarget, async () => { try { await patch("chores", c.id, { name: n, everyDays: d, lastDone: last, action: daily ? "upstream-daily" : "" }); ui.close(); ui.status(`Saved ${n}.`); } catch (x: any) { setErr(x?.message || String(x)); } }); }}>
+    <label className="small">Name<input type="text" value={name} onChange={e => setName(e.target.value)} autoFocus /></label>
+    <label className="small">Every (days)<input type="number" min={1} max={3650} value={every} onChange={e => setEvery(e.target.value)} /></label>
+    <label className="small">Last done<input type="date" value={last} onChange={e => setLast(e.target.value)} /></label>
+    <label className="small row" style={{ gap: 4 }}><input type="checkbox" checked={daily} onChange={e => setDaily(e.target.checked)} /> Runs UpstreamManager's daily check</label>
+    {err && <div className="err">{err}</div>}
+    <div className="row"><button className="btn primary" type="submit">Save</button><button className="btn" type="button" onClick={ui.close}>Cancel</button></div>
+  </form>;
+}
+
 function Chores() {
   const ui = useUi(), chores = useColl("chores"), [name, setName] = useState(""), [every, setEvery] = useState("7"), [daily, setDaily] = useState(false);
   const onContext = (e: React.MouseEvent) => {
     const row = (e.target as Element).closest(".uk") as HTMLElement | null; if (!row) return;
     const c = chores.find(x => x.id === row.dataset.id); if (!c) return;
     e.preventDefault();
-    ui.menu(e.clientX, e.clientY, [{ label: c.name, heading: true }, { label: "Delete chore", danger: true, run: () => removeWithUndo(ui, "chores", c.id, `Deleted ${c.name}.`).catch(ui.error) }]);
+    const at = { getBoundingClientRect: () => ({ left: e.clientX, bottom: e.clientY }) } as unknown as Element;
+    ui.menu(e.clientX, e.clientY, [{ label: c.name, heading: true }, { label: "Edit…", run: () => ui.pop(at, <ChoreEdit c={c} />) },
+      { label: "Delete chore", danger: true, run: () => removeWithUndo(ui, "chores", c.id, `Deleted ${c.name}.`).catch(ui.error) }]);
   };
   const add = async (e: React.FormEvent) => {
     e.preventDefault(); const n = name.trim(); if (!n) return;
-    try { await create("chores", { name: n, everyDays: Number(every) || 7, lastDone: "", ...(daily ? { action: "upstream-daily" } : {}) }); setName(""); setDaily(false); ui.status(`Added ${n}.`); } catch (x) { ui.error(x); }
+    await oneAtATime(e.currentTarget as HTMLFormElement, async () => { try { await create("chores", { name: n, everyDays: Number(every) || 7, lastDone: "", ...(daily ? { action: "upstream-daily" } : {}) }); setName(""); setEvery("7"); setDaily(false); ui.status(`Added ${n}.`); } catch (x) { ui.error(x); } });
   };
   return <>
     <div className="chores-list" onContextMenu={onContext}><ChoreRows /></div>
-    {chores.length > 0 && <div className="hint">Right-click a chore to delete it.</div>}
+    {chores.length > 0 && <div className="hint">Right-click a chore to edit or delete it.</div>}
     <form className="row" onSubmit={add}>
       <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Chore (e.g. test a restore)" aria-label="Chore" required style={{ flex: "1 1 160px" }} />
       <select value={every} onChange={e => setEvery(e.target.value)} aria-label="How often"><option value="1">Daily</option><option value="7">Weekly</option><option value="30">Monthly</option><option value="90">Quarterly</option></select>

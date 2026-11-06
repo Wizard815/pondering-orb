@@ -21,7 +21,7 @@ function agendaBetween(events: Doc[], tasks: Doc[], chores: Doc[], from: string,
 const useAgenda = () => { const e = useColl("events"), t = useColl("tasks"), c = useColl("chores"); return (from: string, to: string) => agendaBetween(e, t, c, from, to); };
 
 function Month({ month }: { month: Date }) {
-  const agenda = useAgenda(), y = month.getFullYear(), mo = month.getMonth();
+  const ui = useUi(), agenda = useAgenda(), y = month.getFullYear(), mo = month.getMonth();
   const start = new Date(y, mo, 1 - ((new Date(y, mo, 1).getDay() + 6) % 7));
   const cells = Array.from({ length: 42 }, (_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
   const byDay: Record<string, Item[]> = {};
@@ -34,7 +34,9 @@ function Month({ month }: { month: Date }) {
         return <div key={iso} className={"cell" + (d.getMonth() !== mo ? " out" : "") + (iso === today ? " today" : "")} aria-label={fmtDate(iso)}>
           <span className="dn">{d.getDate()}</span>
           {ev.slice(0, 3).map((e, k) => <span key={k} className={"ev" + (e.kind === "uk" ? " uk" : "")} title={e.title}>{e.time ? e.time + " " : ""}{e.title}</span>)}
-          {ev.length > 3 && <span className="dn" title={ev.slice(3).map(e => e.title).join("\n")}>+{ev.length - 3}</span>}
+          {ev.length > 3 && <button type="button" className="more" aria-label={`${ev.length - 3} more on ${fmtDate(iso)}`}
+            onClick={e => ui.pop(e.currentTarget, <div className="pop-form"><div className="mh" style={{ padding: 0 }}>{fmtDate(iso)}</div>
+              <ul className="list">{ev.map((x, k) => <li key={k}><span className={"ev" + (x.kind === "uk" ? " uk" : "")}>{x.time ? x.time + " " : ""}{x.title}</span></li>)}</ul></div>)}>+{ev.length - 3} more</button>}
         </div>; })}
     </div></div>
     <div className="hint">Blue: events and task due dates. Amber: chores due.</div>

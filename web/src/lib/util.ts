@@ -1,5 +1,12 @@
 export const DAY = 864e5;
-export const todayISO = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); };
+/** The server's time zone (TZ in .env), so "today" is the same day in the
+ *  browser, the server, CalDAV and the wiki log, wherever you open Orb. */
+let zone: string | undefined;
+export const setZone = (z?: string) => { if (!z) return; try { new Intl.DateTimeFormat(undefined, { timeZone: z }); zone = z; } catch { /* unknown to this browser */ } };
+export const getZone = () => zone;
+export const zoneOpt = (): { timeZone?: string } => (zone ? { timeZone: zone } : {});
+export const dayIn = (d: Date) => new Intl.DateTimeFormat("en-CA", { ...zoneOpt(), year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+export const todayISO = () => dayIn(new Date());
 export const isoOf = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
 export const fmtDate = (iso?: string) => { if (!iso) return ""; const d = new Date(iso.length === 10 ? iso + "T12:00:00" : iso); return isNaN(+d) ? iso : d.toLocaleDateString(undefined, { month: "short", day: "numeric" }); };
 export function ago(t?: string | number) { if (!t) return ""; const ms = Date.now() - new Date(t).getTime(); if (isNaN(ms)) return ""; const m = Math.round(ms / 6e4); if (m < 60) return `${m} min ago`; const h = Math.round(m / 60); if (h < 48) return `${h} h ago`; return `${Math.round(h / 24)} days ago`; }

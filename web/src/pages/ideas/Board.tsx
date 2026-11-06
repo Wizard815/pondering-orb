@@ -307,7 +307,27 @@ export function Board() {
   const onContextMenu = (e: React.MouseEvent) => {
     if (inLayoutEdit(e.currentTarget)) return;
     const t = e.target as Element; if (t.closest("input,textarea,a")) return;
-    if (contextAt(t, e.clientX, e.clientY)) e.preventDefault();
+    // From the keyboard (menu key, Shift+F10) there is no pointer position: use the card's.
+    let { clientX: x, clientY: y } = e;
+    if (!x && !y) { const r = (t.closest(".mc-card,.mc-view") as Element | null)?.getBoundingClientRect(); if (r) { x = r.left + 12; y = r.top + 12; } }
+    if (contextAt(t, x, y)) e.preventDefault();
+  };
+  /** A focused card: arrows move it (Shift for bigger steps), Enter opens it,
+   *  Delete removes it (with Undo). */
+  const keyPos = useRef(new Map<string, { x: number; y: number }>()), keyPosT = useRef<any>(0);
+  const onCardKey = (e: React.KeyboardEvent) => {
+    const card = e.target as HTMLElement; if (!card.classList?.contains("mc-card") || inLayoutEdit(viewRef.current)) return;
+    const i = getDoc("canvas", card.dataset.mc!); if (!i) return;
+    const step = e.shiftKey ? 50 : 10, d: Record<string, [number, number]> = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
+    if (d[e.key] && !card.classList.contains("in-col")) {
+      e.preventDefault(); e.stopPropagation();
+      // Quick presses build on the position just sent, not the stored one, which lags a moment.
+      const cur = keyPos.current.get(i.id) ?? { x: i.x || 0, y: i.y || 0 }, nx = { x: Math.round(cur.x + d[e.key][0]), y: Math.round(cur.y + d[e.key][1]) };
+      keyPos.current.set(i.id, nx); clearTimeout(keyPosT.current); keyPosT.current = setTimeout(() => keyPos.current.clear(), 1500);
+      patch("canvas", i.id, nx).catch(ui.error); return;
+    }
+    if (e.key === "Enter") { e.preventDefault(); if (i.type === "board") setBoard(i.id); else openEdit(i.id, card); return; }
+    if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); const next = (card.nextElementSibling || card.previousElementSibling) as HTMLElement | null; del(i); next?.focus?.(); }
   };
 
   // ---- breadcrumbs
@@ -329,7 +349,7 @@ export function Board() {
         <span className="mc-zoom"><button type="button" className="btn" onClick={() => zoomBy(-1)} aria-label="Zoom out">−</button><span className="mono small">{Math.round(cam.z * 100)}%</span>
           <button type="button" className="btn" onClick={() => zoomBy(1)} aria-label="Zoom in">+</button><button type="button" className="btn" onClick={fit}>Fit</button></span>
       </div>
-      <div ref={viewRef} className={"mc-view tool-" + tool} data-board={board} onPointerDown={onPointerDown} onDoubleClick={onDoubleClick}>
+      <div ref={viewRef} className={"mc-view tool-" + tool} data-board={board} onPointerDown={onPointerDown} onDoubleClick={onDoubleClick} onKeyDown={onCardKey}>
         <div ref={worldRef} className="mc-world" style={{ transform: camCss(cam) }}>
           <svg className="mc-edges" aria-hidden="true"><defs><marker id="mc-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--muted)" /></marker></defs><g ref={edgesRef} /></svg>
           {loose.map(i => <Card key={i.id} i={i} canvas={canvas} ctx={ctx} />)}

@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { Store, Doc, newId } from "./db.js";
 import type { OrbConfig } from "./config.js";
-import { today } from "./dates.js";
+import { isDay, today } from "./dates.js";
 import { isNoteName, notePath } from "./integrations/wiki.js";
 
 /** Collections the web app and agents may read and write through
@@ -59,9 +59,11 @@ export class Records extends EventEmitter {
       if ("priority" in d) { const p = Number(d.priority) || 0; if (p < 0 || p > 9) throw new HttpError(422, "Priority is 0 to 9."); d.priority = p; }
       if (!partial) { d.list ??= "Inbox"; d.done ??= false; }
     }
-    if (coll === "chores" && !partial) {
-      if (!String(d.name ?? "").trim()) throw new HttpError(422, "A chore needs a name.");
-      d.everyDays = Math.max(1, Number(d.everyDays) || 7); d.lastDone ??= "";
+    if (coll === "chores") {
+      if ((!partial || "name" in d) && !String(d.name ?? "").trim()) throw new HttpError(422, "A chore needs a name.");
+      if (!partial || "everyDays" in d) d.everyDays = Math.max(1, Math.min(3650, Math.round(Number(d.everyDays)) || 7));
+      if ("lastDone" in d && d.lastDone && !isDay(d.lastDone)) throw new HttpError(422, "lastDone must be YYYY-MM-DD.");
+      if (!partial) d.lastDone ??= "";
     }
     return d;
   }

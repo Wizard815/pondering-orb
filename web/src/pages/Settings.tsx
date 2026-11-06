@@ -5,7 +5,7 @@ import { useUi } from "../lib/ui";
 import { get, post } from "../lib/api";
 import { PRESETS, EDITABLE } from "../lib/theme";
 import { parseApps, DEFAULT_APPS } from "../lib/apps";
-import { listOf } from "../lib/util";
+import { getZone, listOf } from "../lib/util";
 import { OutboxPanel } from "../components/Outbox";
 
 const CONNS: { id: string; name: string; fields: [string, string][]; note?: string }[] = [
@@ -89,9 +89,10 @@ export const SettingsPage: PageDef = {
       { key: "golem", title: "Golem", node: <GolemSettings />, w: 6, h: 11 },
       { key: "appearance", title: "Appearance", node: <Appearance />, w: 6, h: 11 },
       { key: "connections", title: "Connections", node: <Connections />, w: 12, h: 12 },
-      { key: "logs", title: "Logs", node: <form className="setting" onSubmit={e => { e.preventDefault(); const v = Number(new FormData(e.currentTarget).get("logmax")); saveSettings({ logMax: Math.max(20, Math.min(200, v || 50)) }).then(() => ui.status("Log length saved.")); }}>
+      { key: "logs", title: "Logs", node: <form className="setting" onSubmit={e => { e.preventDefault(); const v = Number(new FormData(e.currentTarget).get("logmax")); saveSettings({ logMax: Math.max(20, Math.min(200, v || 50)) }).then(() => ui.status("Log length saved.")).catch(ui.error); }}>
           <div><label htmlFor="logmax">Log entry length</label><div className="d">Most characters in one entry, for you, Golem and agents. 20 to 200.</div></div>
-          <div className="row"><input type="number" id="logmax" name="logmax" min={20} max={200} defaultValue={s.logMax || 50} key={s.logMax} /><button className="btn" type="submit">Save</button></div></form>, w: 6, h: 4 },
+          <div className="row"><input type="number" id="logmax" name="logmax" min={20} max={200} defaultValue={s.logMax || 50} key={s.logMax} /><button className="btn" type="submit">Save</button></div>
+          <div className="hint" style={{ gridColumn: "1/-1" }}>Days follow the <b>{getZone() || "server's"}</b> time zone. Change it with <code>TZ</code> in <code>.env</code> and restart the stack.</div></form>, w: 6, h: 5 },
       { key: "digest", title: "Daily digest in the wiki", node: <>
           <div className="setting"><div><div>Note my log activity in the wiki</div><div className="d">The wiki's daily log always lists Orb's edits to wiki notes. Turn this on to also add one line each day for the day before, such as “Orb, 2026-11-04: 4 log entries (3 on [[Pondering Orb]], 1 on [[Argos]])”. The text of your entries isn't copied.</div></div>
             <input type="checkbox" checked={!!s.wikiDigest} onChange={e => saveSettings({ wikiDigest: e.target.checked }).catch(ui.error)} aria-label="Note my log activity in the wiki" /></div>

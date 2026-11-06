@@ -6,7 +6,7 @@ import { Orb } from "./components/Orb";
 import { useColl, useOnline, useSettings, saveSettings } from "./lib/store";
 import { useUi } from "./lib/ui";
 import { applyAppearance } from "./lib/theme";
-import { choreState } from "./lib/util";
+import { choreState, zoneOpt } from "./lib/util";
 import { ProjectPage } from "./pages/Project";
 import { EditButton } from "./components/EditButton";
 import { OutboxPill } from "./components/Outbox";
@@ -61,7 +61,8 @@ export function App() {
   for (const p of PAGES) { if (seen.has(p.id)) continue; const l = links.find(z => z.includes(p.id));
     if (l) { l.forEach(x => seen.add(x)); tabs.push({ id: l.join("--"), label: l.map(x => pageById(x)!.label).join(" / "), linked: true }); }
     else tabs.push({ id: p.id, label: p.label }); }
-  const current = link ? linkId : tab;
+  // A project page lights up the Projects tab, also when Projects is linked with another page.
+  const current = link ? linkId : (tabs.find(t => t.id.split("--").includes(tab))?.id ?? tab);
 
   const tabMenu = (e: React.MouseEvent, id: string) => {
     e.preventDefault();
@@ -94,6 +95,9 @@ export function App() {
       <div className="split" style={{ ["--r" as any]: r }}>
         <div className="half"><PageView key={a.id} page={a} editing={editing} setEditing={setEditing} inSplit /></div>
         <div className="divider" role="separator" aria-orientation="vertical" tabIndex={0} aria-valuenow={Math.round(r * 100)} title="Drag to resize. Double-click to reset."
+          aria-valuemin={20} aria-valuemax={80} aria-label="Resize the two linked pages. Arrow keys move it, Home resets."
+          onKeyDown={e => { const step = e.shiftKey ? 0.1 : 0.02, v = e.key === "ArrowLeft" ? r - step : e.key === "ArrowRight" ? r + step : e.key === "Home" ? 0.5 : null; if (v == null) return;
+            e.preventDefault(); const n = Math.round(Math.max(0.2, Math.min(0.8, v)) * 1000) / 1000; setRatio(n); saveSettings({ splitRatio: { ...(settings.splitRatio || {}), [linkId]: n } }).then(() => setRatio(null)).catch(ui.error); }}
           onPointerDown={startSlide} onDoubleClick={() => saveSettings({ splitRatio: { ...(settings.splitRatio || {}), [linkId]: 0.5 } })}><span /></div>
         <div className="half"><PageView key={b.id} page={b} editing={editing} setEditing={setEditing} inSplit /></div>
       </div></>;
@@ -103,7 +107,7 @@ export function App() {
     {!online && <div className="pill bad offline"><i />Lost the connection to the server. Retrying…</div>}
     <header className="top"><div className="top-in">
       <div className="brand-row">
-        <div className="brand"><Orb /><div><h1>Pondering Orb</h1><div className="sub">{new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</div></div></div>
+        <div className="brand"><Orb /><div><h1>Pondering Orb</h1><div className="sub">{new Date().toLocaleDateString(undefined, { ...zoneOpt(), weekday: "long", month: "long", day: "numeric", year: "numeric" })}</div></div></div>
         <Summary />
       </div>
       <nav className="tabs" aria-label="Rooms">
