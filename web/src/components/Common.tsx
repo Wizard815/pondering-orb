@@ -74,7 +74,13 @@ export function QuickLog({ project }: { project?: string }) {
     const anchor = (e.currentTarget.querySelector("button[type=submit]") as Element);
     const last = localStorage.getItem("orb.lastLogProject") || "";
     ui.pop(anchor, <LogPick text={t} names={live} def={live.includes(last) ? last : live[0] || "General"} onPick={async (name, isNew) => {
-      try { if (isNew && !projects.some(p => p.name.toLowerCase() === name.toLowerCase())) await create("projects", { name, status: "next" }); await commit(name, t); setText(""); ui.close(); } catch (x) { ui.error(x); }
+      try {
+        // A "new" name that matches an existing (maybe archived) project logs to that one, and says so.
+        const same = projects.find(p => p.name.toLowerCase() === name.toLowerCase());
+        if (isNew && !same) await create("projects", { name, status: "next" });
+        await commit(same?.name || name, t); setText(""); ui.close();
+        if (isNew && same) ui.status(`${same.name} already exists${same.archived ? " (archived)" : ""}; logged there.`);
+      } catch (x) { ui.error(x); }
     }} />);
   };
   return <form className="row" onSubmit={submit}>

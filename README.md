@@ -70,6 +70,7 @@ from it.
 ```bash
 cp config/orb.example.yaml config/orb.yaml   # addresses of your apps
 cp docker-compose.example.yml docker-compose.yml
+cp .env.example .env                           # time zone, password, keys
 mkdir -p data && sudo chown 1000:1000 data       # Orb runs as uid 1000 and keeps orb.db here
 docker compose up -d --build
 ```
@@ -80,10 +81,12 @@ tunnel, `ai_net` for Hermes, Argos and LLMWIKI). Create them with
 the vault path to your own LLMWIKI vault folder. `ORB_PASSWORD` must be set
 in `.env`; compose refuses to start without it.
 
-Open `http://<host>:8095`. Put secrets in `.env` next to the compose file:
+Open `http://<host>:8095`. Settings and secrets go in `.env` next to the
+compose file (start from `.env.example`):
 
 | Variable | What it is |
 | --- | --- |
+| `TZ` | your time zone, e.g. `America/Chicago` (default `UTC`). Every container gets it; it decides what "today" is for logs, chores, the digest and the wiki log. Settings → Logs shows the zone in use. |
 | `ORB_PASSWORD` | sign-in password for the web app |
 | `ORB_API_TOKENS` | `name:token` pairs for agents and `/mcp`, e.g. `hermes:abc,claude:def` |
 | `CALDAV_USER`, `CALDAV_PASSWORD` | CalDAV account |
@@ -92,6 +95,8 @@ Open `http://<host>:8095`. Put secrets in `.env` next to the compose file:
 | `ALLGLANCE_TOKEN` | the ALLGlance gateway's `GATEWAY_TOKEN` |
 | `OPENROUTER_API_KEY` (or any name) | frontier model key, named in Settings → Golem |
 | `PLEX_TOKEN`, `SABNZBD_API_KEY` (or any name) | keys for live app panels, named by `key_env` in the apps YAML |
+| `UPSTREAM_URL`, `ALLGLANCE_URL` | addresses of apps on other computers |
+| `BTOP_AUTH` | optional `user:password` for the btop terminal |
 
 With neither `ORB_PASSWORD` nor `ORB_API_TOKENS` set, Orb is open to anyone
 who can reach the port. That is only for a private LAN, and the server warns

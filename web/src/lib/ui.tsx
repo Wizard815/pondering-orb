@@ -36,10 +36,20 @@ export function UiProvider({ children }: { children: ReactNode }) {
     addEventListener("pointerdown", down, true); addEventListener("keydown", key); addEventListener("resize", close);
     return () => { removeEventListener("pointerdown", down, true); removeEventListener("keydown", key); removeEventListener("resize", close); };
   }, []);
+  // Keyboard: remember what had focus when a menu or popup opened, and give
+  // focus back to it when the popup closes and focus would be lost.
+  const opener = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (fl) return;
+    const o = opener.current; opener.current = null;
+    requestAnimationFrame(() => { const a = document.activeElement; if (o?.isConnected && (!a || a === document.body)) o.focus(); });
+  }, [fl]);
   useEffect(() => { if (!bar) return; const t = setTimeout(() => setBar(null), 9000); return () => clearTimeout(t); }, [bar]);
+  // Recorded when the first menu or popup opens, before it moves focus into itself.
+  const remember = () => { if (flRef.current || opener.current) return; const a = document.activeElement as HTMLElement | null; opener.current = a && a !== document.body && !a.closest(".cmenu,.pop") ? a : null; };
   const ui: Ui = {
-    menu: (x, y, items) => setFl({ kind: "menu", x, y, items }),
-    pop: (anchor, node, onClose) => { const r = anchor.getBoundingClientRect(); setFl({ kind: "pop", x: r.left, y: r.bottom + 6, node, onClose }); },
+    menu: (x, y, items) => { remember(); setFl({ kind: "menu", x, y, items }); },
+    pop: (anchor, node, onClose) => { remember(); const r = anchor.getBoundingClientRect(); setFl({ kind: "pop", x: r.left, y: r.bottom + 6, node, onClose }); },
     close,
     confirm: (anchor, text, ok, run) => ui.pop(anchor, <div className="pop-form" style={{ minWidth: "min(260px,80vw)" }}><div className="small">{text}</div>
       <div className="row"><button className="btn primary" onClick={async () => { setFl(null); try { await run(); } catch (e) { ui.error(e); } }}>{ok}</button><button className="btn" onClick={() => setFl(null)}>Cancel</button></div></div>),

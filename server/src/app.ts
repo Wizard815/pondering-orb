@@ -22,7 +22,7 @@ import { Wiki, notePath, isNoteName } from "./integrations/wiki.js";
 import { Hermes } from "./integrations/hermes.js";
 import { AllGlance } from "./integrations/allglance.js";
 import { Outbox } from "./outbox.js";
-import { today, localDay, isDay } from "./dates.js";
+import { today, localDay, isDay, timeZone } from "./dates.js";
 
 export const VERSION = "0.1.0";
 
@@ -122,7 +122,7 @@ export async function buildApp(o: AppOptions = {}) {
   const who = (req: any) => req.who as string;
 
   // ---- health and sign-in ----
-  app.get("/api/health", async () => ({ ok: true, version: VERSION, signIn: auth.open ? "open" : "password" }));
+  app.get("/api/health", async () => ({ ok: true, version: VERSION, signIn: auth.open ? "open" : "password", timeZone: timeZone() }));
   app.post("/api/login", async (req, reply) => {
     const { password } = (req.body as any) || {};
     if (!auth.checkPassword(String(password || ""))) return reply.code(401).send({ error: "That password isn't right." });
@@ -162,6 +162,20 @@ export async function buildApp(o: AppOptions = {}) {
     const c = coll(req.params.coll); return records.patch(c, req.params.id, writable(req, c, req.params.id), v);
   });
   app.delete("/api/c/:coll/:id", { preHandler: guard }, async (req: any, reply) => { records.remove(coll(req.params.coll), req.params.id); reply.code(204).send(); });
+
+  /** Rename a project. Logs are filed by project name, so they move with it;
+   *  a task list named after the project keeps its name (it lives in CalDAV)
+   *  and stays linked. The wiki note keeps its file: Orb never moves vault files. */
+  app.post("/api/projects/:id/rename", { preHandler: guard }, async (req: any) => {
+    const p: any = records.get("projects", req.params.id); if (!p) throw new HttpError(404, "No such project.");
+    const name = String(req.body?.name ?? "").trim(), old = p.name;
+    if (name === old) return { project: p, logs: 0 };
+    const taskList = p.taskList || ((records.list("tasks") as any[]).some(t => (t.list || "Inbox") === old) ? old : undefined);
+    const project = records.patch("projects", p.id, { name, ...(taskList ? { taskList } : {}) }); // checks name and uniqueness
+    let logs = 0;
+    for (const l of records.list("logs") as any[]) if (l.project === old) { records.patch("logs", l.id, { project: name }); logs++; }
+    return { project, logs, taskList: taskList || "" };
+  });
 
   // ---- live updates (Server-Sent Events) ----
   app.get("/api/stream", { preHandler: guard }, (req, reply) => {

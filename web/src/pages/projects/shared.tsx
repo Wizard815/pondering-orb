@@ -3,7 +3,7 @@ import { useState } from "react";
 import { create, patch, useColl } from "../../lib/store";
 import { useUi } from "../../lib/ui";
 import { useFetch } from "../../lib/useFetch";
-import { STATUSES, STATUS_LABEL, todayISO } from "../../lib/util";
+import { STATUSES, STATUS_LABEL, oneAtATime, todayISO } from "../../lib/util";
 import { projHref, removeWithUndo } from "../../components/Common";
 
 type Ui = ReturnType<typeof useUi>;
@@ -32,6 +32,7 @@ async function deleteProject(ui: Ui, p: any, leave: boolean) {
 export function projectMenu(ui: Ui, p: any, x: number, y: number, onPage = false) {
   ui.menu(x, y, [
     ...(onPage ? [] : [{ label: "Open project page", run: () => { location.hash = projHref(p).slice(1); } }]),
+    { label: "Rename…", run: () => ui.pop({ getBoundingClientRect: () => ({ left: x, bottom: y }) } as unknown as Element, <RenameForm p={p} />) },
     { label: p.archived ? "Restore from archive" : "Archive (hide from the board)", run: () => setArchived(ui, p, !p.archived) },
     "-",
     { label: "Delete…", danger: true, run: () => ui.menu(x, y, [
@@ -48,6 +49,19 @@ export function StatusSelect({ p }: { p: any }) {
     onChange={e => patch("projects", p.id, { status: e.target.value, updated: todayISO() }).catch(ui.error)}>
     {STATUSES.map(s => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
   </select>;
+}
+
+function RenameForm({ p }: { p: any }) {
+  const ui = useUi(), [name, setName] = useState(p.name), [err, setErr] = useState("");
+  return <form className="pop-form" onSubmit={e => { e.preventDefault(); const n = name.trim(); if (!n || n === p.name) return ui.close();
+    oneAtATime(e.currentTarget, async () => { try {
+      const r = await post<{ logs: number }>(`/api/projects/${encodeURIComponent(p.id)}/rename`, { name: n }); ui.close();
+      ui.status(`Renamed to ${n}${r.logs ? `; ${r.logs} log entr${r.logs === 1 ? "y" : "ies"} moved with it` : ""}.${p.wikiNote ? " The wiki note keeps its file name." : ""}`);
+    } catch (x: any) { setErr(x?.message || String(x)); } }); }}>
+    <label className="small">New name<input type="text" value={name} onChange={e => setName(e.target.value)} autoFocus aria-label="New project name" /></label>
+    {err && <div className="err">{err}</div>}
+    <div className="row"><button className="btn primary" type="submit">Rename</button><button className="btn" type="button" onClick={ui.close}>Cancel</button></div>
+  </form>;
 }
 
 /** The "+ New project" popup form. */

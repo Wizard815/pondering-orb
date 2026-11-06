@@ -64,3 +64,41 @@ test("TestConfig_YamlBeatsEnvAndGolemProviders", () => {
   assert.equal(c.golem.canWrite, false);
   assert.equal(c.wiki.baseUrl, "http://w:1", "env still fills what the YAML leaves out");
 });
+
+test("TestProjects_RenameMovesLogsAndKeepsTaskList", async () => {
+  const { app, records } = await buildApp({ config: cfg() });
+  const p: any = records.create("projects", { name: "Old" });
+  records.create("projects", { name: "Taken" });
+  records.create("logs", { project: "Old", text: "one" }); records.create("logs", { project: "Other", text: "two" });
+  records.create("tasks", { title: "t", list: "Old" });
+  const r = await app.inject({ method: "POST", url: `/api/projects/${p.id}/rename`, payload: { name: "New" } });
+  assert.equal(r.statusCode, 200);
+  assert.equal(r.json().logs, 1);
+  assert.equal((records.get("projects", p.id) as any).taskList, "Old", "tasks in a list named after it stay linked");
+  assert.deepEqual((records.list("logs") as any[]).map(l => l.project).sort(), ["New", "Other"]);
+  assert.equal((await app.inject({ method: "POST", url: `/api/projects/${p.id}/rename`, payload: { name: "taken" } })).statusCode, 409);
+  assert.equal((await app.inject({ method: "POST", url: `/api/projects/${p.id}/rename`, payload: { name: "a/b" } })).statusCode, 422);
+});
+
+test("TestChores_EditIsChecked", async () => {
+  const { records } = await buildApp({ config: cfg() });
+  const c: any = records.create("chores", { name: "Backups", everyDays: 7 });
+  assert.equal((records.patch("chores", c.id, { everyDays: 14.4 }) as any).everyDays, 14);
+  assert.throws(() => records.patch("chores", c.id, { name: " " }), /needs a name/);
+  assert.throws(() => records.patch("chores", c.id, { lastDone: "yesterday" }), /YYYY-MM-DD/);
+});
+
+test("TestDates_FollowTZ", async () => {
+  const { localDay, timeZone } = await import("../src/dates.js");
+  const at = Date.UTC(2026, 10, 6, 3, 0); // 03:00 UTC = evening of the 5th in Chicago
+  const was = process.env.TZ;
+  try {
+    process.env.TZ = "America/Chicago"; assert.equal(localDay(at), "2026-11-05"); assert.equal(timeZone(), "America/Chicago");
+    process.env.TZ = "UTC"; assert.equal(localDay(at), "2026-11-06");
+  } finally { if (was === undefined) delete process.env.TZ; else process.env.TZ = was; }
+});
+
+test("TestHealth_ReportsTimeZone", async () => {
+  const { app } = await buildApp({ config: cfg() });
+  assert.ok((await app.inject({ method: "GET", url: "/api/health" })).json().timeZone);
+});

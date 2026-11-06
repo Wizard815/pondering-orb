@@ -1,6 +1,6 @@
 # Pondering Orb stack. Build the image with `docker compose build` (or use a
 # published image), copy config/orb.example.yaml to config/orb.yaml, and put
-# secrets in .env.
+# secrets in .env (copy .env.example; it also sets TZ, your time zone).
 #
 # This file starts Orb and a read-only proxy for the Docker socket. Nothing
 # else. Apps you already run (Hermes Studio, Argos, LLMWIKI, UpstreamManager,
@@ -21,6 +21,7 @@ services:
       - "8095:8095"
     environment:
       ORB_CONFIG: /config/orb.yaml
+      TZ: ${TZ:-UTC}                                 # your time zone, from .env: what "today" means for logs, chores, the wiki log
       ORB_PASSWORD: ${ORB_PASSWORD:?set ORB_PASSWORD in .env}  # sign-in for the web app; Orb is reachable through the tunnel
       ORB_API_TOKENS: ${ORB_API_TOKENS:-}            # "hermes:<token>,claude:<token>" for agents and /mcp
       # Addresses of apps you already run (container name on a shared
@@ -34,14 +35,14 @@ services:
       ALLGLANCE_TOKEN: ${ALLGLANCE_TOKEN:-}
       ORB_PROC: /host/proc
       DOCKER_HOST: tcp://docker-proxy:2375
-      WIKI_API_KEY: ${WIKI_API_KEY}
-      CALDAV_USER: ${CALDAV_USER}
-      CALDAV_PASSWORD: ${CALDAV_PASSWORD}
+      WIKI_API_KEY: ${WIKI_API_KEY:-}
+      CALDAV_USER: ${CALDAV_USER:-}
+      CALDAV_PASSWORD: ${CALDAV_PASSWORD:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       PLEX_TOKEN: ${PLEX_TOKEN:-}                    # live panels: named by key_env in the apps YAML
       SABNZBD_API_KEY: ${SABNZBD_API_KEY:-}
-      HERMES_USER: ${HERMES_USER}
-      HERMES_PASSWORD: ${HERMES_PASSWORD}
+      HERMES_USER: ${HERMES_USER:-}
+      HERMES_PASSWORD: ${HERMES_PASSWORD:-}
     volumes:
       - ./config:/config
       - ./data:/data                                 # orb.db (SQLite); the container runs as uid 1000
@@ -58,6 +59,8 @@ services:
     restart: unless-stopped
     ports:
       - "3001:3001"
+    environment:
+      TZ: ${TZ:-UTC}
     volumes:
       - ./uptime-kuma:/app/data
     networks: [orb]
@@ -76,6 +79,7 @@ services:
       # on your LAN can watch btop, which shows every host process's command
       # line. Your browser asks for it once inside the System tab.
       BTOP_AUTH: ${BTOP_AUTH:-}
+      TZ: ${TZ:-UTC}
     ports:
       - "7681:7681"                                  # use "<LAN-IP>:7681:7681" to keep it off other interfaces
 

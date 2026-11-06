@@ -85,7 +85,8 @@ export function Card({ i, inCol, canvas, ctx }: { i: Doc; inCol?: boolean; canva
   const style: Record<string, string> = { "--c": c };
   if (!inCol) Object.assign(style, { left: Math.round(i.x || 0) + "px", top: Math.round(i.y || 0) + "px", width: Math.round(i.w || MC_TYPES[t].w || 220) + "px" });
   const kids = t === "column" ? canvas.filter(k => k.parent === i.id).sort((a, b) => (a.order || 0) - (b.order || 0)) : [];
-  return <article className={`mc-card t-${t}${inCol ? " in-col" : ""}${ctx.linking === i.id ? " linking" : ""}`} data-mc={i.id} style={style as React.CSSProperties}>
+  return <article className={`mc-card t-${t}${inCol ? " in-col" : ""}${ctx.linking === i.id ? " linking" : ""}`} data-mc={i.id} style={style as React.CSSProperties}
+    tabIndex={0} aria-label={`${MC_TYPES[t].label}${i.title ? ": " + i.title : ""}. Arrow keys move, Enter opens, Delete removes, menu key for more.`}>
     {t === "column"
       ? <><div className={"mc-title mc-colhead" + (i.title ? "" : " ph")}>{i.title || "Untitled column"}</div>
         <div className="mc-col" data-col={i.id}>{kids.length ? kids.map(k => <Card key={k.id} i={k} inCol canvas={canvas} ctx={ctx} />) : <div className="hint mc-empty">Drop cards here</div>}</div></>

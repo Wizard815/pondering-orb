@@ -5,7 +5,8 @@ import "./app.css";
 import { App } from "./App";
 import { UiProvider } from "./lib/ui";
 import { startStore } from "./lib/store";
-import { api, ApiError } from "./lib/api";
+import { api, ApiError, get } from "./lib/api";
+import { setZone } from "./lib/util";
 
 function Login({ onDone }: { onDone: () => void }) {
   const [pw, setPw] = useState(""), [err, setErr] = useState("");
@@ -34,7 +35,7 @@ class Boundary extends Component<{ children: ReactNode }, { err: Error | null }>
 
 function Root() {
   const [state, setState] = useState<"loading" | "login" | "ready" | "error">("loading"), [err, setErr] = useState("");
-  const boot = () => startStore().then(() => setState("ready")).catch(e => { if (e instanceof ApiError && e.status === 401) setState("login"); else { setErr(e.message); setState("error"); } });
+  const boot = () => get<{ timeZone?: string }>("/api/health").then(h => setZone(h.timeZone), () => {}).then(startStore).then(() => setState("ready")).catch(e => { if (e instanceof ApiError && e.status === 401) setState("login"); else { setErr(e.message); setState("error"); } });
   useEffect(() => { boot(); }, []);
   if (state === "login") return <Login onDone={() => { setState("loading"); boot(); }} />;
   if (state === "error") return <div className="login"><h1>Pondering Orb</h1><div className="err-inline">Couldn't load: {err}</div><button className="btn" onClick={() => { setState("loading"); boot(); }}>Try again</button></div>;

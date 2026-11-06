@@ -2,6 +2,7 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildApp } from "./app.js";
 import { logCommits } from "./pollers.js";
+import { badTimeZone, timeZone } from "./dates.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const dataDir = process.env.ORB_DATA || "/data";
@@ -10,6 +11,8 @@ const { app, auth, records, upstream, cfg, sync, outbox, writeDigest } = await b
   webDir: process.env.ORB_WEB || resolve(here, "../../web/dist"),
   logger: true,
 });
+if (badTimeZone()) app.log.warn(`TZ=${process.env.TZ} isn't a time zone Orb knows (use a name like Europe/London or America/Chicago); using UTC.`);
+app.log.info(`Days follow the ${timeZone()} time zone (set TZ in .env to change it).`);
 if (auth.open) app.log.warn("No ORB_PASSWORD or ORB_API_TOKENS set: anyone who can reach this port can use Orb. Fine on a private LAN, never on a tunnel.");
 
 const port = cfg().port, host = process.env.HOST || "0.0.0.0";
