@@ -13,9 +13,10 @@ Tabs (each one a room of the tower):
   weather, news headlines, your watchlist, open tasks, chores and every
   CalDAV calendar (today and the week ahead)
 - **Picks**: daily stock research (a market-news pass and a stock-news
-  pass), a verdict per candidate from Jev or Golem's model, your yes or no
-  with an amount, and a history of what every pick did afterwards, taken or
-  not. Orb never places orders; see [docs/picks.md](docs/picks.md)
+  pass), a verdict per candidate from your self-hosted decision model, your
+  yes or no with an amount, an order on Robinhood's agentic account when you
+  confirm it, and a history of what every pick did afterwards, taken or not;
+  see [docs/picks.md](docs/picks.md)
 - **Projects**: kanban board and log; each project has a page with its
   tasks, log and wiki note
 - **Ideas**: a Milaclone-style board with cards, columns, nested boards and
@@ -105,7 +106,7 @@ compose file (start from `.env.example`):
 | `UPSTREAM_URL`, `ALLGLANCE_URL` | addresses of apps on other computers |
 | `BTOP_AUTH` | optional `user:password` for the btop terminal |
 | `TIINGO_API_KEY` | optional free key for stock prices (else Yahoo, then Stooq) |
-| `JEV_API_KEY` | optional TypeSafe AI key: Jev gives the stock-pick verdicts (else Golem's model) |
+| `DECIDER_KEY` (or any name) | optional key for your self-hosted decision model, named in Settings → Stock picks |
 
 With neither `ORB_PASSWORD` nor `ORB_API_TOKENS` set, Orb is open to anyone
 who can reach the port. That is only for a private LAN, and the server warns

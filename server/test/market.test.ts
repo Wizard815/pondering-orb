@@ -6,7 +6,7 @@ import { loadConfig } from "../src/config.js";
 import { parseFeed, sources, clearDailyCache } from "../src/integrations/daily.js";
 import { parseEvents } from "../src/integrations/ical.js";
 import { indicators, publicIp, readPage } from "../src/integrations/research.js";
-import { askJev, JEV } from "../src/integrations/jev.js";
+import { askJev } from "../src/integrations/jev.js";
 
 const cfg = (over: any = {}) => ({ ...loadConfig("/nonexistent.yaml", {}), ...over });
 const serve = (h: (req: any, body: string, res: any) => void) => new Promise<{ url: string; close: () => void; hits: any[] }>(ok => {
@@ -45,18 +45,18 @@ test("TestMarket_ReadPageRefusesLan", async () => {
   await assert.rejects(readPage("file:///etc/passwd"), /http/);
 });
 
-test("TestJev_SendsTypedQuestionsAndChecksAnswers", async () => {
+test("TestDecider_JevFormatToSelfHostedUrl", async () => {
   const jev = await serve((_q, _b, res) => { res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify({ model: "jev-latest", answers: { action: { type: "choice", choice: "buy", probabilities: { buy: 0.6, hold: 0.3, skip: 0.1 }, confidence: 0.6 }, d: { choice: "moon" } } })); });
-  const was = JEV.endpoint; JEV.endpoint = jev.url;
   try {
     const qs = { action: { instructions: "Do it?", criteria: { buy: "b", hold: "h", skip: "s" } }, d: { instructions: "Dir?", criteria: { up: "u", flat: "f", down: "d" } } };
-    const v = await askJev("k", { x: 1 }, qs, { action: "skip", d: "flat" });
+    const v = await askJev(jev.url + "/v1/systemone", "k", { x: 1 }, qs, { action: "skip", d: "flat" });
+    assert.equal(jev.hits[0].url, "/v1/systemone", "goes to your own server");
     const sent = JSON.parse(jev.hits[0].body);
     assert.equal(jev.hits[0].headers.authorization, "Bearer k");
     assert.deepEqual(sent.questions.action, { type: "choice", instructions: "Do it?", criteria: { buy: "b", hold: "h", skip: "s" } });
     assert.equal(v.answers.action.choice, "buy"); assert.equal(v.answers.action.probabilities.buy, 0.6);
     assert.equal(v.answers.d.choice, "flat", "an off-menu answer falls back"); assert.equal(v.answers.d.confidence, 0);
-  } finally { JEV.endpoint = was; jev.close(); }
+  } finally { jev.close(); }
 });
 
 test("TestMarket_RunDecideTrackAndScore", async () => {

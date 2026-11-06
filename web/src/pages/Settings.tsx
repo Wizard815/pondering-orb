@@ -99,7 +99,8 @@ export const SettingsPage: PageDef = {
             <input type="checkbox" checked={!!s.wikiDigest} onChange={e => saveSettings({ wikiDigest: e.target.checked }).catch(ui.error)} aria-label="Note my log activity in the wiki" /></div>
           <div className="row"><button className="btn" onClick={async () => { try { const r = await post<{ written: string }>("/api/wiki/digest", {}); ui.status(r.written ? `Wrote the digest for ${r.written}.` : "Nothing to write."); } catch (x) { ui.error(x); } }}>Write yesterday's digest now</button></div></>, w: 6, h: 5 },
       { key: "daily", title: "Daily page", node: <DailySettingsForm />, w: 6, h: 12 },
-      { key: "market", title: "Stock picks", node: <MarketSettingsForm />, w: 6, h: 14 },
+      { key: "market", title: "Stock picks", node: <MarketSettingsForm />, w: 6, h: 16 },
+      { key: "robinhood", title: "Robinhood", node: <RobinhoodSettings />, w: 6, h: 14 },
       { key: "btop", title: "btop terminal", node: <form className="setting" onSubmit={e => { e.preventDefault(); (() => { const u = String(new FormData(e.currentTarget).get("btop") || "").trim(); if (u && !/^https?:\/\//i.test(u)) return Promise.reject(new Error("The btop address must start with http:// or https://.")); return saveSettings({ btopUrl: u }); })().then(() => ui.status("Saved. The System tab shows btop when this is set.")).catch(ui.error); }}>
           <div><label htmlFor="btopurl">btop address</label><div className="d">The ttyd sidecar from the compose file (profile btop), e.g. http://your-server:7681. Leave empty to hide it.</div></div>
           <div className="row"><input type="url" id="btopurl" name="btop" defaultValue={s.btopUrl || ""} key={s.btopUrl} placeholder="http://your-server:7681" /><button className="btn" type="submit">Save</button></div></form>, w: 6, h: 4 },
@@ -134,7 +135,8 @@ function MarketSettingsForm() {
   const strategy = m.strategy || "Long-only US stocks for a personal account. Prefer liquid, well-known companies with a clear, recent, verifiable catalyst. Avoid penny stocks, leveraged ETFs and anything that needs a story to be true.";
   return <form className="editor" key={JSON.stringify(m)} onSubmit={e => { e.preventDefault(); const f = new FormData(e.currentTarget);
     saveSettings({ market: { on: !!f.get("on"), hour: Number(f.get("hour")) || 8, weekdaysOnly: !!f.get("weekdaysOnly"), maxPicks: Number(f.get("maxPicks")) || 5, notional: Number(f.get("notional")) || 100,
-      index: String(f.get("index") || "SPY").trim().toUpperCase(), avoid: lines(f.get("avoid")).map(x => x.toUpperCase()), strategy: String(f.get("strategy") || "").trim() } }).then(() => ui.status("Stock picks saved.")).catch(ui.error); }}>
+      index: String(f.get("index") || "SPY").trim().toUpperCase(), avoid: lines(f.get("avoid")).map(x => x.toUpperCase()), strategy: String(f.get("strategy") || "").trim(),
+      decider: { kind: f.get("dkind") === "jev" ? "jev" : "openai", baseUrl: String(f.get("dbase") || "").trim(), model: String(f.get("dmodel") || "").trim(), keyEnv: String(f.get("dkey") || "").trim() } } }).then(() => ui.status("Stock picks saved.")).catch(ui.error); }}>
     <div className="row"><label className="small row" style={{ gap: 4 }}><input type="checkbox" name="on" defaultChecked={!!m.on} /> Run the research each day after</label>
       <input type="number" name="hour" min={0} max={23} defaultValue={m.hour ?? 8} aria-label="Hour" style={{ width: 64 }} /><span className="small">:00</span>
       <label className="small row" style={{ gap: 4 }}><input type="checkbox" name="weekdaysOnly" defaultChecked={m.weekdaysOnly !== false} /> weekdays only</label></div>
@@ -143,7 +145,43 @@ function MarketSettingsForm() {
       <label className="small">Compare with<input type="text" name="index" defaultValue={m.index || "SPY"} style={{ width: 80 }} /></label></div>
     <label className="small">Never pick (tickers)<input type="text" name="avoid" defaultValue={(m.avoid || []).join(", ")} /></label>
     <label className="small">Strategy (goes into every research pass and verdict)<textarea name="strategy" rows={3} defaultValue={strategy} /></label>
-    <div className="hint">Verdicts come from {st?.jev ? <b>Jev</b> : <>Golem's model; put a TypeSafe AI key in <code>JEV_API_KEY</code> in <code>.env</code> to use Jev</>}. Research uses Golem's model with news search and page reading (public sites only). Orb never places orders.</div>
+    <fieldset className="editor" style={{ border: "1px solid var(--line)", borderRadius: 6, padding: 8 }}><legend className="small">Decision model (self-hosted)</legend>
+      <div className="row"><label className="small">Kind<select name="dkind" defaultValue={m.decider?.kind || "openai"}><option value="openai">OpenAI-compatible model</option><option value="jev">Jev-format service</option></select></label>
+        <label className="small" style={{ flex: 1 }}>Address<input type="url" name="dbase" defaultValue={m.decider?.baseUrl || ""} placeholder="empty = Golem's endpoint · http://argos:8080/v1 · http://jev:8000/v1/systemone" /></label></div>
+      <div className="row"><label className="small" style={{ flex: 1 }}>Model<input type="text" name="dmodel" defaultValue={m.decider?.model || ""} placeholder="model name" /></label>
+        <label className="small" style={{ flex: 1 }}>Key variable (optional)<input type="text" name="dkey" defaultValue={m.decider?.keyEnv || ""} placeholder="e.g. DECIDER_KEY" /></label></div>
+      <div className="hint">{st?.decider?.usesGolem ? "Using Golem's endpoint." : st?.decider?.kind === "jev" ? "Sends Jev's request format (state + typed questions) to your server." : "Asks your model the same fixed-choice questions as strict JSON."}</div>
+    </fieldset>
+    <div className="hint">Research uses Golem's model with news search and page reading (public sites only).</div>
+    <div className="row"><button className="btn primary" type="submit">Save</button></div>
+  </form>;
+}
+
+function RobinhoodSettings() {
+  const ui = useUi(), r = useSettings().robinhood || {}, { data: st, reload, error } = useFetch<any>("/api/robinhood/status", 0);
+  const { data: tl, error: tlErr } = useFetch<any>(st?.connected ? "/api/robinhood/tools" : null, 0);
+  const connect = async () => { try { const x = await post<{ url: string }>("/api/robinhood/connect"); location.href = x.url; } catch (e) { ui.error(e); } };
+  const tools: any[] = tl?.tools || [];
+  return <form className="editor" key={JSON.stringify(r) + (tl ? "t" : "")} onSubmit={e => { e.preventDefault(); const f = new FormData(e.currentTarget);
+    saveSettings({ robinhood: { ...r, tradingOn: !!f.get("tradingOn"), maxOrder: Number(f.get("maxOrder")) || 100, maxDay: Number(f.get("maxDay")) || 300,
+      orderTool: String(f.get("orderTool") || ""), accountTool: String(f.get("accountTool") || "") } }).then(() => { ui.status("Robinhood settings saved."); reload(); }).catch(ui.error); }}>
+    {error && <div className="err-inline small">{error}</div>}
+    <div className="row"><span className={"pill " + (st?.connected ? "ok" : "")}><i />{st?.connected ? "Connected to your agentic account" : "Not connected"}</span>
+      {st?.connected ? <button type="button" className="btn" onClick={e => ui.confirm(e.currentTarget, "Disconnect Robinhood? Orb forgets its sign-in.", "Disconnect", () => post("/api/robinhood/disconnect").then(reload))}>Disconnect</button>
+        : <button type="button" className="btn primary" onClick={connect}>Connect Robinhood</button>}</div>
+    {st?.lastError && <div className="err-inline small">{st.lastError}</div>}
+    <div className="hint">Signs in to Robinhood's Trading MCP with OAuth; you approve it on Robinhood and open the separate agentic account there. Orb comes back to this address, so behind a tunnel open Orb by its https address before connecting.</div>
+    {st?.connected && <>
+      {tlErr && <div className="err-inline small">{tlErr}</div>}
+      <div className="row"><label className="small" style={{ flex: 1 }}>Order tool<select name="orderTool" defaultValue={r.orderTool || tl?.guess?.orderTool || ""}><option value="">(none)</option>{tools.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}</select></label>
+        <label className="small" style={{ flex: 1 }}>Account tool (read only)<select name="accountTool" defaultValue={r.accountTool || tl?.guess?.accountTool || ""}><option value="">(none)</option>{tools.filter(t => t.readOnly || /account|portfolio|position|power/i.test(t.name)).map(t => <option key={t.name} value={t.name}>{t.name}</option>)}</select></label></div>
+      {tools.length > 0 && <details><summary className="small">{tools.length} tools Robinhood offers</summary><ul className="list small">{tools.map(t => <li key={t.name}><b className="mono">{t.name}</b><div className="grow hint">{t.description}</div>{t.readOnly && <span className="tag">read only</span>}</li>)}</ul></details>}
+    </>}
+    <div className="row"><label className="small">Most per order ($)<input type="number" name="maxOrder" min={1} defaultValue={r.maxOrder ?? 100} style={{ width: 90 }} /></label>
+      <label className="small">Most per day ($)<input type="number" name="maxDay" min={1} defaultValue={r.maxDay ?? 300} style={{ width: 90 }} /></label>
+      {st && <span className="hint">sent today: ${Number(st.spentToday || 0).toFixed(2)}</span>}</div>
+    <label className="small row" style={{ gap: 4 }}><input type="checkbox" name="tradingOn" defaultChecked={r.tradingOn === true} /> Let Orb place orders (each one still needs your confirmation)</label>
+    <div className="hint">Orders are only for picks you said “I'm buying” to: that ticker, a buy, within these caps. Golem and agents never get these tools. Turn on Robinhood's own “Trade approvals” too for a second check. You carry the risk of every order.</div>
     <div className="row"><button className="btn primary" type="submit">Save</button></div>
   </form>;
 }
