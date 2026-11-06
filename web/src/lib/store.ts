@@ -3,7 +3,7 @@ import { api } from "./api";
 
 /** Orb's own records, kept in memory and live: one GET per collection on
  *  start, then changes from /api/stream. Same shapes as the demo page. */
-export const COLLS = ["projects", "logs", "tasks", "chores", "canvas", "edges", "events", "layouts", "settings", "chats"] as const;
+export const COLLS = ["projects", "logs", "tasks", "chores", "canvas", "edges", "events", "layouts", "settings", "chats", "daily", "picks", "research"] as const;
 export type Coll = typeof COLLS[number];
 export type Doc = { id: string; version?: number; [k: string]: any };
 

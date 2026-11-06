@@ -33,12 +33,27 @@ export class CalDav {
     if (!found) return [];
     this.home = found; return this.collections(found);
   }
-  private async collections(url: string): Promise<Collection[]> {
+  /** Calendars that hold events (VEVENT), for the Daily page and Calendar. */
+  async eventLists(): Promise<Collection[]> {
+    await this.lists(); // finds the calendar home
+    if (!this.home) return [];
+    return this.collections(this.home, "VEVENT");
+  }
+  /** Events between two instants, with recurring ones expanded by the server
+   *  (RFC 4791 calendar-data expand), so a weekly meeting shows each week. */
+  async events(list: Collection, from: Date, to: Date): Promise<string[]> {
+    const t = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+    const body = `<?xml version="1.0"?><c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:prop><c:calendar-data><c:expand start="${t(from)}" end="${t(to)}"/></c:calendar-data></d:prop><c:filter><c:comp-filter name="VCALENDAR"><c:comp-filter name="VEVENT"><c:time-range start="${t(from)}" end="${t(to)}"/></c:comp-filter></c:comp-filter></c:filter></c:calendar-query>`;
+    const r = await call(this.abs(list.href), { method: "REPORT", headers: { Depth: "1", "Content-Type": "application/xml", ...this.auth() }, body, timeoutMs: 30000 });
+    if (r.status !== 207) throw new HttpError(502, `CalDAV answered ${r.status} for ${list.name}.`);
+    return responses(String(r.body)).map(x => decodeXml(tag(x.xml, "calendar-data"))).filter(x => x.includes("VEVENT"));
+  }
+  private async collections(url: string, comp = "VTODO"): Promise<Collection[]> {
     const body = `<?xml version="1.0"?><d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:prop><d:displayname/><d:resourcetype/><c:supported-calendar-component-set/></d:prop></d:propfind>`;
     const r = await call(url, { method: "PROPFIND", headers: { Depth: "1", "Content-Type": "application/xml", ...this.auth() }, body });
     if (r.status === 401) throw new HttpError(502, "CalDAV refused the user name or password.");
     if (r.status !== 207) throw new HttpError(502, `CalDAV answered ${r.status} when listing task lists.`);
-    return responses(String(r.body)).filter(x => /<(?:[a-z0-9]+:)?calendar\b/i.test(x.xml) && (/<[^>]*comp[^>]*name="VTODO"/i.test(x.xml) || !/supported-calendar-component-set/i.test(x.xml)))
+    return responses(String(r.body)).filter(x => /<(?:[a-z0-9]+:)?calendar\b/i.test(x.xml) && (new RegExp(`<[^>]*comp[^>]*name="${comp}"`, "i").test(x.xml) || !/supported-calendar-component-set/i.test(x.xml)))
       .map(x => ({ href: x.href, name: tag(x.xml, "displayname") || decodeURIComponent(x.href.replace(/\/$/, "").split("/").pop() || "Tasks") }));
   }
   /** current-user-principal, then its calendar-home-set. */
