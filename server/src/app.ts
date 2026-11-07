@@ -58,7 +58,7 @@ export async function buildApp(o: AppOptions = {}) {
   const dav = new CalDav(() => cfg().caldav.url, () => ({ user: secret(cfg().caldav.userEnv), pass: secret(cfg().caldav.passwordEnv) }));
   const sync = new TaskSync(records, dav, cfg, outbox);
   const wiki = new Wiki(() => cfg().wiki.baseUrl, () => secret(cfg().wiki.tokenEnv), () => cfg().wiki.vault);
-  const hermes = new Hermes(() => cfg().hermes.baseUrl, () => ({ user: secret(cfg().hermes.userEnv), pass: secret(cfg().hermes.passwordEnv) }));
+  const hermes = new Hermes(() => cfg().hermes.baseUrl, () => ({ user: secret(cfg().hermes.userEnv), pass: secret(cfg().hermes.passwordEnv) }), () => cfg().hermes.publicUrl || "");
   const glance = new AllGlance(() => cfg().allglance.baseUrl, () => secret(cfg().allglance.tokenEnv));
   // The board's five states map onto the wiki's three; only project_status is written.
   const WIKI_STATUS: Record<string, string> = { next: "active", active: "active", blocked: "active", paused: "paused", shipped: "done" };
@@ -367,6 +367,18 @@ export async function buildApp(o: AppOptions = {}) {
 
   // ---- Hermes Studio chats (read only) ----
   app.get("/api/hermes/sessions", { preHandler: guard }, async (req: any) => hermes.sessions(String(req.query.q || "")));
+  // ---- Hermes Studio's herdr agents: watch them, and send a plan to a new one ----
+  app.get("/api/hermes/agents", { preHandler: guard }, async () => hermes.agents());
+  app.get("/api/hermes/agent-kinds", { preHandler: guard }, async () => hermes.agentKinds());
+  app.post("/api/hermes/launch", { preHandler: guard }, async (req: any) => {
+    const b = req.body || {};
+    const agentId = String(b.agentId || ""), title = String(b.title || "").trim(), prompt = String(b.prompt || "").trim();
+    if (!agentId || !title || !prompt) throw new HttpError(400, "agentId, title and prompt are required.");
+    const out = await hermes.launch({ agentId, title, prompt: prompt.slice(0, 20000), workspace: b.workspace ? String(b.workspace) : undefined });
+    // The project log shows where the plan went.
+    if (b.project) { try { const who = (req as any).who; records.create("logs", { project: String(b.project), text: `Sent to ${agentId} in herdr`.slice(0, records.logMax()), by: who === "you" ? "orb" : who }); } catch { /* the launch already happened */ } }
+    return out;
+  });
 
   // ---- writes waiting to reach another app ----
   app.get("/api/outbox", { preHandler: guard }, async () => outbox.list().map(({ payload: _p, ...it }) => it));

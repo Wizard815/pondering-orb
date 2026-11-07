@@ -12,7 +12,7 @@ export interface OrbConfig {
   system: { proc: string; docker: string; disks: string[] };
   caldav: { url: string; userEnv: string; passwordEnv: string; choresList: string };
   wiki: { baseUrl: string; tokenEnv: string; vault: string };
-  hermes: { baseUrl: string; userEnv: string; passwordEnv: string };
+  hermes: { baseUrl: string; userEnv: string; passwordEnv: string; publicUrl?: string };
   allglance: { baseUrl: string; tokenEnv: string };
   pollMinutes: number;
 }
@@ -26,7 +26,7 @@ const DEFAULTS: OrbConfig = {
   system: { proc: "/proc", docker: "", disks: ["/"] },
   caldav: { url: "", userEnv: "CALDAV_USER", passwordEnv: "CALDAV_PASSWORD", choresList: "Chores" },
   wiki: { baseUrl: "http://llmwiki:27123", tokenEnv: "WIKI_API_KEY", vault: "/vault" },
-  hermes: { baseUrl: "", userEnv: "HERMES_USER", passwordEnv: "HERMES_PASSWORD" },
+  hermes: { baseUrl: "", userEnv: "HERMES_USER", passwordEnv: "HERMES_PASSWORD", publicUrl: "" },
   allglance: { baseUrl: "", tokenEnv: "ALLGLANCE_TOKEN" },
   pollMinutes: 15,
 };
@@ -71,6 +71,8 @@ export function loadConfig(path = process.env.ORB_CONFIG || "/config/orb.yaml", 
   if (env.ARGOS_URL && !raw.golem?.baseUrl && !raw.golem?.local?.baseUrl && raw.golem?.provider !== "frontier") c.golem.baseUrl = env.ARGOS_URL.replace(/\/$/, "") + "/v1";
   if (env.WIKI_URL && !has("wiki", "baseUrl")) c.wiki.baseUrl = env.WIKI_URL;
   if (env.HERMES_URL && !has("hermes", "baseUrl")) c.hermes.baseUrl = env.HERMES_URL;
+  // Links people click (Watch, Chat) need Studio's browser address, which can differ from the container one.
+  if (env.HERMES_PUBLIC_URL && !has("hermes", "publicUrl")) c.hermes.publicUrl = env.HERMES_PUBLIC_URL;
   if (env.ALLGLANCE_URL && !has("allglance", "baseUrl")) c.allglance.baseUrl = env.ALLGLANCE_URL;
   if (env.DOCKER_HOST && !has("system", "docker")) c.system.docker = env.DOCKER_HOST;
   if (env.ORB_PROC && !has("system", "proc")) c.system.proc = env.ORB_PROC;

@@ -15,9 +15,10 @@ import { SystemPage } from "./System";
 import { SettingsPage } from "./Settings";
 import { DailyPage } from "./Daily";
 import { PicksPage } from "./Picks";
+import { AgentsPage } from "./Agents";
 
 /** Tabs, in order. */
-export const PAGES: PageDef[] = [MainPage, DailyPage, ProjectsPage, IdeasPage, TodoPage, WikiPage, CalendarPage, PicksPage, UpkeepPage, UptimePage, SystemPage, SettingsPage];
+export const PAGES: PageDef[] = [MainPage, DailyPage, ProjectsPage, AgentsPage, IdeasPage, TodoPage, WikiPage, CalendarPage, PicksPage, UpkeepPage, UptimePage, SystemPage, SettingsPage];
 
 /** Full pages for apps whose widget says `page: true` (or a tab name):
  *  Goblin-Bank and Omi. They sit after Picks. */
