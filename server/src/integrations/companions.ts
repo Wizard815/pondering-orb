@@ -67,12 +67,13 @@ export type MoneyPerson = { name: string; error?: string; netWorth: number | nul
   billList: Bill[] | null; alertList: MoneyAlert[] | null };
 const NONE = { bills: null, alerts: null, savings: null, goals: null, billList: null, alertList: null };
 const SEV = ["critical", "warning", "info"];
-function shareable(g: any): Pick<MoneyPerson, "bills" | "alerts" | "savings" | "goals"> {
+function shareable(g: any): Pick<MoneyPerson, "bills" | "alerts" | "savings" | "goals" | "spending"> {
   return {
     bills: g.bills && typeof g.bills === "object" ? { next7d: num(g.bills.next_7d), next30d: num(g.bills.next_30d),
       next: g.bills.next && typeof g.bills.next === "object" ? { name: String(g.bills.next.name || ""), date: String(g.bills.next.date || ""), amount: num(g.bills.next.amount) } : null } : null,
     alerts: g.alerts && typeof g.alerts === "object" ? { total: Number(g.alerts.total) || 0, critical: Number(g.alerts.critical) || 0, warning: Number(g.alerts.warning) || 0 } : null,
     savings: g.savings && typeof g.savings === "object" ? { total: num(g.savings.total), free: num(g.savings.free), earmarked: num(g.savings.earmarked) } : null,
+    spending: g.spending && typeof g.spending === "object" ? { soFar: num(g.spending.so_far), projected: num(g.spending.projected), incomeAvg: num(g.spending.income_avg), pctProjected: num(g.spending.pct_projected), leftAfter: num(g.spending.left_after), confidence: String(g.spending.confidence || "") } : null,
     goals: Array.isArray(g.goals) ? g.goals.slice(0, 12).map((x: any) => ({ name: String(x?.name || ""), target: num(x?.target), allocated: num(x?.allocated), pct: num(x?.pct) })).filter((x: any) => x.name) : null,
   };
 }

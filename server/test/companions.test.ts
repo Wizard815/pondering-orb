@@ -24,7 +24,7 @@ test("TestCompanions_ReadOnlyWidgetsAndGolemTools", async () => {
         alert_list: [{ severity: "info", kind: "due_soon", title: "Netflix due", detail: "15.49" }, { severity: "critical", kind: "negative_balance", title: "Checking is overdrawn", detail: "Balance -20.00" }] },
       bob: { error: "unavailable" }, carol: { goblin: "carol" },
         dave: { goblin: "dave", net_worth: 5000, bills: { next_7d: 120.5, next_30d: 480, next: { name: "Netflix", date: "2026-11-09", amount: 15.49 } }, alerts: { total: 3, critical: 1, warning: 2 },
-          savings: { total: 10000, free: 0, earmarked: 10000 }, goals: [{ name: "House", target: 9000, allocated: 9000, pct: 1 }, { name: "Laptop", target: 1500, allocated: 0, pct: 0 }, { name: "", target: 1, allocated: 1, pct: 1 }] } } })
+          savings: { total: 10000, free: 0, earmarked: 10000 }, spending: { so_far: 818.55, projected: 3874.14, income_avg: 4761.64, pct_projected: 0.814, left_after: 887.5, confidence: "high" }, goals: [{ name: "House", target: 9000, allocated: 9000, pct: 1 }, { name: "Laptop", target: 1500, allocated: 0, pct: 0 }, { name: "", target: 1, allocated: 1, pct: 1 }] } } })
     : J(res, { detail: "unauthorized" }, 401));
   const omi = await serve((req, _b, res) => {
     const u = new URL(req.url, "http://x");
