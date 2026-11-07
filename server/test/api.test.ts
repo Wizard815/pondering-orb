@@ -126,3 +126,21 @@ test("TestSystem_ReadsProc", async () => {
   assert.ok(r.hosts[0].cores.length > 0);
   assert.ok(r.hosts[0].mem >= 0 && r.hosts[0].mem <= 100);
 });
+
+test("TestMcp_StartTaskMarksInProgress", async () => {
+  const { app, records } = await buildApp({ config: cfg(), tokens: "studio:t" });
+  records.create("projects", { name: "Argos", status: "next" });
+  const task: any = records.create("tasks", { title: "Fix flaky login", list: "Argos" });
+  const h = { authorization: "Bearer t" };
+  const call = (name: string, args: any) => app.inject({ method: "POST", url: "/mcp", headers: h, payload: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } } });
+  assert.equal((await call("orb_start_task", { title: "fix flaky login", list: "Argos" })).json().result.isError, undefined);
+  assert.equal((records.get("tasks", task.id) as any).started, true);
+  const listed = JSON.parse((await call("orb_list_tasks", {})).json().result.content[0].text);
+  assert.equal(listed[0].inProgress, true);
+  assert.equal((records.list("logs") as any[])[0].text, "Started: Fix flaky login");
+  // A second start is a no-op; completing clears in progress.
+  assert.match((await call("orb_start_task", { title: "Fix flaky login" })).json().result.content[0].text, /already/);
+  assert.equal((records.list("logs") as any[]).length, 1);
+  await call("orb_complete_task", { title: "Fix flaky login" });
+  assert.equal((records.get("tasks", task.id) as any).started, false);
+});

@@ -42,11 +42,11 @@ function SendPlan({ kinds, agents, onSent }: { kinds: Kind[]; agents: Agents | n
   const agent = agentId || kinds[0]?.id || "";
   const open = useMemo(() => tasks.filter((t: any) => !t.done).slice(0, 40), [tasks]);
   const live = useMemo(() => projects.filter((p: any) => !p.archived && p.status !== "shipped"), [projects]);
-  const send = async (key: string, title: string, prompt: string, project?: string) => {
+  const send = async (key: string, title: string, prompt: string, project?: string, orb?: { task?: { title: string; list: string }; project?: string }) => {
     if (!agent) return;
     setBusy(key); ui.status(`Starting ${agent} on “${clip(title, 40)}”…`);
     try {
-      await post("/api/hermes/launch", { agentId: agent, title, prompt, workspace: folder.trim() || undefined, project });
+      await post("/api/hermes/launch", { agentId: agent, title, prompt, workspace: folder.trim() || undefined, project, orb });
       ui.status(`Started ${agent} in herdr.`); onSent();
     } catch (e) { ui.error(e); } finally { setBusy(""); }
   };
@@ -68,11 +68,11 @@ function SendPlan({ kinds, agents, onSent }: { kinds: Kind[]; agents: Agents | n
     <p className="hint" style={{ margin: 0 }}>The agent starts in herdr with your Studio models, MCP servers and skills, and gets the plan as its first message.</p>
     <h4 className="small muted" style={{ margin: "8px 0 4px" }}>Projects</h4>
     {live.length ? <ul className="list">{live.map((p: any) => <li key={p.id}><div className="grow"><b>{p.name}</b>{p.next && <span className="small muted"> · {clip(p.next, 60)}</span>}</div>
-      {action(`p:${p.id}`, p.name, () => send(`p:${p.id}`, p.name, projectPrompt(p), p.name))}</li>)}</ul>
+      {action(`p:${p.id}`, p.name, () => send(`p:${p.id}`, p.name, projectPrompt(p), p.name, { project: p.name }))}</li>)}</ul>
       : <div className="empty">No active projects.</div>}
     <h4 className="small muted" style={{ margin: "8px 0 4px" }}>Open tasks and plans</h4>
-    {open.length ? <ul className="list">{open.map((t: any) => <li key={t.id}><div className="grow">{t.title} <span className="small muted">{listOf(t)}</span></div>
-      {action(`t:${t.id}`, t.title, () => send(`t:${t.id}`, t.title, taskPrompt(t), projects.some((p: any) => p.name === listOf(t)) ? listOf(t) : undefined))}</li>)}</ul>
+    {open.length ? <ul className="list">{open.map((t: any) => <li key={t.id}><div className="grow">{t.title} <span className="small muted">{listOf(t)}</span>{t.started && <span className="small st-active"> · ◐ in progress</span>}</div>
+      {action(`t:${t.id}`, t.title, () => send(`t:${t.id}`, t.title, taskPrompt(t), projects.some((p: any) => p.name === listOf(t)) ? listOf(t) : undefined, { task: { title: t.title, list: listOf(t) } }))}</li>)}</ul>
       : <div className="empty">No open tasks.</div>}
   </>;
 }

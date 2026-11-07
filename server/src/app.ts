@@ -374,7 +374,8 @@ export async function buildApp(o: AppOptions = {}) {
     const b = req.body || {};
     const agentId = String(b.agentId || ""), title = String(b.title || "").trim(), prompt = String(b.prompt || "").trim();
     if (!agentId || !title || !prompt) throw new HttpError(400, "agentId, title and prompt are required.");
-    const out = await hermes.launch({ agentId, title, prompt: prompt.slice(0, 20000), workspace: b.workspace ? String(b.workspace) : undefined });
+    const orb = b.orb?.task?.title ? { task: { title: String(b.orb.task.title), list: String(b.orb.task.list || "") } } : b.orb?.project ? { project: String(b.orb.project) } : undefined;
+    const out = await hermes.launch({ agentId, title, prompt: prompt.slice(0, 20000), workspace: b.workspace ? String(b.workspace) : undefined, orb });
     // The project log shows where the plan went.
     if (b.project) { try { const who = (req as any).who; records.create("logs", { project: String(b.project), text: `Sent to ${agentId} in herdr`.slice(0, records.logMax()), by: who === "you" ? "orb" : who }); } catch { /* the launch already happened */ } }
     return out;

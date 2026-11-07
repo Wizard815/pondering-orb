@@ -4,6 +4,8 @@ import { HttpError } from "../records.js";
 /** Hermes Studio: its chats and Hermes Agent's sessions (read only), and its herdr
  *  agents: a list to watch, and a launch that hands a plan to a new agent.
  *  Signs in with a user and password from the environment and keeps the JWT. */
+export type OrbRef = { task?: { title: string; list: string }; project?: string };
+
 export class Hermes {
   private token = ""; private tokenFor = ""; private at = 0;
   constructor(private base: () => string, private creds: () => { user: string; pass: string }, private publicBase: () => string = () => "") {}
@@ -39,7 +41,8 @@ export class Hermes {
       paneId: String(p.pane_id), space: spaces.get(String(p.workspace_id)) || String(p.workspace_id), agent: String(p.agent),
       status: String(p.agent_status || "unknown"), title: String(p.label || p.terminal_title_stripped || p.agent), cwd: String(p.foreground_cwd || p.cwd || ""),
       chatId: p.studioSessionId ? String(p.studioSessionId) : null }));
-    return { enabled: !!r?.settings?.enabled, connected: !!bridge.connected, studioUrl: trimSlash(this.publicBase() || this.base()), agents };
+    return { enabled: !!r?.settings?.enabled, connected: !!bridge.connected, // Studio reports the address browsers reach it on (its tunnel), so links work without setup.
+    studioUrl: trimSlash(this.publicBase() || (typeof r?.publicUrl === "string" ? r.publicUrl : "") || this.base()), agents };
   }
   /** Agents Studio has installed that herdr can run. */
   async agentKinds() {
@@ -48,8 +51,10 @@ export class Hermes {
     return (r?.tools || []).filter((t: any) => t.installed && runnable.has(t.id)).map((t: any) => ({ id: String(t.id), name: String(t.name || t.id) }));
   }
   /** Start an agent in herdr through Studio with a plan or task as its first prompt. */
-  async launch(input: { agentId: string; title: string; prompt: string; workspace?: string }) {
-    const r = await this.send("POST", "/api/coding-agents/herdr/agents", { agentId: input.agentId, title: input.title.slice(0, 48), prompt: input.prompt, ...(input.workspace ? { workspace: input.workspace } : {}) },
+  /** `orb` names the Orb task or project the agent is for, so Studio marks it in
+   *  progress once the agent starts working (Studio needs this Orb connected). */
+  async launch(input: { agentId: string; title: string; prompt: string; workspace?: string; orb?: OrbRef }) {
+    const r = await this.send("POST", "/api/coding-agents/herdr/agents", { agentId: input.agentId, title: input.title.slice(0, 48), prompt: input.prompt, ...(input.workspace ? { workspace: input.workspace } : {}), ...(input.orb ? { orb: input.orb } : {}) },
       // Studio answers once herdr has the agent running, which can take a while on a cold start.
       120_000);
     return { paneId: String(r?.link?.paneId || ""), workspaceId: String(r?.link?.workspaceId || "") };
