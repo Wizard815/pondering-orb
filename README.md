@@ -105,6 +105,7 @@ compose file (start from `.env.example`):
 | `PLEX_TOKEN`, `SABNZBD_API_KEY` (or any name) | keys for live app panels, named by `key_env` in the apps YAML |
 | `UPSTREAM_URL`, `ALLGLANCE_URL` | addresses of apps on other computers |
 | `BTOP_AUTH` | optional `user:password` for the btop terminal |
+| `GOBLIN_ORB_KEY`, `OMI_DEV_KEY` | read-only keys for Goblin-Bank and Omi panels, named by `key_env` ([docs/companions.md](docs/companions.md)) |
 | `TIINGO_API_KEY` | optional free key for stock prices (else Yahoo, then Stooq) |
 | `DECIDER_KEY` (or any name) | optional key for your self-hosted decision model, named in Settings → Stock picks |
 

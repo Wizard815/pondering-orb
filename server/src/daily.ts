@@ -7,6 +7,7 @@ import type { CalDav } from "./integrations/caldav.js";
 import { parseEvents, type CalEvent } from "./integrations/ical.js";
 import { weather, news, quotes, type NewsItem } from "./integrations/daily.js";
 import { chat } from "./integrations/llm.js";
+import { companion, goblinSummary, omiDays, isOmiEvent } from "./integrations/companions.js";
 import { today, localDay, isDay, timeZone } from "./dates.js";
 
 /** Settings → Daily page. */
@@ -35,7 +36,8 @@ export function dailyApi(app: FastifyInstance, deps: { records: Records; dav: Ca
     if (dav.configured) {
       const lists = await dav.eventLists();
       const a = dayStart(from), b = dayStart(addDays(from, days));
-      for (const l of lists) for (const ics of await dav.events(l, a, b).catch(() => [] as string[])) for (const e of parseEvents(ics)) out.push({ ...e, calendar: l.name, day: e.allDay ? e.start : localDay(Date.parse(e.start.endsWith("Z") ? e.start : e.start)) });
+      // Omi's day reviews and conversation events are logs of what happened, not plans: the Omi panel shows them.
+      for (const l of lists) for (const ics of await dav.events(l, a, b).catch(() => [] as string[])) for (const e of parseEvents(ics)) if (!isOmiEvent(e.uid)) out.push({ ...e, calendar: l.name, day: e.allDay ? e.start : localDay(Date.parse(e.start.endsWith("Z") ? e.start : e.start)) });
     }
     const last = addDays(from, days - 1);
     for (const e of records.list("events") as any[]) if (e.date >= from && e.date <= last) out.push({ uid: e.id, title: e.title, start: e.time ? `${e.date}T${e.time}:00` : e.date, end: "", allDay: !e.time, location: "", calendar: "Orb", day: e.date });
@@ -61,9 +63,16 @@ export function dailyApi(app: FastifyInstance, deps: { records: Records; dav: Ca
     ]);
     const tasks = (records.list("tasks") as any[]).filter(t => !t.done)
       .sort((a, b) => (a.priority || 10) - (b.priority || 10) || String(a.due || "9").localeCompare(String(b.due || "9"))).slice(0, 15)
-      .map(t => ({ title: t.title, list: t.list, due: t.due || "", priority: PRIO[t.priority] || "", overdue: !!t.due && t.due < day, dueToday: t.due === day }));
+      .map(t => ({ title: t.title, list: t.list, due: t.due || "", priority: PRIO[t.priority] || "", overdue: !!t.due && t.due < day, dueToday: t.due === day, fromOmi: t.source === "omi" }));
     const chores = (records.list("chores") as any[]).map(c => ({ name: c.name, due: c.lastDone ? addDays(c.lastDone, Number(c.everyDays) || 7) : day })).filter(c => c.due <= addDays(day, 2)).sort((a, b) => a.due.localeCompare(b.due));
-    return { day, timeZone: timeZone(), weather: wx, news: headlines || [], stocks: prices || [], events: cal || [], tasks, chores, notes };
+    // Your own apps, read only: Goblin-Bank's shared summary and Omi's recap of yesterday.
+    const yaml = String((records.get("settings", "apps") as any)?.yaml || ""), gb = companion(yaml, "goblinbank"), om = companion(yaml, "omi");
+    const money = gb ? await safe("Goblin-Bank", () => goblinSummary(gb)) : null;
+    const omi = om ? await safe("Omi", async () => (await omiDays(om, 1, addDays(day, -1)))[0] || null) : null;
+    const omiTasks = tasks.filter(t => t.fromOmi).length;
+    return { day, timeZone: timeZone(), weather: wx, news: headlines || [], stocks: prices || [], events: cal || [], tasks, chores, notes,
+      money: money && { netWorth: money.netWorth, people: money.people.map(p => ({ name: p.name, netWorth: p.netWorth, subscriptionsMonthly: p.subscriptionsMonthly })) },
+      omiYesterday: omi && { headline: omi.headline, overview: omi.overview.slice(0, 800), decisions: omi.decisions, questions: omi.questions }, omiOpenTasks: omiTasks };
   }
 
   /** The morning brief, written by Golem's model from gather(). Stored per day in "daily". */
@@ -78,7 +87,7 @@ export function dailyApi(app: FastifyInstance, deps: { records: Records; dav: Ca
     let text = "";
     try {
       const r = await chat({ baseUrl: g.baseUrl, model: g.model, key: secret(g.keyEnv), who, tools: [], maxRounds: 1, messages: [
-        { role: "system", content: "You are Golem, the stone servant of the Pondering Orb, writing the user's morning brief. Plain, warm and short, with a light touch of wizard flavour. Markdown. Sections in this order: a one-line greeting with the weather; **Today** (events with times, tasks due or overdue, chores due); **This week** (the notable events); **Tasks to pick up** (top 3 by priority); **News** (5 bullets, one line each, most important first); **Markets** (one line on the watchlist). Use only the data given; never invent events, tasks or prices. If a source failed, say so in one short line." },
+        { role: "system", content: "You are Golem, the stone servant of the Pondering Orb, writing the user's morning brief. Plain, warm and short, with a light touch of wizard flavour. Markdown. Sections in this order: a one-line greeting with the weather; **Today** (events with times, tasks due or overdue, chores due); **This week** (the notable events); **Tasks to pick up** (top 3 by priority; tasks marked fromOmi came from Omi); **Yesterday, per Omi** (two lines from omiYesterday, only if present); **News** (5 bullets, one line each, most important first); **Markets** (one line on the watchlist, and net worth from money only if present). Use only the data given; never invent events, tasks or prices. If a source failed, say so in one short line." },
         { role: "user", content: `Today is ${day} (${data.timeZone}). Data:\n${JSON.stringify(compact).slice(0, 24000)}` }] });
       text = r.text;
     } catch (e: any) { text = `_The Golem couldn't write today's brief: ${e.message}_`; }

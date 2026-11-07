@@ -4,7 +4,7 @@ import { useColl, useSettings } from "../lib/store";
 import { useFetch } from "../lib/useFetch";
 import { Golem } from "../components/Golem";
 import { DayPlan } from "../components/Glance";
-import { LiveWidget } from "../components/LiveWidget";
+import { useAppPanels } from "../components/AppPanels";
 import { ChoreRows, LogList, OpenTasks, QuickLog, Star, TaskRows, projHref } from "../components/Common";
 import { parseApps, DEFAULT_APPS, App } from "../lib/apps";
 import { fmtDate, isUrl, listOf, logSorted, prioOf, sortTasks, STATUS_LABEL, todayISO } from "../lib/util";
@@ -46,14 +46,11 @@ function SystemMini() {
   return <div className="host"><div className="hn"><span>{h.name}</span><span className="small muted mono">{h.cores.length} cores · up {h.uptimeDays}d</span></div>
     <div className="meters">{m("CPU", h.cpu)}{m("Memory", h.mem)}{h.disks.map((d: any) => <div key={d.mount}>{m(d.mount, d.pct)}</div>)}</div></div>;
 }
-const AppTiles = ({ apps }: { apps: App[] }) => <div className="apps">{apps.map(a => { const inner = <><span className="rune">{a.rune}</span><span className="grow"><div className="an">{a.name}</div><div className="ad">{a.description}</div></span></>;
-  return isUrl(a.url) ? <a key={a.name} className="app" href={a.url} target="_blank" rel="noopener">{inner}</a> : <div key={a.name} className="app">{inner}</div>; })}</div>;
 
 export const MainPage: PageDef = {
   id: "main", label: "Main", title: "Scrying Table", flavor: "Everything you chose to keep in view.",
   usePanels: () => {
-    const s = useSettings(), apps = useColl("settings").find(d => d.id === "apps");
-    const { groups } = parseApps(apps?.yaml ?? DEFAULT_APPS);
+    const s = useSettings(), { panels: appPanels, groups, widgetKeys } = useAppPanels();
     const panels: PanelDef[] = [
       { key: "golem", title: "Golem", node: <Golem />, w: 12, h: 10, minH: 6 },
       { key: "favorites", title: "Favorite projects", node: <Favorites />, w: 4, h: 7 },
@@ -65,10 +62,9 @@ export const MainPage: PageDef = {
       { key: "uptime", title: "Uptime", node: <UptimeMini />, w: 4, h: 6 },
       { key: "upstream", title: "UpstreamManager", node: <UpstreamMini />, w: 4, h: 6 },
       { key: "system", title: "System", node: <SystemMini />, w: 4, h: 6 },
-      ...groups.map(g => ({ key: "group:" + g.name, title: g.name, node: <AppTiles apps={g.apps} />, w: 6, h: 5 })),
-      ...groups.flatMap(g => g.apps).map(a => ({ key: "app:" + a.name, title: a.name, node: a.widget ? <><AppTiles apps={[a]} /><LiveWidget name={a.name} /></> : <AppTiles apps={[a]} />, w: a.widget ? 4 : 3, h: a.widget ? 6 : 3 })),
+      ...appPanels,
     ];
     void s;
-    return { panels, defaults: ["golem", "favorites", "tasks", "priority", "today", "log", "chores", "uptime", "upstream", ...groups.slice(0, 1).map(g => "group:" + g.name), ...groups.flatMap(g => g.apps).filter(a => a.widget).map(a => "app:" + a.name)] };
+    return { panels, defaults: ["golem", "favorites", "tasks", "priority", "today", "log", "chores", "uptime", "upstream", ...groups.slice(0, 1).map(g => "group:" + g.name), ...widgetKeys()] };
   },
 };

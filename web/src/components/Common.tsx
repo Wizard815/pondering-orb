@@ -12,8 +12,11 @@ export function Star({ p }: { p: any }) {
   return <button className="star" aria-pressed={!!p.fav} aria-label={p.fav ? "Remove from favorites" : "Add to favorites"} onClick={() => patch("projects", p.id, { fav: !p.fav }).catch(ui.error)}>{p.fav ? "★" : "☆"}</button>;
 }
 
+/** Omi's action items reach Orb through CalDAV and are read only here. */
+export const fromOmi = (t: any) => t?.source === "omi";
 export function PrioChip({ t }: { t: any }) {
   const ui = useUi(), p = prioOf(t);
+  if (fromOmi(t)) return <span className={`prio l${p}`} title={`Priority: ${prioName(p)} (set in Omi)`}>{p ? prioName(p) : "·"}</span>;
   const pick = (e: React.MouseEvent) => { const r = (e.currentTarget as Element).getBoundingClientRect();
     ui.menu(r.left, r.bottom + 4, [{ label: "Priority", heading: true }, ...[...PRIO_LEVELS].reverse().map(l => ({ label: `${l.level === p ? "✓ " : ""}${l.name}`, run: () => { if (l.level !== p) patch("tasks", t.id, { priority: l.cal }).catch(ui.error); } }))]); };
   return <button className={`prio l${p}`} onClick={pick} title={`Priority: ${prioName(p)}. Click to change.`} aria-label={`Priority ${prioName(p)}, change`}>{p ? prioName(p) : "·"}</button>;
@@ -30,11 +33,11 @@ export function TaskRows({ tasks, showList }: { tasks: any[]; showList?: boolean
   const toggle = (t: any, done: boolean) => patch("tasks", t.id, done ? { done: true, doneAt: today, doneBy: "you" } : { done: false, doneAt: "", doneBy: "" }).catch(ui.error);
   if (!tasks.length) return <div className="empty">No tasks.</div>;
   return <div>{tasks.map(t => <div key={t.id} className={"task" + (t.done ? " done" : "")}>
-    <input type="checkbox" checked={!!t.done} onChange={e => toggle(t, e.target.checked)} aria-label={"Done: " + t.title} />
+    <input type="checkbox" checked={!!t.done} disabled={fromOmi(t)} title={fromOmi(t) ? "From Omi: mark it done in Omi" : undefined} onChange={e => toggle(t, e.target.checked)} aria-label={"Done: " + t.title} />
     <PrioChip t={t} />
-    <div className="grow"><span className="t">{t.title}</span>{showList && <> <span className="tag">{listOf(t)}</span></>}{t.done && t.doneBy && <div className="hint">done by {t.doneBy}</div>}</div>
+    <div className="grow"><span className="t">{t.title}</span>{fromOmi(t) && <> <span className="tag omi" title="An Omi action item, read from CalDAV. Change it in Omi.">Omi</span></>}{showList && <> <span className="tag">{listOf(t)}</span></>}{t.done && t.doneBy && <div className="hint">done by {t.doneBy}</div>}</div>
     {t.due && <span className={"due" + (!t.done && t.due < today ? " late" : "")}>{fmtDate(t.due)}</span>}
-    <button className="btn sm ghost x" title="Delete task" aria-label={"Delete task: " + t.title} onClick={() => removeWithUndo(ui, "tasks", t.id, `Deleted “${t.title}”${t.caldav ? " (also in CalDAV)" : ""}.`).catch(ui.error)}>×</button>
+    {!fromOmi(t) && <button className="btn sm ghost x" title="Delete task" aria-label={"Delete task: " + t.title} onClick={() => removeWithUndo(ui, "tasks", t.id, `Deleted “${t.title}”${t.caldav ? " (also in CalDAV)" : ""}.`).catch(ui.error)}>×</button>}
   </div>)}</div>;
 }
 

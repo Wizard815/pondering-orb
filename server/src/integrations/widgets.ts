@@ -2,6 +2,7 @@ import { parse } from "yaml";
 import { call, trimSlash } from "./http.js";
 import { secret } from "../config.js";
 import { HttpError } from "../records.js";
+import { goblinSummary, omiDays, omiConversations } from "./companions.js";
 
 /** Live app panels. Each app in the apps YAML may have
  *    widget: { type: plex | sabnzbd, url: http://..., key_env: NAME }
@@ -40,6 +41,12 @@ export async function widgetData(name: string, w: WidgetCfg) {
     const q = r.body?.queue || {};
     data = { type: "sabnzbd", speed: q.speed ? `${q.speed}B/s` : "", timeleft: q.timeleft || "", paused: !!q.paused, sizeLeft: q.sizeleft || "",
       queue: (q.slots || []).slice(0, 8).map((s: any) => ({ name: s.filename, pct: Number(s.percentage) || 0, size: s.size || "", status: s.status || "" })) };
+  } else if (w.type === "goblinbank") {
+    data = { type: "goblinbank", ...(await goblinSummary({ name, url: w.url, keyEnv: w.keyEnv })) };
+  } else if (w.type === "omi") {
+    const c = { name, url: w.url, keyEnv: w.keyEnv };
+    const [days, convs] = await Promise.all([omiDays(c, 2), omiConversations(c, 5)]);
+    data = { type: "omi", day: days[0] || null, conversations: convs };
   } else throw new HttpError(400, `No live view for widget type ${w.type}.`);
   cache.set(name, { at: Date.now(), data }); return data;
 }
