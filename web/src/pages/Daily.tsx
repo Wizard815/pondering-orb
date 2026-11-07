@@ -7,6 +7,7 @@ import { Markdown } from "../lib/markdown";
 import { ago, choreState, fmtDate, sortTasks, todayISO, zoneOpt } from "../lib/util";
 import { TaskRows } from "../components/Common";
 import { Spark, pct, money } from "../components/Spark";
+import { useAppPanels } from "../components/AppPanels";
 
 type Ev = { title: string; start: string; end: string; allDay: boolean; location: string; calendar?: string; day: string };
 type Wx = { place: string; units: "F" | "C"; now: { temp: number; feels: number; wind: number; text: string }; days: { date: string; high: number; low: number; rain: number; text: string }[] };
@@ -89,8 +90,10 @@ function PicksToday() {
 
 export const DailyPage: PageDef = {
   id: "daily", label: "Daily", title: "Morning Scroll", flavor: "The Golem's morning brief: weather, news, markets, your tasks and the week ahead.",
-  usePanels: () => ({
-    panels: [
+  usePanels: () => {
+    // Your apps can go on this page too (Edit layout → add). Goblin-Bank and Omi start here.
+    const { panels: apps, widgetKeys } = useAppPanels();
+    const own = [
       { key: "brief", title: "Morning brief", node: <Brief />, w: 8, h: 14 },
       { key: "weather", title: "Weather", node: <Weather />, w: 4, h: 7 },
       { key: "today", title: "Today", node: <Today />, w: 4, h: 7 },
@@ -99,6 +102,7 @@ export const DailyPage: PageDef = {
       { key: "stocks", title: "Markets", node: <Stocks />, w: 4, h: 9 },
       { key: "news", title: "News", node: <NewsList />, w: 6, h: 11 },
       { key: "picks", title: "Today's stock picks", node: <PicksToday />, w: 6, h: 7 },
-    ],
-  }),
+    ];
+    return { panels: [...own, ...apps], defaults: [...own.map(p => p.key), ...widgetKeys("omi"), ...widgetKeys("goblinbank")] };
+  },
 };

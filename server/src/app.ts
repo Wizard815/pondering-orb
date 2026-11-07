@@ -12,6 +12,7 @@ import { uptime } from "./integrations/uptime.js";
 import { hostStats, containers } from "./integrations/system.js";
 import { chat, chatStream, Msg, Tool } from "./integrations/llm.js";
 import { widgetsFrom, widgetData } from "./integrations/widgets.js";
+import { companion, goblinSummary, omiDays, omiConversations, omiSearchMemories, isOmiTask } from "./integrations/companions.js";
 import { call, trimSlash } from "./integrations/http.js";
 import { orbTools } from "./tools.js";
 import { mountMcp } from "./mcp.js";
@@ -86,6 +87,23 @@ export async function buildApp(o: AppOptions = {}) {
       parameters: { type: "object", properties: { date: { type: "string" } } }, run: ({ date }: any) => glance.day(/^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : today()) },
     { name: "allglance_dayglance_tasks", description: "dayGLANCE tasks (inbox and today) with priority 0 none to 5 do now.", parameters: { type: "object", properties: {} }, run: () => glance.dayglanceTasks() },
   ];
+  const appsYaml = () => String((store.get("settings", "apps") as any)?.yaml || "");
+  /** Golem's read-only tools for Goblin-Bank and Omi, when they're in the apps YAML. */
+  const companionTools = (): Tool[] => {
+    const gb = companion(appsYaml(), "goblinbank"), om = companion(appsYaml(), "omi");
+    return [
+      ...(gb ? [{ name: "money_summary", description: "Goblin-Bank's shared summary per person: net worth, monthly subscriptions, Robinhood balances. Only what each person chose to share; no transactions. Read only.",
+        parameters: { type: "object", properties: {} }, run: () => goblinSummary(gb) }] : []),
+      ...(om ? [
+        { name: "omi_search_memories", description: "Search the user's Omi memories (things Omi learned from their conversations). Read only.", parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
+          run: ({ query }: any) => omiSearchMemories(om, String(query || ""), 10) },
+        { name: "omi_daily_summary", description: "Omi's recap of a day (headline, overview, decisions, open questions). date is YYYY-MM-DD; empty for the latest. Read only.", parameters: { type: "object", properties: { date: { type: "string" } } },
+          run: async ({ date }: any) => (await omiDays(om, 1, String(date || "")))[0] || { none: true } },
+        { name: "omi_recent_conversations", description: "The user's most recent Omi conversations: title and overview. Read only.", parameters: { type: "object", properties: { limit: { type: "number" } } },
+          run: ({ limit }: any) => omiConversations(om, Number(limit) || 5) },
+      ] : []),
+    ];
+  };
   // Read-only tools for the wiki (search, read a note) and linked Hermes chats.
   const readTools = (): Tool[] => [
     ...(cfg().wiki.baseUrl ? [
@@ -94,6 +112,7 @@ export async function buildApp(o: AppOptions = {}) {
       { name: "wiki_read", description: "Read one LLMWIKI note (front-matter and body) by its path, e.g. wiki/1-projects/Argos.md. Read only.", parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] },
         run: async ({ path }: any) => { const n = await wiki.note(notePath(path)); return { ...n, body: n.body.slice(0, 12000) }; } },
     ] : []),
+    ...companionTools(),
     ...(cfg().hermes.baseUrl ? [
       { name: "project_chats", description: "The Hermes chats linked to a project, with their newest messages. Read only.", parameters: { type: "object", properties: { project: { type: "string" } }, required: ["project"] },
         run: async ({ project }: any) => { const p: any = records.list("projects").find((x: any) => String(x.name).toLowerCase() === String(project).toLowerCase()); if (!p) throw new Error(`No project named ${project}`);
@@ -152,7 +171,12 @@ export async function buildApp(o: AppOptions = {}) {
     if (typeof raw !== "object" || Array.isArray(raw)) throw new HttpError(400, "Send a JSON object.");
     const body: Record<string, any> = { ...raw };
     if (c === "settings" && body.btopUrl && !/^https?:\/\//i.test(String(body.btopUrl))) throw new HttpError(422, "The btop address must start with http:// or https://.");
-    if (c === "tasks" || c === "chores") { delete body.caldav; const cur: any = id && records.get(c, id); if (cur?.caldav && req.method === "PUT") body.caldav = cur.caldav; }
+    if (c === "tasks" || c === "chores") {
+      const cur: any = id && records.get(c, id);
+      // Omi's action items reach Orb through CalDAV and are read only here: change them in Omi.
+      if (c === "tasks" && isOmiTask(cur?.caldav?.uid)) throw new HttpError(403, "This task comes from Omi. Change it in Omi; Orb only reads it.");
+      delete body.caldav; delete body.source; if (cur?.caldav && req.method === "PUT") { body.caldav = cur.caldav; body.source = cur.source; }
+    }
     if (c === "logs" && who(req) !== "you" && (req.method === "POST" || "by" in body)) body.by = who(req);
     return body;
   };
@@ -172,6 +196,7 @@ export async function buildApp(o: AppOptions = {}) {
     // Deletes follow the same rules as writes (an agent can't remove settings, picks or orders).
     if (c === "orders") throw new HttpError(403, "Orders are kept as a record.");
     if (["settings", "daily", "picks", "research"].includes(c) && who(req) !== "you") throw new HttpError(403, "Only a signed-in person can delete these.");
+    if (c === "tasks" && isOmiTask((records.get("tasks", req.params.id) as any)?.caldav?.uid)) throw new HttpError(403, "This task comes from Omi. Change it in Omi; Orb only reads it.");
     records.remove(c, req.params.id); reply.code(204).send();
   });
 

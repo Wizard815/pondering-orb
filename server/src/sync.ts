@@ -5,6 +5,7 @@ import { CalDav, Collection } from "./integrations/caldav.js";
 import { parseTodo, writeTodo, rruleDays, daysRrule, managedOf } from "./integrations/ical.js";
 import type { Outbox } from "./outbox.js";
 import { today } from "./dates.js";
+import { isOmiTask } from "./integrations/companions.js";
 
 const ORIGIN = "caldav";
 const idFor = (uid: string) => "cd-" + createHash("sha1").update(uid).digest("hex").slice(0, 16);
@@ -56,7 +57,7 @@ export class TaskSync {
         const caldav = { href: it.href, etag: it.etag, uid: t.uid, list: list.name, ics: it.ics };
         const data = isChores
           ? { name: t.summary || "Chore", everyDays: t.rrule ? rruleDays(t.rrule) : 7, lastDone: t.completed || (t.due && t.rrule ? addDays(t.due, -rruleDays(t.rrule)) : ""), due: t.due, caldav }
-          : { title: t.summary || "Untitled", list: list.name, due: t.due, done: t.status === "COMPLETED", priority: t.priority, doneAt: t.completed, caldav };
+          : { title: t.summary || "Untitled", list: list.name, due: t.due, done: t.status === "COMPLETED", priority: t.priority, doneAt: t.completed, caldav, source: isOmiTask(t.uid) ? "omi" : "" };
         const cur: any = this.r.get(coll, id);
         if (!cur) this.r.create(coll, data, id, ORIGIN);
         else if (cur.caldav?.etag !== it.etag) this.r.put(coll, id, { ...strip(cur), ...data }, ORIGIN);
@@ -78,11 +79,13 @@ export class TaskSync {
 
   private async push(c: Change) {
     if (!this.dav.configured) return;
-    if (c.op === "delete") { const p: any = c.prev; if (p?.caldav?.href) await this.dav.del(p.caldav.href, p.caldav.etag); return; }
+    if (c.op === "delete") { const p: any = c.prev; if (p?.caldav?.href && !isOmiTask(p.caldav.uid)) await this.dav.del(p.caldav.href, p.caldav.etag); return; }
     // Push the record as it is now, not the snapshot from when it changed: a
     // quick second edit would otherwise still see no href (and create the
     // task twice) or an old etag.
     const d: any = this.r.get(c.coll, c.id); if (!d) return;
+    // Omi's own tasks are Omi's: Orb reads them and never writes them back.
+    if (isOmiTask(d.caldav?.uid)) return;
     if (c.coll === "tasks") {
       if (d.caldav?.href) {
         const fields = { uid: d.caldav.uid, summary: d.title, done: !!d.done, due: d.due || "", priority: Number(d.priority) || 0 };

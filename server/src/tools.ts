@@ -2,6 +2,7 @@ import type { Records } from "./records.js";
 import type { Tool } from "./integrations/llm.js";
 import { STATUSES } from "./records.js";
 import { today } from "./dates.js";
+import { isOmiTask } from "./integrations/companions.js";
 
 // Priority is stored as CalDAV PRIORITY and named on vikunja's five levels,
 // with vikunja's own mapping (low 9, medium 5, high 3, urgent 2, do now 1).
@@ -47,6 +48,7 @@ export function orbTools(r: Records): Tool[] {
         if (!(priority in PRIO)) throw new Error(`Priority must be one of ${LEVELS.join(", ")}`);
         const m = r.list("tasks").filter((t: any) => !t.done && String(t.title).toLowerCase() === String(title).toLowerCase() && (!list || listOf(t).toLowerCase() === String(list).toLowerCase()));
         if (!m.length) throw new Error(`No open task titled ${title}`); if (m.length > 1) throw new Error("Several tasks match; give the list too");
+        if (isOmiTask((m[0] as any).caldav?.uid)) throw new Error("That task comes from Omi; Orb only reads it. Change it in Omi.");
         r.patch("tasks", (m[0] as any).id, { priority: PRIO[priority] }); return { title: (m[0] as any).title, priority };
       } },
     { name: "orb_complete_task", write: true, description: "Mark an open task done by its exact title (give the list when titles repeat). Also writes a log line for its project.",
@@ -55,6 +57,7 @@ export function orbTools(r: Records): Tool[] {
         const m = r.list("tasks").filter((t: any) => !t.done && String(t.title).toLowerCase() === String(title).toLowerCase() && (!list || listOf(t).toLowerCase() === String(list).toLowerCase()));
         if (!m.length) throw new Error(`No open task titled ${title}`); if (m.length > 1) throw new Error("Several tasks match; give the list too");
         const t: any = m[0]; const by = who === "you" ? "golem" : who;
+        if (isOmiTask(t.caldav?.uid)) throw new Error("That task comes from Omi; Orb only reads it. Mark it done in Omi.");
         r.patch("tasks", t.id, { done: true, doneAt: today(), doneBy: by });
         const p = r.list("projects").find((x: any) => (x.taskList || x.name) === listOf(t)) as any;
         if (p) { try { r.create("logs", { project: p.name, text: `Done: ${t.title}`.slice(0, r.logMax()), by }); } catch { /* too long etc */ } }

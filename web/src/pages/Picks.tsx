@@ -7,6 +7,7 @@ import { useFetch } from "../lib/useFetch";
 import { Markdown } from "../lib/markdown";
 import { ago, fmtDate, oneAtATime, todayISO } from "../lib/util";
 import { Spark, pct, money } from "../components/Spark";
+import { useAppPanels } from "../components/AppPanels";
 
 const ACTION_CLS: Record<string, string> = { buy: "ok", hold: "warn", skip: "bad" };
 const H = [1, 5, 20, 60];
@@ -152,13 +153,15 @@ function Scorecard() {
 
 export const PicksPage: PageDef = {
   id: "picks", label: "Picks", title: "Augury", flavor: "Daily research, a verdict per stock, your call, and what came of it.",
-  usePanels: () => ({
-    panels: [
+  usePanels: () => {
+    const { panels: apps } = useAppPanels();
+    const own = [
       { key: "research", title: "Today's research", node: <Research />, w: 12, h: 5 },
       { key: "today", title: "Picks waiting for you", node: <Today />, w: 7, h: 16 },
       { key: "score", title: "Scorecard", node: <Scorecard />, w: 5, h: 10 },
       { key: "history", title: "History", node: <History />, w: 12, h: 10 },
       { key: "account", title: "Robinhood agentic account", node: <Account />, w: 5, h: 7 },
-    ],
-  }),
+    ];
+    return { panels: [...own, ...apps], defaults: own.map(p => p.key) };
+  },
 };

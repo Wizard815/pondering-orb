@@ -1,4 +1,37 @@
 import { useFetch } from "../lib/useFetch";
+import { useColl } from "../lib/store";
+import { ago, sortTasks } from "../lib/util";
+import { TaskRows, fromOmi } from "./Common";
+
+const usd = (n: number | null) => (n === null || n === undefined ? "—" : n.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: Math.abs(n) >= 1000 ? 0 : 2 }));
+
+/** Goblin-Bank: only what each person shares (no transactions). */
+function GoblinBank({ data }: { data: any }) {
+  return <>
+    {data.netWorth !== null && <div className="row"><span className="wx-t">{usd(data.netWorth)}</span><span className="hint">net worth, shared</span></div>}
+    <table className="tbl small"><tbody>{data.people.map((p: any) => <tr key={p.name}><td><b>{p.name}</b></td>
+      {p.error ? <td colSpan={3} className="err-inline">{p.error}</td> : <>
+        <td className="num">{p.netWorth !== null ? usd(p.netWorth) : <span className="muted">not shared</span>}</td>
+        <td className="num">{p.subscriptionsMonthly !== null ? `${usd(p.subscriptionsMonthly)}/mo` : ""}</td>
+        <td className="num">{p.robinhoodAgent?.equity != null ? <span title={`agentic account, as of ${p.robinhoodAgent.asOf}`}>RH agent {usd(p.robinhoodAgent.equity)}</span> : p.robinhoodMain?.equity != null ? <span title={`${p.robinhoodMain.source}, as of ${p.robinhoodMain.asOf}`}>RH {usd(p.robinhoodMain.equity)}</span> : ""}</td></>}
+    </tr>)}</tbody></table>
+    <div className="hint">Read only, from Goblin-Bank's shared summary · {ago(data.at)}</div>
+  </>;
+}
+/** Omi: yesterday's recap and recent conversations from Omi; its action items from CalDAV. */
+function Omi({ data }: { data: any }) {
+  const tasks = sortTasks(useColl("tasks").filter(t => fromOmi(t) && !t.done)).slice(0, 6), d = data.day;
+  return <>
+    {d ? <div><b>{d.emoji} {d.headline || "Your day"}</b> <span className="hint">{d.date}</span><div className="small">{d.overview}</div>
+      {d.decisions?.length > 0 && <div className="small"><span className="muted">Decided:</span> {d.decisions.join(" · ")}</div>}
+      {d.questions?.length > 0 && <div className="small"><span className="muted">Open:</span> {d.questions.join(" · ")}</div>}</div>
+      : <div className="empty small">No daily summary yet.</div>}
+    <h4 className="group-name">Action items <span className="hint">(from CalDAV, read only)</span></h4>
+    {tasks.length ? <TaskRows tasks={tasks} /> : <div className="empty small">None open.</div>}
+    {data.conversations?.length > 0 && <><h4 className="group-name">Recent conversations</h4><ul className="list small">{data.conversations.map((c: any) =>
+      <li key={c.id}><div className="grow"><b>{c.emoji} {c.title}</b><div className="hint">{c.overview}</div></div><span className="hint">{c.at ? ago(c.at) : ""}</span></li>)}</ul></>}
+  </>;
+}
 
 /** Live data for an app with `widget:` in the apps YAML (Plex, SABnzbd),
  *  fetched through the server so the app's key never reaches the browser. */
@@ -14,5 +47,7 @@ export function LiveWidget({ name }: { name: string }) {
     <div className="row small mono" style={{ justifyContent: "space-between" }}><span>{data.paused ? "paused" : data.speed || "idle"}</span><span>{data.timeleft ? `${data.timeleft} left` : ""}{data.sizeLeft ? ` · ${data.sizeLeft}` : ""}</span></div>
     {data.queue.length ? data.queue.map((q: any, i: number) => <div key={i} className="lv"><div className="row" style={{ justifyContent: "space-between" }}><span className="grow" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{q.name}</span><span className="mono small">{q.pct}%</span></div>{bar(q.pct)}</div>)
       : <div className="empty small">Queue empty.</div>}</>;
+  if (data.type === "goblinbank") return <GoblinBank data={data} />;
+  if (data.type === "omi") return <Omi data={data} />;
   return null;
 }

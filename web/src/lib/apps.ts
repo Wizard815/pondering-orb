@@ -23,7 +23,7 @@ groups:
         rune: Up
         url: http://upstream-manager:5000
         description: Upstreams, branches, approval requests
-  # Live panels: give an app a widget (plex or sabnzbd) and the name of the
+  # Live panels: give an app a widget (plex, sabnzbd, goblinbank or omi) and the name of the
   # environment variable that holds its key on the Orb server.
   # - name: Media
   #   apps:
@@ -33,4 +33,13 @@ groups:
   #     - name: SABnzbd
   #       url: http://sabnzbd:8085
   #       widget: { type: sabnzbd, url: http://sabnzbd:8085, key_env: SABNZBD_API_KEY }
+  # Your own apps, read only:
+  # - name: Household
+  #   apps:
+  #     - name: Goblin-Bank
+  #       url: http://coingateway:8080
+  #       widget: { type: goblinbank, key_env: GOBLIN_ORB_KEY }   # the gateway's read-only Orb key
+  #     - name: Omi
+  #       url: http://192.168.20.5:8000
+  #       widget: { type: omi, key_env: OMI_DEV_KEY }             # an omi_dev_ key with read scopes
 `;
