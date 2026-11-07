@@ -4,7 +4,7 @@ import type { PanelDef } from "../components/PanelGrid";
 import { patch, useColl } from "../lib/store";
 import { useUi } from "../lib/ui";
 import { listOf, STATUSES, STATUS_LABEL, todayISO } from "../lib/util";
-import { LogList, QuickLog, Star, projHref } from "../components/Common";
+import { LogList, QuickLog, Star, projHref, AgentBadge } from "../components/Common";
 import { NewProjectForm, Repo, StatusSelect, projectList, projectMenu, setArchived, useRepos } from "./projects/shared";
 import "./projects.css";
 
@@ -14,7 +14,7 @@ function Card({ p, logs, open, repo, onDrag }: { p: any; logs: number; open: num
     onDragStart={e => { setDragging(true); onDrag(p.id); try { e.dataTransfer.setData("text/plain", p.id); e.dataTransfer.effectAllowed = "move"; } catch { /* old browsers */ } }}
     onDragEnd={() => { setDragging(false); onDrag(null); }}
     onContextMenu={e => { e.preventDefault(); e.stopPropagation(); projectMenu(ui, p, e.clientX, e.clientY); }}>
-    <div className="name" style={{ display: "flex", justifyContent: "space-between", gap: 6 }}><a href={projHref(p)} draggable={false}>{p.name}</a><Star p={p} /></div>
+    <div className="name" style={{ display: "flex", justifyContent: "space-between", gap: 6 }}><a href={projHref(p)} draggable={false}>{p.name}</a><Star p={p} /></div>{p.agent?.status && <div><AgentBadge status={p.agent.status} name={p.agent.name} /></div>}
     {p.repo && <div className="repo">{p.repo}</div>}
     {p.next && <div className="next">{p.next}</div>}
     <div className="foot"><StatusSelect p={p} />

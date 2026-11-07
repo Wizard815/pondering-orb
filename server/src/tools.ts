@@ -11,6 +11,8 @@ const prioName = (p: number) => LEVELS[[0, 5, 4, 3, 3, 2, 1, 1, 1, 1][Math.max(0
 const PRIO: Record<string, number> = { none: 0, low: 9, medium: 5, high: 3, urgent: 2, do_now: 1, "do now": 1 };
 const byName = (r: Records, name: string) => r.list("projects").find((p: any) => String(p.name).toLowerCase() === String(name || "").toLowerCase()) as any;
 const listOf = (t: any) => t.list || t.project || "Inbox";
+/** herdr's agent states, plus gone (the pane closed). */
+const AGENT_STATUSES = ["working", "blocked", "done", "idle", "gone"];
 
 /** The tools Golem uses and the MCP endpoint serves. Same rules either way:
  *  writes go through Records, so log length and the rest are enforced. */
@@ -18,7 +20,7 @@ export function orbTools(r: Records): Tool[] {
   return [
     { name: "orb_list_projects", description: "List projects: name, status (next, active, blocked, paused, shipped), next step, archived, open task count.",
       parameters: { type: "object", properties: {} },
-      run: () => r.list("projects").map((p: any) => ({ name: p.name, status: p.status, next: p.next || "", archived: !!p.archived,
+      run: () => r.list("projects").map((p: any) => ({ name: p.name, status: p.status, next: p.next || "", archived: !!p.archived, agentStatus: p.agent?.status || "",
         openTasks: r.list("tasks").filter((t: any) => !t.done && listOf(t) === (p.taskList || p.name)).length })) },
     { name: "orb_get_project", description: "One project with its 20 newest log entries and its tasks.",
       parameters: { type: "object", properties: { name: { type: "string" } }, required: ["name"] },
@@ -38,7 +40,7 @@ export function orbTools(r: Records): Tool[] {
     { name: "orb_list_tasks", description: "Tasks, optionally from one list (projects use their own name). openOnly defaults to true.",
       parameters: { type: "object", properties: { list: { type: "string" }, openOnly: { type: "boolean" } } },
       run: ({ list, openOnly }) => r.list("tasks").filter((t: any) => (!list || listOf(t).toLowerCase() === String(list).toLowerCase()) && (openOnly === false || !t.done))
-        .map((t: any) => ({ title: t.title, list: listOf(t), due: t.due || "", done: !!t.done, inProgress: !t.done && !!t.started, priority: prioName(t.priority) })) },
+        .map((t: any) => ({ title: t.title, list: listOf(t), due: t.due || "", done: !!t.done, inProgress: !t.done && !!t.started, agentStatus: t.agent?.status || "", priority: prioName(t.priority) })) },
     { name: "orb_add_task", write: true, description: "Add a task to a list. due is optional (YYYY-MM-DD); priority is none, low, medium, high, urgent or do_now.",
       parameters: { type: "object", properties: { title: { type: "string" }, list: { type: "string" }, due: { type: "string" }, priority: { type: "string", enum: LEVELS } }, required: ["title", "list"] },
       run: ({ title, list, due, priority }) => r.create("tasks", { title, list, due: /^\d{4}-\d{2}-\d{2}$/.test(due || "") ? due : "", priority: PRIO[priority] ?? 0, done: false }) },
@@ -63,6 +65,36 @@ export function orbTools(r: Records): Tool[] {
         const p = r.list("projects").find((x: any) => (x.taskList || x.name) === listOf(t)) as any;
         if (p) { try { r.create("logs", { project: p.name, text: `Started: ${t.title}`.slice(0, r.logMax()), by }); } catch { /* too long etc */ } }
         return { title: t.title, list: listOf(t), inProgress: true };
+      } },
+    { name: "orb_set_agent_status", write: true, description: "Record the live status of the coding agent working on a task or project, as herdr shows it: working, blocked (needs you), done (finished its turn), idle, or gone (its pane closed). The first working marks a task in progress and moves a project to active; gone puts an unfinished task back to open.",
+      parameters: { type: "object", properties: { task: { type: "object", properties: { title: { type: "string" }, list: { type: "string" } } }, project: { type: "string" }, status: { type: "string", enum: AGENT_STATUSES }, agent: { type: "string" } }, required: ["status"] },
+      run: ({ task, project, status, agent }, who) => {
+        if (!AGENT_STATUSES.includes(status)) throw new Error(`Status must be one of ${AGENT_STATUSES.join(", ")}`);
+        const by = who === "you" ? "golem" : who;
+        const live = status === "gone" ? null : { status, name: String(agent || "").slice(0, 40), at: Date.now() };
+        if (task?.title) {
+          const m = r.list("tasks").filter((t: any) => String(t.title).toLowerCase() === String(task.title).toLowerCase() && (!task.list || listOf(t).toLowerCase() === String(task.list).toLowerCase()));
+          const t: any = m.find((x: any) => !x.done) || m[0]; if (!t) throw new Error(`No task titled ${task.title}`);
+          if (isOmiTask(t.caldav?.uid)) throw new Error("That task comes from Omi; Orb only reads it.");
+          const patch: any = { agent: live };
+          if (!t.done && status === "working" && !t.started) {
+            patch.started = true;
+            const p = r.list("projects").find((x: any) => (x.taskList || x.name) === listOf(t)) as any;
+            if (p) { try { r.create("logs", { project: p.name, text: `Started: ${t.title}`.slice(0, r.logMax()), by }); } catch { /* too long etc */ } }
+          }
+          // The agent went away without finishing: the task is open again.
+          if (status === "gone" && !t.done) patch.started = false;
+          r.patch("tasks", t.id, patch);
+          return { title: t.title, list: listOf(t), agentStatus: live?.status || "", inProgress: !t.done && (patch.started ?? !!t.started) };
+        }
+        if (project) {
+          const p = byName(r, project); if (!p) throw new Error(`No project named ${project}`);
+          const patch: any = { agent: live };
+          if (status === "working" && !["active", "shipped"].includes(p.status)) patch.status = "active";
+          r.patch("projects", p.id, patch);
+          return { name: p.name, agentStatus: live?.status || "", status: patch.status || p.status };
+        }
+        throw new Error("Give a task or a project.");
       } },
     { name: "orb_complete_task", write: true, description: "Mark an open task done by its exact title (give the list when titles repeat). Also writes a log line for its project.",
       parameters: { type: "object", properties: { title: { type: "string" }, list: { type: "string" } }, required: ["title"] },
