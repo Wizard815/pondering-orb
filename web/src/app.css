@@ -56,3 +56,6 @@ div:not(.editing) > .react-grid-layout .react-resizable-handle { display: none; 
 .probs span.on { color: var(--ink); font-weight: 600 } .probs span.on i { background: var(--arcane) }
 .pick .src { margin-right: 8px; color: var(--arcane) }
 .decide input[type=number] { text-align: right }
+.money-people { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px }
+.money-person { border: 1px solid var(--line); border-radius: 8px; padding: 8px }
+.omi-head { font-size: 1.1rem; margin: 8px 0 2px }

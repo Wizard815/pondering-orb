@@ -12,7 +12,7 @@ import { uptime } from "./integrations/uptime.js";
 import { hostStats, containers } from "./integrations/system.js";
 import { chat, chatStream, Msg, Tool } from "./integrations/llm.js";
 import { widgetsFrom, widgetData } from "./integrations/widgets.js";
-import { companion, goblinSummary, omiDays, omiConversations, omiSearchMemories, isOmiTask } from "./integrations/companions.js";
+import { companion, companionByName, goblinSummary, omiDays, omiConversations, omiSearchMemories, isOmiTask } from "./integrations/companions.js";
 import { call, trimSlash } from "./integrations/http.js";
 import { orbTools } from "./tools.js";
 import { mountMcp } from "./mcp.js";
@@ -374,6 +374,12 @@ export async function buildApp(o: AppOptions = {}) {
   app.delete("/api/outbox/:id", { preHandler: guard }, async (req: any, reply) => { outbox.drop(req.params.id); reply.code(204).send(); });
 
   // ---- live app panels (Plex, SABnzbd) from the apps YAML ----
+  // Full pages for Goblin-Bank and Omi (page: true in the apps YAML). Read only, like the widgets.
+  const comp = (name: string, type: string) => { const c = companionByName(appsYaml(), name); if (!c || c.type !== type) throw new HttpError(404, `No ${type} app called ${name} in the apps YAML.`); return c; };
+  app.get("/api/apps/:name/money", { preHandler: guard }, async (req: any) => goblinSummary(comp(req.params.name, "goblinbank")));
+  app.get("/api/apps/:name/omi/days", { preHandler: guard }, async (req: any) => omiDays(comp(req.params.name, "omi"), Number(req.query.limit) || 14, "", Number(req.query.offset) || 0));
+  app.get("/api/apps/:name/omi/conversations", { preHandler: guard }, async (req: any) => omiConversations(comp(req.params.name, "omi"), Number(req.query.limit) || 25));
+  app.get("/api/apps/:name/omi/memories", { preHandler: guard }, async (req: any) => omiSearchMemories(comp(req.params.name, "omi"), String(req.query.q || ""), 20));
   app.get("/api/widgets/:name", { preHandler: guard }, async (req: any) => {
     const w = widgetsFrom(String((store.get("settings", "apps") as any)?.yaml || ""))[req.params.name];
     if (!w) throw new HttpError(404, `${req.params.name} has no widget in the apps YAML.`);

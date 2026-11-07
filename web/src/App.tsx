@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { PAGES, pageById } from "./pages";
+import { usePages, pageById } from "./pages";
 import type { PageDef } from "./pages/types";
 import { PanelGrid } from "./components/PanelGrid";
 import { Orb } from "./components/Orb";
@@ -42,6 +42,7 @@ function PageView({ page, editing, setEditing, inSplit }: { page: PageDef; editi
 
 export function App() {
   const hash = useHash(), settings = useSettings(), online = useOnline(), ui = useUi();
+  const pages = usePages(); // the built-in tabs plus any app pages (page: true in the apps YAML)
   const [editing, setEditing] = useState(false);
   const [dragTab, setDragTab] = useState<string | null>(null);
   const [ratio, setRatio] = useState<number | null>(null);
@@ -58,7 +59,7 @@ export function App() {
 
   const tabs: { id: string; label: string; linked?: boolean }[] = [];
   const seen = new Set<string>();
-  for (const p of PAGES) { if (seen.has(p.id)) continue; const l = links.find(z => z.includes(p.id));
+  for (const p of pages) { if (seen.has(p.id)) continue; const l = links.find(z => z.includes(p.id));
     if (l) { l.forEach(x => seen.add(x)); tabs.push({ id: l.join("--"), label: l.map(x => pageById(x)!.label).join(" / "), linked: true }); }
     else tabs.push({ id: p.id, label: p.label }); }
   // A project page lights up the Projects tab, also when Projects is linked with another page.

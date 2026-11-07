@@ -25,6 +25,8 @@ function GoblinBank({ data }: { data: any }) {
       {p.alerts?.total > 0 && <span className={p.alerts.critical ? "err-inline" : "hint"}> · {p.alerts.total} alert{p.alerts.total === 1 ? "" : "s"}{p.alerts.critical ? `, ${p.alerts.critical} critical` : ""}</span>}
       {p.goals?.length > 0 && <div className="muted">{p.goals.map((g: any) => `${g.name} ${g.pct != null ? Math.round(g.pct * 100) + "%" : ""}`).join(" · ")}</div>}
     </div>)}
+    {data.alerts?.filter((a: any) => a.severity !== "info").slice(0, 3).map((a: any, k: number) => <div key={k} className="small"><span className={"chip " + (a.severity === "critical" ? "bad" : "warn")}>{a.severity}</span> {a.title} <span className="hint">{a.person}</span></div>)}
+    {data.bills?.length > 0 && <div className="small">Next bills: {data.bills.slice(0, 3).map((b: any) => `${b.name} ${b.date.slice(5)} ${usd(b.amount)}`).join(" · ")}</div>}
     <div className="hint">Read only, from Goblin-Bank's shared summary · {ago(data.at)}</div>
   </>;
 }

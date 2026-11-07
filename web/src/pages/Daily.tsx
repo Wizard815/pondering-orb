@@ -39,25 +39,32 @@ function Weather() {
 }
 
 function useEvents() { return useFetch<Ev[]>("/api/daily/events?days=7", 10 * 60000); }
+/** Bills from Goblin-Bank's shared bill lists (empty when it isn't set up or nobody shares them). */
+type BillDue = { date: string; name: string; amount: number; person: string; paidBy: string };
+function useBills() { return useFetch<BillDue[]>("/api/daily/bills?days=7", 10 * 60000); }
+const usd = (n: number) => n.toLocaleString(undefined, { style: "currency", currency: "USD" });
+const BillRow = ({ b }: { b: BillDue }) => <li><span className="date">bill</span><div className="grow">{b.name}<div className="hint">{b.person}{b.paidBy !== "me" ? ` · paid by ${b.paidBy}` : ""}</div></div><span className="num">{usd(b.amount)}</span></li>;
 function Today() {
-  const { data, error } = useEvents(), day = todayISO(), tasks = useColl("tasks"), chores = useColl("chores");
+  const { data, error } = useEvents(), day = todayISO(), tasks = useColl("tasks"), chores = useColl("chores"), bills = (useBills().data || []).filter(b => b.date === day);
   const ev = (data || []).filter(e => e.day === day), due = sortTasks(tasks.filter(t => !t.done && t.due && t.due <= day));
   const ch = chores.map(c => ({ c, s: choreState(c) })).filter(x => x.s.cls === "over" || x.s.left <= 0 || !x.c.lastDone);
   return <>
     {error && <div className="err-inline small">Calendar: {error}</div>}
     {ev.length ? <ul className="list">{ev.map((e, k) => <li key={k}><span className="date">{time(e)}</span><div className="grow">{e.title}{e.location && <div className="hint">{e.location}</div>}</div>{e.calendar && <span className="tag">{e.calendar}</span>}</li>)}</ul>
       : data && <div className="empty small">Nothing on the calendar today.</div>}
+    {bills.length > 0 && <><h4 className="group-name">Bills due today</h4><ul className="list">{bills.map((b, k) => <BillRow key={k} b={b} />)}</ul></>}
     {due.length > 0 && <><h4 className="group-name">Due today or overdue</h4><TaskRows tasks={due} showList /></>}
     {ch.length > 0 && <><h4 className="group-name">Chores due</h4><ul className="list">{ch.map(({ c, s }) => <li key={c.id}><div className="grow">{c.name}</div><span className={"chip " + (s.cls === "over" ? "bad" : "warn")}>{!c.lastDone ? "never done" : s.left < 0 ? `${-s.left} day${s.left === -1 ? "" : "s"} late` : "due today"}</span></li>)}</ul></>}
   </>;
 }
 function Week() {
-  const { data } = useEvents(), day = todayISO();
-  const rest = (data || []).filter(e => e.day > day), days = [...new Set(rest.map(e => e.day))];
+  const { data } = useEvents(), day = todayISO(), bills = (useBills().data || []).filter(b => b.date > day);
+  const rest = (data || []).filter(e => e.day > day), days = [...new Set([...rest.map(e => e.day), ...bills.map(b => b.date)])].sort();
   if (!data) return <div className="hint">Reading the calendar…</div>;
   if (!days.length) return <div className="empty">Nothing else this week.</div>;
   return <>{days.map(d => <div key={d}><h4 className="group-name">{dayName(d)}</h4><ul className="list">{rest.filter(e => e.day === d).map((e, k) =>
-    <li key={k}><span className="date">{time(e)}</span><div className="grow">{e.title}</div>{e.calendar && <span className="tag">{e.calendar}</span>}</li>)}</ul></div>)}</>;
+    <li key={k}><span className="date">{time(e)}</span><div className="grow">{e.title}</div>{e.calendar && <span className="tag">{e.calendar}</span>}</li>)}
+    {bills.filter(b => b.date === d).map((b, k) => <BillRow key={"b" + k} b={b} />)}</ul></div>)}</>;
 }
 function Tasks() {
   const tasks = sortTasks(useColl("tasks").filter(t => !t.done)).slice(0, 10);

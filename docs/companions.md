@@ -18,11 +18,30 @@ groups:
 Put the keys in `.env` (`GOBLIN_ORB_KEY`, `OMI_DEV_KEY`). They stay on the
 server; the browser only sees what Orb shows.
 
+## Panel, or a full page
+
+Each app is a panel by default (on Main and Daily; add it to any page in Edit
+layout). Add `page: true` to its widget to also give it a tab of its own, or
+`page: "Household"` to name the tab:
+
+```yaml
+        widget: { type: goblinbank, key_env: GOBLIN_ORB_KEY, page: true }   # tab "Money"
+        widget: { type: omi, key_env: OMI_DEV_KEY, page: "Omi" }
+```
+
+- **Money** (Goblin-Bank): each person's shared totals, bills for the next 30
+  days, alerts (critical first), savings and goals, Robinhood balances.
+- **Omi**: day recaps you can step through (headline, highlights, decisions,
+  open questions, what it learned), Omi's action items (from CalDAV),
+  memory search and recent conversations.
+
+Take `page:` away and the tab goes; the panels stay.
+
 ## What Orb reads
 
 | App | Request (always GET) | Shown |
 | --- | --- | --- |
-| Goblin-Bank | `GET /api/v1/summary` on CoinGateway, with its Orb key (`summary:read`) | per person: net worth, monthly subscriptions, bills due (this week, 30 days, the next one), alert counts, savings (total and free), goal progress and Robinhood balances, each only if that person ticked it under Goblin-Bank → Settings → Sharing |
+| Goblin-Bank | `GET /api/v1/summary` on CoinGateway, with its Orb key (`summary:read`) | per person, only what they share (Goblin-Bank → Settings → Sharing): net worth, subscriptions, bill totals and the **bill list**, alert counts and the **alert list**, savings, goals, Robinhood balances |
 | Omi | `GET /v1/dev/user/daily-summaries`, `/conversations`, `/memories/search`, with an `omi_dev_` key | yesterday's recap (headline, overview, decisions, open questions) and recent conversations |
 
 Orb never sends anything to either app, never asks for transactions, and
@@ -44,11 +63,15 @@ task, marked **Omi**. To keep Omi in charge of them:
   the brief's calendar, since they record what happened rather than plans.
   The Omi panel shows them instead.
 
+Bill and alert *lists* are their own share options in Goblin-Bank (`bill_list`,
+`alert_list`); sharing the totals doesn't share them.
+
 ## Where they show up
 
 - **Panels**: Goblin-Bank and Omi are on Main and the Daily page to start
   with. Any app panel can be added to Main, Daily or Picks in Edit layout.
-- **Morning brief**: yesterday per Omi, and net worth from Goblin-Bank's
-  shared summary.
+- **Daily page**: shared bills appear under Today and in This week.
+- **Morning brief**: bills this week and critical or warning alerts, yesterday
+  per Omi, and net worth from Goblin-Bank's shared summary.
 - **Golem** (read-only tools): `money_summary`, `omi_search_memories`,
   `omi_daily_summary`, `omi_recent_conversations`.

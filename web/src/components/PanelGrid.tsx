@@ -1,4 +1,4 @@
-import { ReactNode, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Responsive, WidthProvider, Layout, Layouts } from "react-grid-layout";
 import { useColl, put } from "../lib/store";
 import { useUi } from "../lib/ui";
@@ -52,6 +52,18 @@ export function PanelGrid({ page, panels, defaults, editing }: { page: string; p
     return base;
   }, [JSON.stringify(saved.layouts), shown.map(p => p.key).join(","), editing, JSON.stringify(fit)]);
 
+  // Panels load their data after they first render, so re-measure when what's
+  // inside a panel changes size (a list arriving after "Loading…").
+  const [, remeasure] = useState(0);
+  useEffect(() => {
+    if (!root.current || typeof ResizeObserver === "undefined") return;
+    let t = 0;
+    const ro = new ResizeObserver(() => { cancelAnimationFrame(t); t = requestAnimationFrame(() => remeasure(n => n + 1)); });
+    const watch = () => root.current!.querySelectorAll<HTMLElement>(".gp[data-pk] .pbody > *").forEach(el => ro.observe(el));
+    watch();
+    const mo = new MutationObserver(watch); mo.observe(root.current, { childList: true, subtree: true });
+    return () => { ro.disconnect(); mo.disconnect(); cancelAnimationFrame(t); };
+  }, []);
   useLayoutEffect(() => {
     if (!root.current) return;
     const savedKeys = new Set((saved.layouts?.[bp.current] || []).map(l => l.i));
