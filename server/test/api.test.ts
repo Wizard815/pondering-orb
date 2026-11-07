@@ -144,3 +144,26 @@ test("TestMcp_StartTaskMarksInProgress", async () => {
   await call("orb_complete_task", { title: "Fix flaky login" });
   assert.equal((records.get("tasks", task.id) as any).started, false);
 });
+
+test("TestMcp_AgentStatusFollowsHerdr", async () => {
+  const { app, records } = await buildApp({ config: cfg(), tokens: "studio:t" });
+  const proj: any = records.create("projects", { name: "Argos", status: "next" });
+  const task: any = records.create("tasks", { title: "Fix login", list: "Argos" });
+  const h = { authorization: "Bearer t" };
+  const call = async (args: any) => (await app.inject({ method: "POST", url: "/mcp", headers: h, payload: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "orb_set_agent_status", arguments: args } } })).json().result;
+  const t = { title: "Fix login", list: "Argos" };
+  await call({ task: t, status: "working", agent: "claude" });
+  let cur: any = records.get("tasks", task.id);
+  assert.equal(cur.started, true); assert.equal(cur.agent.status, "working"); assert.equal(cur.agent.name, "claude");
+  await call({ task: t, status: "blocked" });
+  assert.equal((records.get("tasks", task.id) as any).agent.status, "blocked");
+  // The pane closed before the task was finished: open again.
+  await call({ task: t, status: "gone" });
+  cur = records.get("tasks", task.id);
+  assert.equal(cur.agent, null); assert.equal(cur.started, false);
+  // Projects: working moves next → active.
+  await call({ project: "argos", status: "working", agent: "codex" });
+  cur = records.get("projects", proj.id);
+  assert.equal(cur.status, "active"); assert.equal(cur.agent.status, "working");
+  assert.equal((await call({ task: t, status: "sleeping" })).isError, true);
+});

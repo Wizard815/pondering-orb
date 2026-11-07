@@ -28,6 +28,18 @@ export function PrioSelect({ value, onChange }: { value: number; onChange: (cal:
     {[...PRIO_LEVELS].reverse().map(l => <option key={l.level} value={l.cal}>{l.level ? l.name : "No priority"}</option>)}</select>;
 }
 
+/** The agent on a task or project, with herdr's glyphs and colors (Studio uses the same). */
+const AGENT_LOOK: Record<string, { g: string; cls: string; label: string }> = {
+  working: { g: "◐", cls: "st-paused", label: "agent working" },
+  blocked: { g: "×", cls: "st-blocked", label: "agent needs you" },
+  done: { g: "✓", cls: "st-shipped", label: "agent done" },
+  idle: { g: "○", cls: "st-active", label: "agent idle" },
+};
+export function AgentBadge({ status, name }: { status?: string; name?: string }) {
+  const look = status ? AGENT_LOOK[status] : undefined; if (!look) return null;
+  return <span className={"tag agent-badge " + look.cls} title={name ? `${name}: ${look.label}` : look.label}><span className="glyph" aria-hidden="true">{look.g}</span> {look.label}</span>;
+}
+
 export function TaskRows({ tasks, showList }: { tasks: any[]; showList?: boolean }) {
   const ui = useUi(), today = todayISO();
   const toggle = (t: any, done: boolean) => patch("tasks", t.id, done ? { done: true, doneAt: today, doneBy: "you" } : { done: false, doneAt: "", doneBy: "" }).catch(ui.error);
@@ -35,7 +47,7 @@ export function TaskRows({ tasks, showList }: { tasks: any[]; showList?: boolean
   return <div>{tasks.map(t => <div key={t.id} className={"task" + (t.done ? " done" : "")}>
     <input type="checkbox" checked={!!t.done} disabled={fromOmi(t)} title={fromOmi(t) ? "From Omi: mark it done in Omi" : undefined} onChange={e => toggle(t, e.target.checked)} aria-label={"Done: " + t.title} />
     <PrioChip t={t} />
-    <div className="grow"><span className="t">{t.title}</span>{fromOmi(t) && <> <span className="tag omi" title="An Omi action item, read from CalDAV. Change it in Omi.">Omi</span></>}{showList && <> <span className="tag">{listOf(t)}</span></>}{!t.done && t.started && <> <button type="button" className="tag st-active linkish" title="In progress (an agent or you started it). Click to clear." onClick={() => patch("tasks", t.id, { started: false }).catch(ui.error)}>in progress</button></>}{t.done && t.doneBy && <div className="hint">done by {t.doneBy}</div>}</div>
+    <div className="grow"><span className="t">{t.title}</span>{fromOmi(t) && <> <span className="tag omi" title="An Omi action item, read from CalDAV. Change it in Omi.">Omi</span></>}{showList && <> <span className="tag">{listOf(t)}</span></>}{!t.done && t.agent?.status && <> <AgentBadge status={t.agent.status} name={t.agent.name} /></>}{!t.done && t.started && !t.agent?.status && <> <button type="button" className="tag st-active linkish" title="In progress (an agent or you started it). Click to clear." onClick={() => patch("tasks", t.id, { started: false }).catch(ui.error)}>in progress</button></>}{t.done && t.doneBy && <div className="hint">done by {t.doneBy}</div>}</div>
     {t.due && <span className={"due" + (!t.done && t.due < today ? " late" : "")}>{fmtDate(t.due)}</span>}
     {!fromOmi(t) && <button className="btn sm ghost x" title="Delete task" aria-label={"Delete task: " + t.title} onClick={() => removeWithUndo(ui, "tasks", t.id, `Deleted “${t.title}”${t.caldav ? " (also in CalDAV)" : ""}.`).catch(ui.error)}>×</button>}
   </div>)}</div>;

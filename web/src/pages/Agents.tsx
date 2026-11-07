@@ -6,6 +6,7 @@ import { useUi } from "../lib/ui";
 import { post } from "../lib/api";
 import { useFetch } from "../lib/useFetch";
 import { clip, listOf } from "../lib/util";
+import { AgentBadge } from "../components/Common";
 
 /** Coding agents running in herdr, read through Hermes Studio, and a way to
  *  hand an Orb task, plan or project to a new agent. Studio starts the agent
@@ -27,7 +28,7 @@ function AgentList({ data, error }: { data: Agents | null; error: string }) {
   const list = [...data.agents].sort((a, b) => (RANK[a.status] ?? 4) - (RANK[b.status] ?? 4));
   if (!list.length) return <div className="empty">No agents are running in herdr.</div>;
   return <ul className="list">{list.map(a => <li key={a.paneId}>
-    <span className={ST_CLASS[a.status] || "muted"} title={a.status} aria-label={a.status} style={{ width: 16, textAlign: "center" }}>{GLYPH[a.status] || "·"}</span>
+    <span className={ST_CLASS[a.status] || "muted"} title={a.status} aria-label={a.status} style={{ width: 16, textAlign: "center" }}><span className="glyph">{GLYPH[a.status] || "·"}</span></span>
     <div className="grow"><b>{a.title}</b> <span className="small muted">{a.agent} · {a.space}</span>
       {a.cwd && <div className="small muted mono">{clip(a.cwd, 60)}</div>}</div>
     {data.studioUrl && <a className="btn" href={`${data.studioUrl}/mission/?pane=${encodeURIComponent(a.paneId)}`} target="_blank" rel="noopener">Watch</a>}
@@ -67,11 +68,11 @@ function SendPlan({ kinds, agents, onSent }: { kinds: Kind[]; agents: Agents | n
     </div>
     <p className="hint" style={{ margin: 0 }}>The agent starts in herdr with your Studio models, MCP servers and skills, and gets the plan as its first message.</p>
     <h4 className="small muted" style={{ margin: "8px 0 4px" }}>Projects</h4>
-    {live.length ? <ul className="list">{live.map((p: any) => <li key={p.id}><div className="grow"><b>{p.name}</b>{p.next && <span className="small muted"> · {clip(p.next, 60)}</span>}</div>
+    {live.length ? <ul className="list">{live.map((p: any) => <li key={p.id}><div className="grow"><b>{p.name}</b>{p.next && <span className="small muted"> · {clip(p.next, 60)}</span>}{p.agent?.status && <> <AgentBadge status={p.agent.status} name={p.agent.name} /></>}</div>
       {action(`p:${p.id}`, p.name, () => send(`p:${p.id}`, p.name, projectPrompt(p), p.name, { project: p.name }))}</li>)}</ul>
       : <div className="empty">No active projects.</div>}
     <h4 className="small muted" style={{ margin: "8px 0 4px" }}>Open tasks and plans</h4>
-    {open.length ? <ul className="list">{open.map((t: any) => <li key={t.id}><div className="grow">{t.title} <span className="small muted">{listOf(t)}</span>{t.started && <span className="small st-active"> · ◐ in progress</span>}</div>
+    {open.length ? <ul className="list">{open.map((t: any) => <li key={t.id}><div className="grow">{t.title} <span className="small muted">{listOf(t)}</span>{t.agent?.status ? <> <AgentBadge status={t.agent.status} name={t.agent.name} /></> : t.started && <span className="small st-active"> · in progress</span>}</div>
       {action(`t:${t.id}`, t.title, () => send(`t:${t.id}`, t.title, taskPrompt(t), projects.some((p: any) => p.name === listOf(t)) ? listOf(t) : undefined, { task: { title: t.title, list: listOf(t) } }))}</li>)}</ul>
       : <div className="empty">No open tasks.</div>}
   </>;

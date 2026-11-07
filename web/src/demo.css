@@ -99,6 +99,8 @@ form.row input[type=text]{flex:1 1 180px}
 .grow{flex:1;min-width:0;overflow-wrap:anywhere}
 .date{font-family:var(--f-mono);font-size:.78rem;color:var(--muted);white-space:nowrap;padding-top:2px;min-width:5.5em}
 .tag{font-size:.78rem;font-weight:700;color:var(--arcane)}
+/* herdr's status glyphs need a font that has them (the display fonts do not). */
+.glyph{font-family:"DejaVu Sans","Segoe UI Symbol","Apple Symbols",system-ui,sans-serif;font-weight:700}
 button.tag.linkish{background:none;border:0;padding:0;cursor:pointer;font-family:inherit}
 
 /* projects */
