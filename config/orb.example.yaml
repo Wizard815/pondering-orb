@@ -37,6 +37,8 @@ wiki:                # LLMWIKI: reads from the mount, writes over the REST API
 
 hermes:
   base_url: http://hermes-studio:6060
+  # Studio's address in your browser (for the Agents tab's Watch and Chat links), e.g. through the tunnel.
+  # public_url: https://studio.example.com
   user_env: HERMES_USER
   password_env: HERMES_PASSWORD
 
