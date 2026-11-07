@@ -92,7 +92,7 @@ export async function buildApp(o: AppOptions = {}) {
   const companionTools = (): Tool[] => {
     const gb = companion(appsYaml(), "goblinbank"), om = companion(appsYaml(), "omi");
     return [
-      ...(gb ? [{ name: "money_summary", description: "Goblin-Bank's shared summary per person: net worth, monthly subscriptions, Robinhood balances. Only what each person chose to share; no transactions. Read only.",
+      ...(gb ? [{ name: "money_summary", description: "Goblin-Bank's shared summary per person: net worth, monthly subscriptions, bills due soon, alert counts, savings (total and free), goal progress and Robinhood balances. Only what each person chose to share; no transactions. Read only.",
         parameters: { type: "object", properties: {} }, run: () => goblinSummary(gb) }] : []),
       ...(om ? [
         { name: "omi_search_memories", description: "Search the user's Omi memories (things Omi learned from their conversations). Read only.", parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },

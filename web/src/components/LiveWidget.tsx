@@ -7,6 +7,11 @@ const usd = (n: number | null) => (n === null || n === undefined ? "—" : n.toL
 
 /** Goblin-Bank: only what each person shares (no transactions). */
 function GoblinBank({ data }: { data: any }) {
+  const bits = (p: any) => [
+    p.bills?.next7d != null && `bills ${usd(p.bills.next7d)} this week${p.bills.next30d != null ? `, ${usd(p.bills.next30d)} in 30 days` : ""}`,
+    p.bills?.next && `next: ${p.bills.next.name} ${String(p.bills.next.date).slice(5)}`,
+    p.savings?.total != null && `savings ${usd(p.savings.total)}${p.savings.free != null ? `, ${usd(p.savings.free)} free` : ""}`,
+  ].filter(Boolean) as string[];
   return <>
     {data.netWorth !== null && <div className="row"><span className="wx-t">{usd(data.netWorth)}</span><span className="hint">net worth, shared</span></div>}
     <table className="tbl small"><tbody>{data.people.map((p: any) => <tr key={p.name}><td><b>{p.name}</b></td>
@@ -15,6 +20,11 @@ function GoblinBank({ data }: { data: any }) {
         <td className="num">{p.subscriptionsMonthly !== null ? `${usd(p.subscriptionsMonthly)}/mo` : ""}</td>
         <td className="num">{p.robinhoodAgent?.equity != null ? <span title={`agentic account, as of ${p.robinhoodAgent.asOf}`}>RH agent {usd(p.robinhoodAgent.equity)}</span> : p.robinhoodMain?.equity != null ? <span title={`${p.robinhoodMain.source}, as of ${p.robinhoodMain.asOf}`}>RH {usd(p.robinhoodMain.equity)}</span> : ""}</td></>}
     </tr>)}</tbody></table>
+    {data.people.filter((p: any) => !p.error && (bits(p).length || p.alerts?.total || p.goals?.length)).map((p: any) => <div key={p.name} className="small" style={{ marginTop: 6 }}>
+      <b>{p.name}</b> <span className="muted">{bits(p).join(" · ")}</span>
+      {p.alerts?.total > 0 && <span className={p.alerts.critical ? "err-inline" : "hint"}> · {p.alerts.total} alert{p.alerts.total === 1 ? "" : "s"}{p.alerts.critical ? `, ${p.alerts.critical} critical` : ""}</span>}
+      {p.goals?.length > 0 && <div className="muted">{p.goals.map((g: any) => `${g.name} ${g.pct != null ? Math.round(g.pct * 100) + "%" : ""}`).join(" · ")}</div>}
+    </div>)}
     <div className="hint">Read only, from Goblin-Bank's shared summary · {ago(data.at)}</div>
   </>;
 }

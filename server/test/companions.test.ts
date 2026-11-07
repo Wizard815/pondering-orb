@@ -17,7 +17,9 @@ const J = (res: any, o: unknown, code = 200) => { res.writeHead(code, { "content
 test("TestCompanions_ReadOnlyWidgetsAndGolemTools", async () => {
   process.env.GB_KEY = "orbkey"; process.env.OMI_KEY = "omi_dev_x";
   const gb = await serve((req, _b, res) => req.url === "/api/v1/summary" && req.headers.authorization === "Bearer orbkey"
-    ? J(res, { goblins: { alice: { goblin: "alice", net_worth: 12000.5, subscriptions_monthly: 42.1, robinhood_agent: { as_of: "2026-11-07", balances: { equity: 510.25 } } }, bob: { error: "unavailable" }, carol: { goblin: "carol" } } })
+    ? J(res, { goblins: { alice: { goblin: "alice", net_worth: 12000.5, subscriptions_monthly: 42.1, robinhood_agent: { as_of: "2026-11-07", balances: { equity: 510.25 } } }, bob: { error: "unavailable" }, carol: { goblin: "carol" },
+        dave: { goblin: "dave", net_worth: 5000, bills: { next_7d: 120.5, next_30d: 480, next: { name: "Netflix", date: "2026-11-09", amount: 15.49 } }, alerts: { total: 3, critical: 1, warning: 2 },
+          savings: { total: 10000, free: 0, earmarked: 10000 }, goals: [{ name: "House", target: 9000, allocated: 9000, pct: 1 }, { name: "Laptop", target: 1500, allocated: 0, pct: 0 }, { name: "", target: 1, allocated: 1, pct: 1 }] } } })
     : J(res, { detail: "unauthorized" }, 401));
   const omi = await serve((req, _b, res) => {
     const u = new URL(req.url, "http://x");
@@ -33,9 +35,16 @@ test("TestCompanions_ReadOnlyWidgetsAndGolemTools", async () => {
     const yaml = `groups:\n  - name: Home\n    apps:\n      - name: Bank\n        url: ${gb.url}\n        widget: { type: goblinbank, key_env: GB_KEY }\n      - name: Omi\n        url: ${omi.url}\n        widget: { type: omi, key_env: OMI_KEY }\n`;
     await app.inject({ method: "PUT", url: "/api/c/settings/apps", payload: { yaml } });
     const bank = (await app.inject({ method: "GET", url: "/api/widgets/Bank" })).json();
-    assert.equal(bank.netWorth, 12000.5, "only people who share net worth count");
+    assert.equal(bank.netWorth, 17000.5, "only people who share net worth count (alice and dave)");
     assert.equal(bank.people.find((p: any) => p.name === "alice").robinhoodAgent.equity, 510.25);
     assert.equal(bank.people.find((p: any) => p.name === "bob").error, "unavailable");
+    // the newer shared fields: parsed when present, null when that person does not share them
+    const dave = bank.people.find((p: any) => p.name === "dave");
+    assert.deepEqual(dave.bills, { next7d: 120.5, next30d: 480, next: { name: "Netflix", date: "2026-11-09", amount: 15.49 } });
+    assert.deepEqual(dave.alerts, { total: 3, critical: 1, warning: 2 }); assert.deepEqual(dave.savings, { total: 10000, free: 0, earmarked: 10000 });
+    assert.deepEqual(dave.goals.map((g: any) => [g.name, g.pct]), [["House", 1], ["Laptop", 0]], "a goal without a name is dropped");
+    const alice = bank.people.find((p: any) => p.name === "alice");
+    assert.ok(alice.bills === null && alice.alerts === null && alice.savings === null && alice.goals === null, "unshared means null, not zero");
     const o = (await app.inject({ method: "GET", url: "/api/widgets/Omi" })).json();
     assert.equal(o.day.headline, "Shipped the NAS fix"); assert.deepEqual(o.day.decisions, ["Move backups to Sunday"]); assert.equal(o.conversations[0].title, "NAS planning");
     // Only GETs ever reached either app.
