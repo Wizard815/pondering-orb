@@ -48,14 +48,30 @@ function equity(b: any): number | null {
   return null;
 }
 export type MoneyPerson = { name: string; error?: string; netWorth: number | null; subscriptionsMonthly: number | null;
-  robinhoodMain: { asOf: string; source: string; equity: number | null } | null; robinhoodAgent: { asOf: string; equity: number | null } | null };
+  robinhoodMain: { asOf: string; source: string; equity: number | null } | null; robinhoodAgent: { asOf: string; equity: number | null } | null;
+  /** Bills due, alert counts, savings and goal progress: each is null unless that person shares it. Totals only, never transactions. */
+  bills: { next7d: number | null; next30d: number | null; next: { name: string; date: string; amount: number | null } | null } | null;
+  alerts: { total: number; critical: number; warning: number } | null;
+  savings: { total: number | null; free: number | null; earmarked: number | null } | null;
+  goals: { name: string; target: number | null; allocated: number | null; pct: number | null }[] | null };
+const NONE = { bills: null, alerts: null, savings: null, goals: null };
+function shareable(g: any): Pick<MoneyPerson, "bills" | "alerts" | "savings" | "goals"> {
+  return {
+    bills: g.bills && typeof g.bills === "object" ? { next7d: num(g.bills.next_7d), next30d: num(g.bills.next_30d),
+      next: g.bills.next && typeof g.bills.next === "object" ? { name: String(g.bills.next.name || ""), date: String(g.bills.next.date || ""), amount: num(g.bills.next.amount) } : null } : null,
+    alerts: g.alerts && typeof g.alerts === "object" ? { total: Number(g.alerts.total) || 0, critical: Number(g.alerts.critical) || 0, warning: Number(g.alerts.warning) || 0 } : null,
+    savings: g.savings && typeof g.savings === "object" ? { total: num(g.savings.total), free: num(g.savings.free), earmarked: num(g.savings.earmarked) } : null,
+    goals: Array.isArray(g.goals) ? g.goals.slice(0, 12).map((x: any) => ({ name: String(x?.name || ""), target: num(x?.target), allocated: num(x?.allocated), pct: num(x?.pct) })).filter((x: any) => x.name) : null,
+  };
+}
 export async function goblinSummary(c: Companion) {
   return cached(`gb:${c.url}`, 5 * 60000, async () => {
     const body = await get(c, "/api/v1/summary", "the summary");
-    const people: MoneyPerson[] = Object.entries(body?.goblins || {}).map(([name, g]: [string, any]) => g?.error ? { name, error: String(g.error), netWorth: null, subscriptionsMonthly: null, robinhoodMain: null, robinhoodAgent: null } : {
+    const people: MoneyPerson[] = Object.entries(body?.goblins || {}).map(([name, g]: [string, any]) => g?.error ? { name, error: String(g.error), netWorth: null, subscriptionsMonthly: null, robinhoodMain: null, robinhoodAgent: null, ...NONE } : {
       name, netWorth: num(g.net_worth), subscriptionsMonthly: num(g.subscriptions_monthly),
       robinhoodMain: g.robinhood_main ? { asOf: String(g.robinhood_main.as_of || ""), source: String(g.robinhood_main.source || ""), equity: equity(g.robinhood_main.balances) } : null,
       robinhoodAgent: g.robinhood_agent ? { asOf: String(g.robinhood_agent.as_of || ""), equity: equity(g.robinhood_agent.balances) } : null,
+      ...shareable(g),
     });
     const shared = people.filter(p => p.netWorth !== null);
     return { people, netWorth: shared.length ? +shared.reduce((a, p) => a + p.netWorth!, 0).toFixed(2) : null, at: Date.now() };

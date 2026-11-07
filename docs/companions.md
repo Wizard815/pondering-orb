@@ -22,7 +22,7 @@ server; the browser only sees what Orb shows.
 
 | App | Request (always GET) | Shown |
 | --- | --- | --- |
-| Goblin-Bank | `GET /api/v1/summary` on CoinGateway, with its Orb key (`summary:read`) | per person: net worth, monthly subscriptions, Robinhood balances, only if that person shares them (`share:` in `goblins.yaml`) |
+| Goblin-Bank | `GET /api/v1/summary` on CoinGateway, with its Orb key (`summary:read`) | per person: net worth, monthly subscriptions, bills due (this week, 30 days, the next one), alert counts, savings (total and free), goal progress and Robinhood balances, each only if that person ticked it under Goblin-Bank → Settings → Sharing |
 | Omi | `GET /v1/dev/user/daily-summaries`, `/conversations`, `/memories/search`, with an `omi_dev_` key | yesterday's recap (headline, overview, decisions, open questions) and recent conversations |
 
 Orb never sends anything to either app, never asks for transactions, and
