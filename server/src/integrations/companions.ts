@@ -13,13 +13,20 @@ import { HttpError } from "../records.js";
  *  Every request here is a GET. Omi's action items are NOT read from Omi:
  *  Omi already writes them to CalDAV (UID omi-task-...@omi-local), and Orb
  *  reads every task from that one CalDAV server, so nothing is listed twice. */
-export type Companion = { name: string; url: string; keyEnv?: string };
+export type Companion = { name: string; url: string; keyEnv?: string; page?: string };
 
 /** The first app of a widget type in the apps YAML. */
 export function companion(yaml: string, type: "goblinbank" | "omi"): Companion | null {
   let c: any = {}; try { c = parse(yaml || "") || {}; } catch { return null; }
   for (const g of Array.isArray(c.groups) ? c.groups : []) for (const a of Array.isArray(g?.apps) ? g.apps : [])
-    if (a?.widget?.type === type) return { name: String(a.name), url: String(a.widget.url || a.url || ""), keyEnv: a.widget.key_env || a.widget.keyEnv };
+    if (a?.widget?.type === type) return { name: String(a.name), url: String(a.widget.url || a.url || ""), keyEnv: a.widget.key_env || a.widget.keyEnv, page: pageLabel(a.widget.page, type) };
+  return null;
+}
+/** `page: true` (or a tab name) in a widget turns on that app's full page. */
+const pageLabel = (v: unknown, type: string) => v === true ? (type === "goblinbank" ? "Money" : "Omi") : typeof v === "string" && v.trim() ? v.trim().slice(0, 24) : undefined;
+/** Every app by name, for the per-app routes. */
+export function companionByName(yaml: string, name: string): (Companion & { type: string }) | null {
+  for (const type of ["goblinbank", "omi"] as const) { const c = companion(yaml, type); if (c && c.name === name) return { ...c, type }; }
   return null;
 }
 
@@ -47,14 +54,19 @@ function equity(b: any): number | null {
   for (const k of ["equity", "total_equity", "portfolio_value", "total", "market_value"]) { const v = num(Number(b[k])); if (v !== null && b[k] !== undefined && b[k] !== null) return v; }
   return null;
 }
+export type Bill = { date: string; name: string; amount: number; category: string; paidBy: string; person: string };
+export type MoneyAlert = { severity: "critical" | "warning" | "info"; kind: string; title: string; detail: string; person: string };
 export type MoneyPerson = { name: string; error?: string; netWorth: number | null; subscriptionsMonthly: number | null;
   robinhoodMain: { asOf: string; source: string; equity: number | null } | null; robinhoodAgent: { asOf: string; equity: number | null } | null;
   /** Bills due, alert counts, savings and goal progress: each is null unless that person shares it. Totals only, never transactions. */
   bills: { next7d: number | null; next30d: number | null; next: { name: string; date: string; amount: number | null } | null } | null;
   alerts: { total: number; critical: number; warning: number } | null;
   savings: { total: number | null; free: number | null; earmarked: number | null } | null;
-  goals: { name: string; target: number | null; allocated: number | null; pct: number | null }[] | null };
-const NONE = { bills: null, alerts: null, savings: null, goals: null };
+  goals: { name: string; target: number | null; allocated: number | null; pct: number | null }[] | null;
+  /** The itemised lists, separate opt-ins in Goblin-Bank (bill_list, alert_list). */
+  billList: Bill[] | null; alertList: MoneyAlert[] | null };
+const NONE = { bills: null, alerts: null, savings: null, goals: null, billList: null, alertList: null };
+const SEV = ["critical", "warning", "info"];
 function shareable(g: any): Pick<MoneyPerson, "bills" | "alerts" | "savings" | "goals"> {
   return {
     bills: g.bills && typeof g.bills === "object" ? { next7d: num(g.bills.next_7d), next30d: num(g.bills.next_30d),
@@ -72,19 +84,26 @@ export async function goblinSummary(c: Companion) {
       robinhoodMain: g.robinhood_main ? { asOf: String(g.robinhood_main.as_of || ""), source: String(g.robinhood_main.source || ""), equity: equity(g.robinhood_main.balances) } : null,
       robinhoodAgent: g.robinhood_agent ? { asOf: String(g.robinhood_agent.as_of || ""), equity: equity(g.robinhood_agent.balances) } : null,
       ...shareable(g),
+      billList: Array.isArray(g.bill_list) ? g.bill_list.slice(0, 200).map((b: any) => ({ date: String(b?.date || ""), name: String(b?.name || ""), amount: Number(b?.amount) || 0, category: String(b?.category || ""), paidBy: String(b?.paid_by || "me"), person: name })).filter((b: any) => b.name && /^\d{4}-\d{2}-\d{2}$/.test(b.date)) : null,
+      alertList: Array.isArray(g.alert_list) ? g.alert_list.slice(0, 50).map((a: any) => ({ severity: (SEV.includes(a?.severity) ? a.severity : "info") as MoneyAlert["severity"], kind: String(a?.kind || ""), title: String(a?.title || ""), detail: String(a?.detail || ""), person: name })).filter((a: any) => a.title) : null,
     });
     const shared = people.filter(p => p.netWorth !== null);
-    return { people, netWorth: shared.length ? +shared.reduce((a, p) => a + p.netWorth!, 0).toFixed(2) : null, at: Date.now() };
+    const bills = people.flatMap(p => p.billList || []).sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name));
+    const alerts = people.flatMap(p => p.alertList || []).sort((a, b) => SEV.indexOf(a.severity) - SEV.indexOf(b.severity));
+    return { people, netWorth: shared.length ? +shared.reduce((a, p) => a + p.netWorth!, 0).toFixed(2) : null, bills, alerts, at: Date.now() };
   });
 }
 
 // ---- omi-local ----
-export type OmiDay = { date: string; headline: string; overview: string; emoji: string; stats: Record<string, unknown>; decisions: string[]; questions: string[] };
+export type OmiDay = { date: string; headline: string; overview: string; emoji: string; stats: Record<string, unknown>; decisions: string[]; questions: string[];
+  highlights: { topic: string; emoji: string; summary: string }[]; nuggets: string[] };
 const day = (s: any): OmiDay => ({ date: String(s?.date || ""), headline: String(s?.headline || ""), overview: String(s?.overview || ""), emoji: String(s?.day_emoji || ""),
-  stats: s?.stats || {}, decisions: (s?.decisions_made || []).map((d: any) => String(d?.decision || "")).filter(Boolean).slice(0, 5),
-  questions: (s?.unresolved_questions || []).map((q: any) => String(q?.question || "")).filter(Boolean).slice(0, 5) });
-export async function omiDays(c: Companion, limit = 3, date = "") {
-  const q = new URLSearchParams({ limit: String(Math.max(1, Math.min(30, limit))), ...(/^\d{4}-\d{2}-\d{2}$/.test(date) ? { start_date: date, end_date: date } : {}) });
+  stats: s?.stats || {}, decisions: (s?.decisions_made || []).map((d: any) => String(d?.decision || "")).filter(Boolean).slice(0, 8),
+  questions: (s?.unresolved_questions || []).map((q: any) => String(q?.question || "")).filter(Boolean).slice(0, 8),
+  highlights: (s?.highlights || []).map((h: any) => ({ topic: String(h?.topic || ""), emoji: String(h?.emoji || ""), summary: String(h?.summary || "") })).filter((h: any) => h.topic || h.summary).slice(0, 8),
+  nuggets: (s?.knowledge_nuggets || []).map((k: any) => String(k?.insight || "")).filter(Boolean).slice(0, 8) });
+export async function omiDays(c: Companion, limit = 3, date = "", offset = 0) {
+  const q = new URLSearchParams({ limit: String(Math.max(1, Math.min(30, limit))), ...(offset > 0 ? { offset: String(Math.min(1000, offset)) } : {}), ...(/^\d{4}-\d{2}-\d{2}$/.test(date) ? { start_date: date, end_date: date } : {}) });
   return cached(`omi:d:${c.url}:${q}`, 10 * 60000, async () => ((await get(c, `/v1/dev/user/daily-summaries?${q}`, "daily summaries"))?.summaries || []).map(day));
 }
 export async function omiConversations(c: Companion, limit = 5) {

@@ -71,7 +71,9 @@ export function dailyApi(app: FastifyInstance, deps: { records: Records; dav: Ca
     const omi = om ? await safe("Omi", async () => (await omiDays(om, 1, addDays(day, -1)))[0] || null) : null;
     const omiTasks = tasks.filter(t => t.fromOmi).length;
     return { day, timeZone: timeZone(), weather: wx, news: headlines || [], stocks: prices || [], events: cal || [], tasks, chores, notes,
-      money: money && { netWorth: money.netWorth, people: money.people.map(p => ({ name: p.name, netWorth: p.netWorth, subscriptionsMonthly: p.subscriptionsMonthly })) },
+      money: money && { netWorth: money.netWorth, people: money.people.map(p => ({ name: p.name, netWorth: p.netWorth, subscriptionsMonthly: p.subscriptionsMonthly })),
+        billsThisWeek: money.bills.filter(b => b.date <= addDays(day, 6)).map(b => ({ day: b.date, name: b.name, amount: b.amount, person: b.person, paidBy: b.paidBy })),
+        alerts: money.alerts.filter(a => a.severity !== "info").map(a => ({ severity: a.severity, title: a.title, person: a.person })) },
       omiYesterday: omi && { headline: omi.headline, overview: omi.overview.slice(0, 800), decisions: omi.decisions, questions: omi.questions }, omiOpenTasks: omiTasks };
   }
 
@@ -87,7 +89,7 @@ export function dailyApi(app: FastifyInstance, deps: { records: Records; dav: Ca
     let text = "";
     try {
       const r = await chat({ baseUrl: g.baseUrl, model: g.model, key: secret(g.keyEnv), who, tools: [], maxRounds: 1, messages: [
-        { role: "system", content: "You are Golem, the stone servant of the Pondering Orb, writing the user's morning brief. Plain, warm and short, with a light touch of wizard flavour. Markdown. Sections in this order: a one-line greeting with the weather; **Today** (events with times, tasks due or overdue, chores due); **This week** (the notable events); **Tasks to pick up** (top 3 by priority; tasks marked fromOmi came from Omi); **Yesterday, per Omi** (two lines from omiYesterday, only if present); **News** (5 bullets, one line each, most important first); **Markets** (one line on the watchlist, and net worth from money only if present). Use only the data given; never invent events, tasks or prices. If a source failed, say so in one short line." },
+        { role: "system", content: "You are Golem, the stone servant of the Pondering Orb, writing the user's morning brief. Plain, warm and short, with a light touch of wizard flavour. Markdown. Sections in this order: a one-line greeting with the weather; **Today** (events with times, tasks due or overdue, chores due); **This week** (the notable events); **Tasks to pick up** (top 3 by priority; tasks marked fromOmi came from Omi); **Money** (only if money is present: bills due this week with amounts, and any critical or warning alerts); **Yesterday, per Omi** (two lines from omiYesterday, only if present); **News** (5 bullets, one line each, most important first); **Markets** (one line on the watchlist, and net worth from money only if present). Use only the data given; never invent events, tasks or prices. If a source failed, say so in one short line." },
         { role: "user", content: `Today is ${day} (${data.timeZone}). Data:\n${JSON.stringify(compact).slice(0, 24000)}` }] });
       text = r.text;
     } catch (e: any) { text = `_The Golem couldn't write today's brief: ${e.message}_`; }
@@ -95,6 +97,12 @@ export function dailyApi(app: FastifyInstance, deps: { records: Records; dav: Ca
     return records.get("daily", id) ? records.put("daily", id, doc) : records.create("daily", doc, id);
   }
 
+  /** Bills from Goblin-Bank's shared bill lists, for Today and This week. */
+  app.get("/api/daily/bills", { preHandler: guard }, async (req: any) => {
+    const gb = companion(String((records.get("settings", "apps") as any)?.yaml || ""), "goblinbank"); if (!gb) return [];
+    const from = today(), to = addDays(from, Math.max(1, Math.min(31, Number(req.query.days) || 7)) - 1);
+    return (await goblinSummary(gb)).bills.filter(b => b.date >= from && b.date <= to);
+  });
   app.get("/api/daily/weather", { preHandler: guard }, async () => { const s = dailySettings(records); return weather(s.location, s.units); });
   app.get("/api/daily/news", { preHandler: guard }, async () => news(dailySettings(records).feeds, 25));
   app.get("/api/daily/quotes", { preHandler: guard }, async () => quotes(dailySettings(records).watchlist));
