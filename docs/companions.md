@@ -63,6 +63,8 @@ task, marked **Omi**. To keep Omi in charge of them:
   the brief's calendar, since they record what happened rather than plans.
   The Omi panel shows them instead.
 
+CDs and bonds nearing maturity arrive as dated alerts (kind `maturing`, with the date and where the money would go) once the alert list is shared; they show under **Maturing today** on Today, in This week, on the Money page and in the brief when they are within a week.
+
 Bill and alert *lists* are their own share options in Goblin-Bank (`bill_list`,
 `alert_list`); sharing the totals doesn't share them.
 

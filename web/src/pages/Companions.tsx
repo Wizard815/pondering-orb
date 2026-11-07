@@ -53,7 +53,7 @@ function Alerts({ app }: { app: App }) {
   if (!data.people.some((p: any) => p.alertList)) return <div className="empty">Nobody shares an alert list yet (Goblin-Bank → Settings → Sharing → Alert list).</div>;
   if (!data.alerts.length) return <div className="empty">All quiet in the vaults.</div>;
   return <ul className="list">{data.alerts.map((a: any, k: number) => <li key={k}><span className={"chip " + SEV_CLS[a.severity]}>{a.severity}</span>
-    <div className="grow">{a.title}{a.detail && <div className="hint">{a.detail}</div>}</div><span className="tag">{a.person}</span></li>)}</ul>;
+    <div className="grow">{a.title}{a.detail && <div className="hint">{a.detail}</div>}</div>{a.date && <span className="date">{fmtDate(a.date)}</span>}<span className="tag">{a.person}</span></li>)}</ul>;
 }
 function Goals({ app }: { app: App }) {
   const { data } = useMoney(app);
