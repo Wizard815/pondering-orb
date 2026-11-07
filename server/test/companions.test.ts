@@ -23,7 +23,8 @@ test("TestCompanions_ReadOnlyWidgetsAndGolemTools", async () => {
         bill_list: [{ date: todayIso, name: "Netflix", amount: 15.49, category: "Subscriptions", paid_by: "me" }, { date: "2099-01-01", name: "Far away", amount: 1, category: "x", paid_by: "me" }],
         alert_list: [{ severity: "info", kind: "due_soon", title: "Netflix due", detail: "15.49" }, { severity: "critical", kind: "negative_balance", title: "Checking is overdrawn", detail: "Balance -20.00" },
           { severity: "warning", kind: "maturing", title: `12-mo CD matures today`, detail: "Worth about 10,512.20; 1,512.20 free → Car 1,512.20. Nothing else needs it.", date: todayIso },
-          { severity: "info", kind: "maturing", title: "6-mo CD matures in 40 days (2099-02-01)", detail: "Worth about 5,100.00", date: "2099-02-01" }] },
+          { severity: "info", kind: "maturing", title: "6-mo CD matures in 40 days (2099-02-01)", detail: "Worth about 5,100.00", date: "2099-02-01" },
+          { severity: "warning", kind: "matured_idle", title: "Old CD matured 12 days ago and is still sitting there", detail: "2,500.00 on it, 2,500.00 free. Roll it over, move it, or mark it handled.", date: "2026-10-26" }] },
       bob: { error: "unavailable" }, carol: { goblin: "carol" },
         dave: { goblin: "dave", net_worth: 5000, bills: { next_7d: 120.5, next_30d: 480, next: { name: "Netflix", date: "2026-11-09", amount: 15.49 } }, alerts: { total: 3, critical: 1, warning: 2 },
           savings: { total: 10000, free: 0, earmarked: 10000 }, spending: { so_far: 818.55, projected: 3874.14, income_avg: 4761.64, pct_projected: 0.814, left_after: 887.5, confidence: "high" }, goals: [{ name: "House", target: 9000, allocated: 9000, pct: 1 }, { name: "Laptop", target: 1500, allocated: 0, pct: 0 }, { name: "", target: 1, allocated: 1, pct: 1 }] } } })
