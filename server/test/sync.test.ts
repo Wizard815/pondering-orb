@@ -100,3 +100,12 @@ test("TestWiki_SectionEditPatchesAndLogs", async () => {
     assert.equal(bad.statusCode, 403);
   } finally { server.close(); }
 });
+
+test("TestIcal_InProgressIsInProcess", () => {
+  const base = ics("y", "SUMMARY:Fix it\r\nSTATUS:NEEDS-ACTION");
+  const started = writeTodo(base, { uid: "y", summary: "Fix it", done: false, started: true, due: "", priority: 0 });
+  assert.equal(parseTodo(started)!.status, "IN-PROCESS");
+  // Done wins over in progress; not started goes back to NEEDS-ACTION.
+  assert.equal(parseTodo(writeTodo(started, { uid: "y", summary: "Fix it", done: true, started: true, due: "", priority: 0 }))!.status, "COMPLETED");
+  assert.equal(parseTodo(writeTodo(started, { uid: "y", summary: "Fix it", done: false, due: "", priority: 0 }))!.status, "NEEDS-ACTION");
+});

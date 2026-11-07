@@ -57,7 +57,7 @@ export class TaskSync {
         const caldav = { href: it.href, etag: it.etag, uid: t.uid, list: list.name, ics: it.ics };
         const data = isChores
           ? { name: t.summary || "Chore", everyDays: t.rrule ? rruleDays(t.rrule) : 7, lastDone: t.completed || (t.due && t.rrule ? addDays(t.due, -rruleDays(t.rrule)) : ""), due: t.due, caldav }
-          : { title: t.summary || "Untitled", list: list.name, due: t.due, done: t.status === "COMPLETED", priority: t.priority, doneAt: t.completed, caldav, source: isOmiTask(t.uid) ? "omi" : "" };
+          : { title: t.summary || "Untitled", list: list.name, due: t.due, done: t.status === "COMPLETED", started: t.status === "IN-PROCESS", priority: t.priority, doneAt: t.completed, caldav, source: isOmiTask(t.uid) ? "omi" : "" };
         const cur: any = this.r.get(coll, id);
         if (!cur) this.r.create(coll, data, id, ORIGIN);
         else if (cur.caldav?.etag !== it.etag) this.r.put(coll, id, { ...strip(cur), ...data }, ORIGIN);
@@ -88,7 +88,7 @@ export class TaskSync {
     if (isOmiTask(d.caldav?.uid)) return;
     if (c.coll === "tasks") {
       if (d.caldav?.href) {
-        const fields = { uid: d.caldav.uid, summary: d.title, done: !!d.done, due: d.due || "", priority: Number(d.priority) || 0 };
+        const fields = { uid: d.caldav.uid, summary: d.title, done: !!d.done, started: !!d.started, due: d.due || "", priority: Number(d.priority) || 0 };
         const ics = writeTodo(d.caldav.ics, fields);
         const target = this.lists.find(l => l.name === d.list);
         if (target && d.list !== d.caldav.list) { // moved to another list: create it there, then remove the old one
@@ -104,7 +104,7 @@ export class TaskSync {
         if (!this.lists.length) await this.pull(); // unreachable: throws, so the change is queued
         const list = this.lists.find(l => l.name === d.list); if (!list) return; // a list that only lives in Orb
         const uid = randomUUID(), href = list.href.replace(/\/?$/, "/") + uid + ".ics";
-        const ics = writeTodo(null, { uid, summary: d.title, done: !!d.done, due: d.due || "", priority: Number(d.priority) || 0 });
+        const ics = writeTodo(null, { uid, summary: d.title, done: !!d.done, started: !!d.started, due: d.due || "", priority: Number(d.priority) || 0 });
         await this.save(c.coll, d, href, ics, undefined, uid, list.name);
       }
     } else if (c.coll === "chores") {

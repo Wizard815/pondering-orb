@@ -57,6 +57,8 @@ export class Records extends EventEmitter {
     if (coll === "tasks") {
       if (!partial || "title" in d) { const t = String(d.title ?? "").trim(); if (!t) throw new HttpError(422, "A task needs a title."); d.title = t; }
       if ("priority" in d) { const p = Number(d.priority) || 0; if (p < 0 || p > 9) throw new HttpError(422, "Priority is 0 to 9."); d.priority = p; }
+      if ("started" in d) d.started = !!d.started;
+      if (d.done) d.started = false; // done is past in progress
       if (!partial) { d.list ??= "Inbox"; d.done ??= false; }
     }
     if (coll === "chores") {

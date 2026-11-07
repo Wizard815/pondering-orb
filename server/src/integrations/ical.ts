@@ -61,10 +61,11 @@ function dayLine(name: string, iso: string, old?: string) {
 /** Change the managed properties inside an existing VTODO (or build a new one),
  *  leaving everything else (alarms, categories, other apps' X- fields) alone.
  *  Only the master VTODO is edited; recurrence exceptions stay as they are. */
-export function writeTodo(base: string | null, t: { uid: string; summary: string; done: boolean; due: string; priority: number; rrule?: string; dtstart?: string }) {
+export function writeTodo(base: string | null, t: { uid: string; summary: string; done: boolean; started?: boolean; due: string; priority: number; rrule?: string; dtstart?: string }) {
   const managed = (old: Record<string, string>): Record<string, string | null> => ({
     SUMMARY: `SUMMARY:${escv(t.summary)}`,
-    STATUS: `STATUS:${t.done ? "COMPLETED" : "NEEDS-ACTION"}`,
+    // IN-PROCESS is CalDAV's "in progress" (an agent or person is on it).
+    STATUS: `STATUS:${t.done ? "COMPLETED" : t.started ? "IN-PROCESS" : "NEEDS-ACTION"}`,
     "PERCENT-COMPLETE": t.done ? "PERCENT-COMPLETE:100" : null,
     // Keep the time it was finished when it was already done.
     COMPLETED: t.done ? (old.COMPLETED && /COMPLETED/i.test(old.STATUS || "") ? old.COMPLETED : `COMPLETED:${stamp()}`) : null,
@@ -104,7 +105,7 @@ export function writeTodo(base: string | null, t: { uid: string; summary: string
 }
 
 /** The fields Orb manages, to tell whether a write would change anything. */
-export const managedOf = (ics: string) => { const t = parseTodo(ics); return t && JSON.stringify([t.summary, t.status === "COMPLETED", t.due, t.priority, t.rrule]); };
+export const managedOf = (ics: string) => { const t = parseTodo(ics); return t && JSON.stringify([t.summary, t.status === "COMPLETED", t.status === "IN-PROCESS", t.due, t.priority, t.rrule]); };
 
 /** RRULE → interval in days, for chores (DAILY, WEEKLY, MONTHLY, YEARLY). */
 export function rruleDays(rrule: string) {

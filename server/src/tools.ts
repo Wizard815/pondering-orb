@@ -38,7 +38,7 @@ export function orbTools(r: Records): Tool[] {
     { name: "orb_list_tasks", description: "Tasks, optionally from one list (projects use their own name). openOnly defaults to true.",
       parameters: { type: "object", properties: { list: { type: "string" }, openOnly: { type: "boolean" } } },
       run: ({ list, openOnly }) => r.list("tasks").filter((t: any) => (!list || listOf(t).toLowerCase() === String(list).toLowerCase()) && (openOnly === false || !t.done))
-        .map((t: any) => ({ title: t.title, list: listOf(t), due: t.due || "", done: !!t.done, priority: prioName(t.priority) })) },
+        .map((t: any) => ({ title: t.title, list: listOf(t), due: t.due || "", done: !!t.done, inProgress: !t.done && !!t.started, priority: prioName(t.priority) })) },
     { name: "orb_add_task", write: true, description: "Add a task to a list. due is optional (YYYY-MM-DD); priority is none, low, medium, high, urgent or do_now.",
       parameters: { type: "object", properties: { title: { type: "string" }, list: { type: "string" }, due: { type: "string" }, priority: { type: "string", enum: LEVELS } }, required: ["title", "list"] },
       run: ({ title, list, due, priority }) => r.create("tasks", { title, list, due: /^\d{4}-\d{2}-\d{2}$/.test(due || "") ? due : "", priority: PRIO[priority] ?? 0, done: false }) },
@@ -50,6 +50,19 @@ export function orbTools(r: Records): Tool[] {
         if (!m.length) throw new Error(`No open task titled ${title}`); if (m.length > 1) throw new Error("Several tasks match; give the list too");
         if (isOmiTask((m[0] as any).caldav?.uid)) throw new Error("That task comes from Omi; Orb only reads it. Change it in Omi.");
         r.patch("tasks", (m[0] as any).id, { priority: PRIO[priority] }); return { title: (m[0] as any).title, priority };
+      } },
+    { name: "orb_start_task", write: true, description: "Mark an open task in progress by its exact title (give the list when titles repeat): someone or an agent has started on it. Also writes a log line for its project.",
+      parameters: { type: "object", properties: { title: { type: "string" }, list: { type: "string" } }, required: ["title"] },
+      run: ({ title, list }, who) => {
+        const m = r.list("tasks").filter((t: any) => !t.done && String(t.title).toLowerCase() === String(title).toLowerCase() && (!list || listOf(t).toLowerCase() === String(list).toLowerCase()));
+        if (!m.length) throw new Error(`No open task titled ${title}`); if (m.length > 1) throw new Error("Several tasks match; give the list too");
+        const t: any = m[0]; const by = who === "you" ? "golem" : who;
+        if (isOmiTask(t.caldav?.uid)) throw new Error("That task comes from Omi; Orb only reads it. Change it in Omi.");
+        if (t.started) return { title: t.title, list: listOf(t), inProgress: true, already: true };
+        r.patch("tasks", t.id, { started: true });
+        const p = r.list("projects").find((x: any) => (x.taskList || x.name) === listOf(t)) as any;
+        if (p) { try { r.create("logs", { project: p.name, text: `Started: ${t.title}`.slice(0, r.logMax()), by }); } catch { /* too long etc */ } }
+        return { title: t.title, list: listOf(t), inProgress: true };
       } },
     { name: "orb_complete_task", write: true, description: "Mark an open task done by its exact title (give the list when titles repeat). Also writes a log line for its project.",
       parameters: { type: "object", properties: { title: { type: "string" }, list: { type: "string" } }, required: ["title"] },
