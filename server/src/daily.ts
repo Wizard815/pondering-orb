@@ -73,6 +73,7 @@ export function dailyApi(app: FastifyInstance, deps: { records: Records; dav: Ca
     return { day, timeZone: timeZone(), weather: wx, news: headlines || [], stocks: prices || [], events: cal || [], tasks, chores, notes,
       money: money && { netWorth: money.netWorth, people: money.people.map(p => ({ name: p.name, netWorth: p.netWorth, subscriptionsMonthly: p.subscriptionsMonthly })),
         billsThisWeek: money.bills.filter(b => b.date <= addDays(day, 6)).map(b => ({ day: b.date, name: b.name, amount: b.amount, person: b.person, paidBy: b.paidBy })),
+        maturitiesThisWeek: money.maturities.filter(m => m.date <= addDays(day, 6)).map(m => ({ day: m.date, title: m.title, detail: m.detail, person: m.person })),
         alerts: money.alerts.filter(a => a.severity !== "info").map(a => ({ severity: a.severity, title: a.title, person: a.person })) },
       omiYesterday: omi && { headline: omi.headline, overview: omi.overview.slice(0, 800), decisions: omi.decisions, questions: omi.questions }, omiOpenTasks: omiTasks };
   }
@@ -102,6 +103,12 @@ export function dailyApi(app: FastifyInstance, deps: { records: Records; dav: Ca
     const gb = companion(String((records.get("settings", "apps") as any)?.yaml || ""), "goblinbank"); if (!gb) return [];
     const from = today(), to = addDays(from, Math.max(1, Math.min(31, Number(req.query.days) || 7)) - 1);
     return (await goblinSummary(gb)).bills.filter(b => b.date >= from && b.date <= to);
+  });
+  /** CDs and bonds about to mature, from Goblin-Bank's shared alert list, for Today and This week. */
+  app.get("/api/daily/maturities", { preHandler: guard }, async (req: any) => {
+    const gb = companion(String((records.get("settings", "apps") as any)?.yaml || ""), "goblinbank"); if (!gb) return [];
+    const from = today(), to = addDays(from, Math.max(1, Math.min(60, Number(req.query.days) || 7)) - 1);
+    return (await goblinSummary(gb)).maturities.filter(m => m.date >= from && m.date <= to);
   });
   app.get("/api/daily/weather", { preHandler: guard }, async () => { const s = dailySettings(records); return weather(s.location, s.units); });
   app.get("/api/daily/news", { preHandler: guard }, async () => news(dailySettings(records).feeds, 25));

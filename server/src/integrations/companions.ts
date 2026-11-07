@@ -55,7 +55,8 @@ function equity(b: any): number | null {
   return null;
 }
 export type Bill = { date: string; name: string; amount: number; category: string; paidBy: string; person: string };
-export type MoneyAlert = { severity: "critical" | "warning" | "info"; kind: string; title: string; detail: string; person: string };
+/** `date` is set when the alert is about a day (a CD maturing, a bill due), YYYY-MM-DD; empty otherwise. */
+export type MoneyAlert = { severity: "critical" | "warning" | "info"; kind: string; title: string; detail: string; person: string; date: string };
 export type MoneyPerson = { name: string; error?: string; netWorth: number | null; subscriptionsMonthly: number | null;
   robinhoodMain: { asOf: string; source: string; equity: number | null } | null; robinhoodAgent: { asOf: string; equity: number | null } | null;
   /** Bills due, alert counts, savings and goal progress: each is null unless that person shares it. Totals only, never transactions. */
@@ -88,12 +89,14 @@ export async function goblinSummary(c: Companion) {
       robinhoodAgent: g.robinhood_agent ? { asOf: String(g.robinhood_agent.as_of || ""), equity: equity(g.robinhood_agent.balances) } : null,
       ...shareable(g),
       billList: Array.isArray(g.bill_list) ? g.bill_list.slice(0, 200).map((b: any) => ({ date: String(b?.date || ""), name: String(b?.name || ""), amount: Number(b?.amount) || 0, category: String(b?.category || ""), paidBy: String(b?.paid_by || "me"), person: name })).filter((b: any) => b.name && /^\d{4}-\d{2}-\d{2}$/.test(b.date)) : null,
-      alertList: Array.isArray(g.alert_list) ? g.alert_list.slice(0, 50).map((a: any) => ({ severity: (SEV.includes(a?.severity) ? a.severity : "info") as MoneyAlert["severity"], kind: String(a?.kind || ""), title: String(a?.title || ""), detail: String(a?.detail || ""), person: name })).filter((a: any) => a.title) : null,
+      alertList: Array.isArray(g.alert_list) ? g.alert_list.slice(0, 50).map((a: any) => ({ severity: (SEV.includes(a?.severity) ? a.severity : "info") as MoneyAlert["severity"], kind: String(a?.kind || ""), title: String(a?.title || ""), detail: String(a?.detail || ""), person: name, date: /^\d{4}-\d{2}-\d{2}$/.test(String(a?.date || "")) ? String(a.date) : "" })).filter((a: any) => a.title) : null,
     });
     const shared = people.filter(p => p.netWorth !== null);
     const bills = people.flatMap(p => p.billList || []).sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name));
     const alerts = people.flatMap(p => p.alertList || []).sort((a, b) => SEV.indexOf(a.severity) - SEV.indexOf(b.severity));
-    return { people, netWorth: shared.length ? +shared.reduce((a, p) => a + p.netWorth!, 0).toFixed(2) : null, bills, alerts, at: Date.now() };
+    /** CDs and bonds nearing their maturity date: the alerts Goblin-Bank dated "maturing", soonest first. */
+    const maturities = alerts.filter(a => a.kind === "maturing" && a.date).sort((a, b) => a.date.localeCompare(b.date));
+    return { people, netWorth: shared.length ? +shared.reduce((a, p) => a + p.netWorth!, 0).toFixed(2) : null, bills, alerts, maturities, at: Date.now() };
   });
 }
 
