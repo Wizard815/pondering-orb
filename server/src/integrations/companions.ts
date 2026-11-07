@@ -63,9 +63,11 @@ export type MoneyPerson = { name: string; error?: string; netWorth: number | nul
   alerts: { total: number; critical: number; warning: number } | null;
   savings: { total: number | null; free: number | null; earmarked: number | null } | null;
   goals: { name: string; target: number | null; allocated: number | null; pct: number | null }[] | null;
+  /** This month's spending so far, the projection from their history, and how it compares to average income. */
+  spending: { soFar: number | null; projected: number | null; incomeAvg: number | null; pctProjected: number | null; leftAfter: number | null; confidence: string } | null;
   /** The itemised lists, separate opt-ins in Goblin-Bank (bill_list, alert_list). */
   billList: Bill[] | null; alertList: MoneyAlert[] | null };
-const NONE = { bills: null, alerts: null, savings: null, goals: null, billList: null, alertList: null };
+const NONE = { bills: null, alerts: null, savings: null, goals: null, spending: null, billList: null, alertList: null };
 const SEV = ["critical", "warning", "info"];
 function shareable(g: any): Pick<MoneyPerson, "bills" | "alerts" | "savings" | "goals" | "spending"> {
   return {
