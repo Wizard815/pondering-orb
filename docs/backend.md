@@ -47,8 +47,10 @@ old Plans list is gone; it became task lists.
 - Config is `orb.yaml`, mounted at `/config/orb.yaml`. Secrets come from
   environment variables named in the YAML (`token_env`, `key_env`), never
   from the YAML itself, and never reach the browser.
-- Networks: `edge` for the Cloudflare tunnel, `ai_net` for Argos, llmwiki and
-  the gateway, plus whatever network the media apps use.
+- Networks: Orb has its own network plus an internal one for the Docker
+  socket proxy. To reach apps by container name, join their networks (for
+  example `ai_net` for Argos and llmwiki, `proxynat` for a tunnel) in
+  `docker-compose.yml`; otherwise use `http://<host>:<port>` addresses.
 
 ## Data model (SQLite)
 
@@ -129,7 +131,7 @@ the board.
 
 ## LLMWIKI (notes)
 
-The vault lives in the `llmwiki` container. Orb is on `ai_net`, so it uses
+The vault lives in the `llmwiki` container. When Orb joins `ai_net` it uses
 `http://llmwiki:27123` (agents on Codebox, such as Hermes, use the LAN URL
 `http://192.168.20.5:27123` instead). Orb only uses the Obsidian Local REST
 API and never touches vault files: direct writes leave files owned by root,

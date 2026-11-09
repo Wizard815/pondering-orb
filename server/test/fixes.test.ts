@@ -102,3 +102,14 @@ test("TestHealth_ReportsTimeZone", async () => {
   const { app } = await buildApp({ config: cfg() });
   assert.ok((await app.inject({ method: "GET", url: "/api/health" })).json().timeZone);
 });
+
+test("TestConfig_ExampleYamlLeavesAddressesToEnv", () => {
+  const c = loadConfig(new URL("../../config/orb.example.yaml", import.meta.url).pathname,
+    { ALLGLANCE_URL: "http://nas:8090", WIKI_URL: "http://nas:27123", ARGOS_URL: "http://gpu:8080", UPSTREAM_URL: "http://pc:5000", UPTIME_URL: "http://nas:3001", HERMES_URL: "http://nas:6060" });
+  assert.equal(c.allglance.baseUrl, "http://nas:8090"); assert.equal(c.wiki.baseUrl, "http://nas:27123");
+  assert.equal(c.golem.baseUrl, "http://gpu:8080/v1"); assert.equal(c.upstream.baseUrl, "http://pc:5000");
+  assert.equal(c.uptime.baseUrl, "http://nas:3001"); assert.equal(c.hermes.baseUrl, "http://nas:6060");
+  assert.equal(c.caldav.url, "", "CalDAV is left to fall back to the gateway's /dav/");
+  const empty = loadConfig(new URL("../../config/orb.example.yaml", import.meta.url).pathname, {});
+  assert.equal(empty.allglance.baseUrl, ""); assert.equal(empty.uptime.baseUrl, "", "nothing points at an app you don't run");
+});

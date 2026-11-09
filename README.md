@@ -1,153 +1,195 @@
 # Pondering Orb
 
-A homelab command center: what you are working on, a project log, plans,
-upkeep checks, system stats, and links into the rest of the stack.
+A self-hosted homelab command center, styled as a wizard's tower. One page to
+see what you're working on, what's due, how the lab is doing and what the day
+holds, with the Golem, an assistant that can read all of it.
 
-Tabs (each one a room of the tower):
+One Orb is one person. For someone else, run a second container with its own
+folder, `.env` and port.
 
-- **Edit layout** on every page: add, remove, hide, move and resize panels
-- **Main**: modular panels; Golem, favorite projects, open tasks, uptime,
-  the log, and one panel per app or app group, with live views for Plex,
-  SABnzbd and UpstreamManager
-- **Daily**: the Golem's morning brief, written each morning from the
-  weather, news headlines, your watchlist, open tasks, chores and every
-  CalDAV calendar (today and the week ahead)
-- **Picks**: daily stock research (a market-news pass and a stock-news
-  pass), a verdict per candidate from your self-hosted decision model, your
-  yes or no with an amount, an order on Robinhood's agentic account when you
-  confirm it, and a history of what every pick did afterwards, taken or not;
-  see [docs/picks.md](docs/picks.md)
-- **Projects**: kanban board and log; each project has a page with its
-  tasks, log and wiki note
-- **Ideas**: a Milaclone-style board with cards, columns, nested boards and
-  arrows (a preview of Miladash)
-- **To-do**: CalDAV-style task lists; pick which lists to show
-- **Wiki**: preview of the LLMWIKI vault (PARA folders, section edits)
-- **Upkeep**: UpstreamManager's repos, approval requests and daily check,
-  plus your chores
-- **Calendar**
-- **Uptime**: monitors as Uptime Kuma reports them
-- **System**: btop-style cores, memory, disks and containers
-- **Settings**: Golem's model endpoint, task lists on Main, log length,
-  Main layout, apps YAML
+## What's in it
 
-Star a project to put it in Favorites on Main. Log entries are short: 50
-characters by default.
+Every page is a grid of panels you can move, resize, hide and add in **Edit
+layout**. Drag a tab onto another to show two pages side by side.
 
-## Golem
+| Tab | What it shows |
+| --- | --- |
+| **Main** | The Golem, favorite projects, open and top-priority tasks, today's family calendar, the log, chores, uptime, UpstreamManager, system, and a panel per app (with live views for Plex, SABnzbd, Goblin-Bank and Omi) |
+| **Daily** | The morning brief, written by the Golem from the weather, news, your watchlist, tasks, chores, bills and every calendar; plus Today and This week |
+| **Projects** | Kanban board (next, active, blocked, paused, shipped) and the log; each project has a page with its tasks, log, wiki note, repository and linked chats |
+| **Agents** | Coding agents running in herdr through Hermes Studio: watch them, or send a project or task to a new one |
+| **Ideas** | A board in Milaclone's style: cards, columns, nested boards, arrows, to-do cards |
+| **To-do** | CalDAV task lists with priorities, plus dayGLANCE's tasks |
+| **Wiki** | The LLMWIKI vault: tree, notes, search, section edits, related links |
+| **Calendar** | Month and next two weeks: your events, the family calendar, CalDAV calendars, task due dates and chores |
+| **Picks** | Daily stock research, a verdict per stock from your self-hosted decision model, your call with an amount, an order on Robinhood when you confirm it, and what every pick did afterwards |
+| **Money**, **Omi** | Optional full pages for Goblin-Bank and Omi (`page: true` in the apps YAML) |
+| **Upkeep** | UpstreamManager's repos, approval requests and daily check, and your chores |
+| **Uptime** | Monitors from an Uptime Kuma status page |
+| **System** | btop-style cores, memory, disks and containers (with CPU and memory), or real btop |
+| **Settings** | Connections, Golem, appearance and themes, Daily page, stock picks, Robinhood, apps YAML, what's waiting to sync |
 
-The dashboard assistant on the Main tab. It reads projects, logs, ideas and
-upkeep, and when allowed it adds logs, plans and ideas and moves project
-cards. In the demo it thinks with Claude. In the container it uses a local
-OpenAI-compatible endpoint (such as Argos) or a frontier API (OpenRouter or
-the Claude API), chosen in Settings.
+### The Golem
 
-## orb.yaml
+The assistant on Main. It runs on any OpenAI-compatible endpoint: a local
+model (Argos, llama-server, Ollama) or a frontier API such as OpenRouter. It
+streams its replies. With tools it reads projects, logs, tasks, chores, the
+wiki, linked chats, ALLGlance, Goblin-Bank and Omi. When writing is allowed,
+it adds logs and tasks and completes them. Settings → Golem picks the model
+and whether it may write.
 
-```yaml
-groups:
-  - name: The Tower
-    apps:
-      - name: Argos
-        rune: Ar
-        url: http://homelab.local:8080
-        description: Local models, GPU scheduler
-        links:
-          - label: Models
-            url: http://homelab.local:8080/v1/models
-        live:            # reserved for data a connector will feed
-          source: n8n
-          workflow: argos-status
-```
+## Integrations
 
-## Running it
+Each one is optional; leave its address empty and its panels say so.
 
-The app is two parts in one repo:
+| App | What Orb does | Doc |
+| --- | --- | --- |
+| **ALLGlance** gateway | Tasks over vikunja's CalDAV at the gateway's `/dav` (read and write, priorities kept), the family calendar (dayGLANCE: read, and add events), lastGLANCE chores, lifeGLANCE milestones | [docs/allglance.md](docs/allglance.md) |
+| Any **CalDAV** server | Task lists, chores (as recurring to-dos) and calendars; changes that fail wait in a retry queue | [docs/backend.md](docs/backend.md) |
+| **LLMWIKI** (Obsidian Local REST API) | Reads the vault (mounted read only); writes only through the REST API, following the vault's rules; a daily digest line if you want one | [docs/backend.md](docs/backend.md) |
+| **UpstreamManager** | Repos, approval requests (approve part of one), daily check, fetch, new commits logged per project | [docs/backend.md](docs/backend.md) |
+| **Hermes Studio** | Chats linked to projects; herdr coding agents on the Agents tab | |
+| **Uptime Kuma** | Monitors from a public status page | |
+| **Goblin-Bank** | Read only: each person's shared net worth, bills, alerts, savings, goals, spending and Robinhood balances; never transactions | [docs/companions.md](docs/companions.md) |
+| **Omi** (omi-local) | Read only: daily recaps, conversations, memory search; its action items come through CalDAV, once | [docs/companions.md](docs/companions.md) |
+| **Robinhood** | Its Trading MCP (OAuth): the agentic account, and orders for picks you approve, within caps you set | [docs/picks.md](docs/picks.md) |
+| **Plex**, **SABnzbd** | Live panels | |
+| Agents (MCP) | `POST /mcp` with a token: projects, logs, tasks, chores | [docs/backend.md](docs/backend.md) |
 
-- `server/`: Node.js 22 + TypeScript + Fastify, with Node's built-in SQLite.
-  It holds Orb's records, talks to your other apps, runs Golem, and serves the
-  MCP endpoint and the web app.
-- `web/`: React 18 + Vite + TypeScript.
+Every key stays on the server. Settings and the apps YAML only name the
+environment variable that holds it.
 
-`demo/index.html` is the original single-page demo (a claude.ai artifact). It
-is kept for history only; the React app is the reference now and has moved on
-from it.
-
-### With Docker
+## Run it with Docker
 
 ```bash
-cp config/orb.example.yaml config/orb.yaml   # addresses of your apps
+git clone https://github.com/Wizard815/pondering-orb && cd pondering-orb
 cp docker-compose.example.yml docker-compose.yml
-cp .env.example .env                           # time zone, password, keys
-mkdir -p data && sudo chown 1000:1000 data       # Orb runs as uid 1000 and keeps orb.db here
-docker compose up -d --build
+cp .env.example .env                        # time zone, password, addresses, keys
+cp config/orb.example.yaml config/orb.yaml  # optional: more settings
+mkdir -p data && sudo chown 1000:1000 data  # Orb runs as uid 1000 and keeps orb.db here
+docker compose pull                         # the published image (or skip this and add --build below)
+docker compose up -d
 ```
 
-The compose file joins two networks you may not have (`proxynat` for a
-tunnel, `ai_net` for Hermes, Argos and LLMWIKI). Create them with
-`docker network create <name>`, or remove them from the `orb` service. Change
-the vault path to your own LLMWIKI vault folder. `ORB_PASSWORD` must be set
-in `.env`; compose refuses to start without it.
+Open `http://<host>:8095` and sign in with `ORB_PASSWORD`. Then go to
+Settings → Connections and press **Test** on each app you use.
 
-Open `http://<host>:8095`. Settings and secrets go in `.env` next to the
-compose file (start from `.env.example`):
+`docker compose pull` fetches `ghcr.io/wizard815/pondering-orb:latest`, which
+GitHub Actions tests, builds and publishes from `main` (and `:<version>` from
+a `v*` tag). A new GitHub package is private: make it public once (GitHub →
+your profile → Packages → pondering-orb → Package settings → Change
+visibility), or `docker login ghcr.io` first. To build it yourself instead,
+skip the pull and run `docker compose up -d --build`. The image is multi-arch
+(amd64, arm64), runs as a non-root user and has a health check.
+
+What the compose file starts: Orb, and a read-only Docker socket proxy for the
+System tab (it can list containers and nothing else). Everything else you
+already run stays where it is; Orb reaches it by address. Optional extras:
+
+```bash
+docker compose --profile uptime up -d   # a bundled Uptime Kuma (then UPTIME_URL=http://uptime-kuma:3001)
+docker compose --profile btop up -d     # real btop as a web terminal for the System tab
+```
+
+### `.env`
+
+Start from [`.env.example`](.env.example). Values here never reach the browser.
 
 | Variable | What it is |
 | --- | --- |
-| `TZ` | your time zone, e.g. `America/Chicago` (default `UTC`). Every container gets it; it decides what "today" is for logs, chores, the digest and the wiki log. Settings → Logs shows the zone in use. |
-| `ORB_PASSWORD` | sign-in password for the web app |
-| `ORB_API_TOKENS` | `name:token` pairs for agents and `/mcp`, e.g. `hermes:abc,claude:def` |
-| `CALDAV_USER`, `CALDAV_PASSWORD` | CalDAV account |
+| `TZ` | Your time zone, e.g. `America/Chicago`. It decides what "today" is for logs, chores, bills and the brief. Use the same one in your other apps. |
+| `ORB_PASSWORD` | Sign-in for the web app (required) |
+| `ORB_API_TOKENS` | `name:token` pairs for agents and `/mcp`, e.g. `hermes:abc,claude:def`; the name is recorded on what each one writes |
+| `ORB_PORT`, `ORB_HOSTNAME` | The host port (default 8095) and the name the System tab shows |
+| `ALLGLANCE_URL`, `UPSTREAM_URL`, `UPTIME_URL`, `HERMES_URL`, `HERMES_PUBLIC_URL`, `ARGOS_URL`, `WIKI_URL` | Addresses of your apps. Empty means not used. Use a container name if Orb shares the app's network, else `http://<host>:<port>`. |
+| `LLMWIKI_VAULT` | The vault folder on this host, mounted read only |
+| `CALDAV_USER`, `CALDAV_PASSWORD` | Your CalDAV login; with ALLGlance, your vikunja login |
+| `ALLGLANCE_TOKEN` | The gateway's `GATEWAY_TOKEN` |
 | `WIKI_API_KEY` | Obsidian Local REST API key |
-| `HERMES_USER`, `HERMES_PASSWORD` | a Hermes Studio user for Orb |
-| `ALLGLANCE_TOKEN` | the ALLGlance gateway's `GATEWAY_TOKEN` |
-| `OPENROUTER_API_KEY` (or any name) | frontier model key, named in Settings → Golem |
-| `PLEX_TOKEN`, `SABNZBD_API_KEY` (or any name) | keys for live app panels, named by `key_env` in the apps YAML |
-| `UPSTREAM_URL`, `ALLGLANCE_URL` | addresses of apps on other computers |
-| `BTOP_AUTH` | optional `user:password` for the btop terminal |
-| `GOBLIN_ORB_KEY`, `OMI_DEV_KEY` | read-only keys for Goblin-Bank and Omi panels, named by `key_env` ([docs/companions.md](docs/companions.md)) |
-| `TIINGO_API_KEY` | optional free key for stock prices (else Yahoo, then Stooq) |
-| `DECIDER_KEY` (or any name) | optional key for your self-hosted decision model, named in Settings → Stock picks |
+| `HERMES_USER`, `HERMES_PASSWORD` | A Hermes Studio user for Orb |
+| `OPENROUTER_API_KEY` (or any name) | A frontier model key, named in Settings → Golem |
+| `DECIDER_KEY` (or any name) | Key for your self-hosted decision model, if it needs one |
+| `TIINGO_API_KEY` | Free key for stock prices (else Yahoo, then Stooq) |
+| `GOBLIN_ORB_KEY`, `OMI_DEV_KEY` | Read-only keys for Goblin-Bank and Omi |
+| `PLEX_TOKEN`, `SABNZBD_API_KEY` (or any name) | Keys for live app panels, named in the apps YAML |
+| `BTOP_AUTH` | Optional `user:password` for the btop terminal |
 
-With neither `ORB_PASSWORD` nor `ORB_API_TOKENS` set, Orb is open to anyone
-who can reach the port. That is only for a private LAN, and the server warns
-about it when it starts.
+Where settings live: addresses and keys in `.env`; anything else you'd rather
+keep in a file in `config/orb.yaml` (a value there wins over the same one in
+`.env`); everything else in Settings, saved in `data/orb.db`.
 
-`docker compose up` starts only Orb and a read-only Docker socket proxy. Apps
-you already run (Hermes Studio, Argos, LLMWIKI, UpstreamManager, CalDAV,
-Uptime Kuma) are reached by address. A bundled Uptime Kuma starts only with
-`docker compose --profile uptime up -d`, and real btop as a web terminal for
-the System tab with `docker compose --profile btop up -d`.
+### Reaching your other apps
 
-### For development
+Orb's container is on its own network. To use container names such as
+`http://hermes-studio:6060`, join the networks those apps are on: in
+`docker-compose.yml`, add them to the `orb` service's `networks:` and declare
+them as `external: true` at the bottom (the file has an example). Apps in
+another compose project or on another machine just need
+`http://<host>:<port>`.
+
+### Updating, backups
+
+```bash
+docker compose pull && docker compose up -d   # or: git pull && docker compose up -d --build
+```
+
+Everything Orb keeps is in `data/orb.db` (SQLite). Back up the `data` folder
+and `.env`. Stopping the container cleanly is enough for a consistent copy.
+
+### If something's wrong
+
+- **"can't write to its data folder"** on start: run `sudo chown 1000:1000 data`.
+- **A tab says an app isn't set up**: its address is empty; set it in `.env`
+  or Settings → Connections, then **Test**.
+- **The System tab shows no containers**: the socket proxy isn't running, or
+  `DOCKER_HOST` doesn't point at it.
+- **Days roll over at the wrong hour**: set `TZ` in `.env`. Settings → Logs
+  shows the zone in use.
+
+## Security
+
+- Sign in with `ORB_PASSWORD`. Agents use tokens from `ORB_API_TOKENS`, and
+  they can't change settings, decide stock picks or place orders.
+- With neither set, Orb is open to anyone who can reach the port. That's only
+  for a private LAN, and the server warns about it on start.
+- Requests from other websites are refused, and the Docker socket is only
+  reachable read-only through the proxy.
+- Goblin-Bank and Omi are read only. Robinhood orders need your confirmation
+  each time, stay within your caps, and are off until you turn them on.
+- Never put keys in `orb.yaml`, the apps YAML or Settings. Those only name the
+  environment variable that holds the key.
+
+## Develop
+
+Node 22.13 or newer.
 
 ```bash
 npm install
-npm run dev        # server on :8095 (restarts on change), web on :5173 with the API proxied
-npm test           # server tests and the web type check
-npm run build      # server/dist and web/dist
+npm run dev     # server on :8095 (restarts on change), web on :5173 with the API proxied
+npm test        # server tests and the web type check
+npm run build   # server/dist and web/dist
 ```
 
-### For agents (MCP)
+- `server/`: Node + TypeScript + Fastify, with Node's built-in SQLite. It
+  keeps Orb's records, talks to the other apps, runs the Golem, schedules the
+  brief, research and syncs, and serves the API, `/mcp` and the web app.
+- `web/`: React + Vite + TypeScript.
+- `docker/btop/`: the optional btop terminal.
+- `demo/index.html`: the original single-page demo, kept for history.
 
-`POST /mcp` with `Authorization: Bearer <token>` (from `ORB_API_TOKENS`)
-serves tools to list and get projects, read and add logs, move projects,
-list, add and complete tasks, and list and finish chores. Anything an agent
-writes is marked with its token's name.
+## Docs
 
-## Design and status
+- [docs/backend.md](docs/backend.md): what Orb owns and what it reads, the
+  REST API, MCP tools, CalDAV, the wiki rules
+- [docs/allglance.md](docs/allglance.md): the ALLGlance stack, priorities,
+  the family calendar
+- [docs/companions.md](docs/companions.md): Goblin-Bank and Omi
+- [docs/picks.md](docs/picks.md): the Daily page, stock picks, the decision
+  model and Robinhood
+- [docs/miladash.md](docs/miladash.md): the ideas board and Miladash
 
-[docs/backend.md](docs/backend.md) covers what Orb owns and what it reads
-from other apps, the API, the MCP tools, CalDAV, the wiki rules and what is
-built so far. [docs/miladash.md](docs/miladash.md) covers the ideas board.
-[docs/allglance.md](docs/allglance.md) covers ALLGlance and the task priority scale.
-
-`demo/index.html` is the demo built as a claude.ai artifact. Its storage and
-Golem use the artifact runtime (`window.claude`), so opened as a plain file it
-renders but does not save.
-
-Left out for now: Mail (kept on the `mail` branch), writing tasks through to
-ALLGlance's dayGLANCE, and several users with their own logins.
+Not in Orb, by choice: several users in one Orb (run one per person), and
+mail (an early version is kept on the `mail` branch).
 
 ## License
 

@@ -1,4 +1,5 @@
 import { resolve, dirname } from "node:path";
+import { accessSync, constants, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { buildApp } from "./app.js";
 import { logCommits } from "./pollers.js";
@@ -6,6 +7,15 @@ import { badTimeZone, timeZone } from "./dates.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const dataDir = process.env.ORB_DATA || "/data";
+try {
+  mkdirSync(dataDir, { recursive: true });
+  accessSync(dataDir, constants.W_OK);
+} catch {
+  const uid = typeof process.getuid === "function" ? process.getuid() : "?";
+  console.error(`Pondering Orb can't write to its data folder ${dataDir} (running as uid ${uid}).\n` +
+    `On the host, make the folder you mounted there writable for that user, e.g.:\n  mkdir -p data && sudo chown ${uid}:${uid} data`);
+  process.exit(1);
+}
 const { app, auth, records, upstream, cfg, sync, outbox, writeDigest, daily, market } = await buildApp({
   dataFile: resolve(dataDir, "orb.db"),
   webDir: process.env.ORB_WEB || resolve(here, "../../web/dist"),
