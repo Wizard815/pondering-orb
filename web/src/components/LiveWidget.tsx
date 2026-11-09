@@ -14,7 +14,7 @@ function GoblinBank({ data }: { data: any }) {
     p.spending?.projected != null && `spending ${usd(p.spending.soFar)} so far, on track for ${usd(p.spending.projected)}${p.spending.pctProjected != null ? ` (${Math.round(p.spending.pctProjected * 100)}% of income)` : ""}`,
   ].filter(Boolean) as string[];
   return <>
-    {data.netWorth !== null && <div className="row"><span className="wx-t">{usd(data.netWorth)}</span><span className="hint">net worth, shared</span></div>}
+    {data.netWorth !== null && <div className="row"><span className="wx-t">{usd(data.netWorth)}</span><span className="hint" title="Each person's net worth added up; a joint account both of you link counts twice.">net worth, shared</span></div>}
     <table className="tbl small"><tbody>{data.people.map((p: any) => <tr key={p.name}><td><b>{p.name}</b></td>
       {p.error ? <td colSpan={3} className="err-inline">{p.error}</td> : <>
         <td className="num">{p.netWorth !== null ? usd(p.netWorth) : <span className="muted">not shared</span>}</td>

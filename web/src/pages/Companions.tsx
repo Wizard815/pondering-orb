@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { PageDef } from "./types";
 import { useColl } from "../lib/store";
 import { useFetch } from "../lib/useFetch";
-import { ago, fmtDate, sortTasks, todayISO } from "../lib/util";
+import { ago, dayIn, fmtDate, sortTasks, todayISO } from "../lib/util";
 import { TaskRows, fromOmi } from "../components/Common";
 import { AppTiles } from "../components/AppPanels";
 import type { App } from "../lib/apps";
@@ -20,7 +20,7 @@ function People({ app }: { app: App }) {
   if (error) return <div className="err-inline">{error}</div>;
   if (!data) return <div className="hint">Counting the hoard…</div>;
   return <>
-    {data.netWorth !== null && <div className="row"><span className="wx-t">{usd(data.netWorth)}</span><span className="hint">shared net worth, everyone together</span></div>}
+    {data.netWorth !== null && <div className="row"><span className="wx-t">{usd(data.netWorth)}</span><span className="hint" title="Each person's net worth added up. An account two people both link (a joint account) counts once for each of them.">shared net worth, added up</span></div>}
     <div className="money-people">{data.people.map((p: any) => <div key={p.name} className="money-person">
       <div className="row"><b>{p.name}</b>{p.error && <span className="chip bad">{p.error}</span>}{p.alerts?.critical > 0 && <span className="chip bad">{p.alerts.critical} critical</span>}{p.alerts?.warning > 0 && <span className="chip warn">{p.alerts.warning} warning</span>}</div>
       {!p.error && <table className="tbl small"><tbody>
@@ -28,6 +28,7 @@ function People({ app }: { app: App }) {
         <tr><td>Subscriptions</td><td className="num">{p.subscriptionsMonthly !== null ? `${usd(p.subscriptionsMonthly)}/mo` : notShared}</td></tr>
         <tr><td>Bills, next 7 / 30 days</td><td className="num">{p.bills ? `${usd(p.bills.next7d)} / ${usd(p.bills.next30d)}` : notShared}</td></tr>
         {p.bills?.next && <tr><td>Next bill</td><td className="num">{p.bills.next.name} · {fmtDate(p.bills.next.date)} · {usd(p.bills.next.amount)}</td></tr>}
+        <tr><td>Spending this month</td><td className="num">{p.spending ? <span title={`confidence: ${p.spending.confidence}`}>{usd(p.spending.soFar)} so far, on track for {usd(p.spending.projected)}{p.spending.pctProjected != null ? ` (${Math.round(p.spending.pctProjected * 100)}% of income)` : ""}{p.spending.leftAfter != null ? `, ${usd(p.spending.leftAfter)} left` : ""}</span> : notShared}</td></tr>
         <tr><td>Savings (free / set aside)</td><td className="num">{p.savings ? `${usd(p.savings.total)} (${usd(p.savings.free)} / ${usd(p.savings.earmarked)})` : notShared}</td></tr>
         {p.robinhoodMain && <tr><td>Robinhood</td><td className="num" title={`${p.robinhoodMain.source}, as of ${p.robinhoodMain.asOf}`}>{usd(p.robinhoodMain.equity)}</td></tr>}
         {p.robinhoodAgent && <tr><td>Robinhood agentic account</td><td className="num" title={`as of ${p.robinhoodAgent.asOf}`}>{usd(p.robinhoodAgent.equity)}</td></tr>}
@@ -39,7 +40,7 @@ function People({ app }: { app: App }) {
 function Bills({ app, days }: { app: App; days: number }) {
   const { data } = useMoney(app), today = todayISO();
   if (!data) return <div className="hint">…</div>;
-  const end = new Date(Date.now() + days * 864e5).toISOString().slice(0, 10), list = (data.bills || []).filter((b: any) => b.date >= today && b.date <= end);
+  const end = dayIn(new Date(Date.now() + days * 864e5)), list = (data.bills || []).filter((b: any) => b.date >= today && b.date <= end);
   if (!data.people.some((p: any) => p.billList)) return <div className="empty">Nobody shares a bill list yet (Goblin-Bank → Settings → Sharing → Bill list).</div>;
   if (!list.length) return <div className="empty">No bills in the next {days} days.</div>;
   const mine = list.filter((b: any) => b.paidBy === "me");
@@ -54,6 +55,14 @@ function Alerts({ app }: { app: App }) {
   if (!data.alerts.length) return <div className="empty">All quiet in the vaults.</div>;
   return <ul className="list">{data.alerts.map((a: any, k: number) => <li key={k}><span className={"chip " + SEV_CLS[a.severity]}>{a.severity}</span>
     <div className="grow">{a.title}{a.detail && <div className="hint">{a.detail}</div>}</div>{a.date && <span className="date">{fmtDate(a.date)}</span>}<span className="tag">{a.person}</span></li>)}</ul>;
+}
+function Maturities({ app }: { app: App }) {
+  const { data } = useMoney(app), today = todayISO();
+  if (!data) return <div className="hint">…</div>;
+  const list = data.maturities || [];
+  if (!list.length) return <div className="empty">No CDs or bonds maturing soon{data.people.some((p: any) => p.alertList) ? "" : " (they come with the shared alert list)"}.</div>;
+  return <ul className="list">{list.map((m: any, k: number) => <li key={k}><span className="date">{m.date === today ? "Today" : fmtDate(m.date)}</span>
+    <div className="grow">{m.title}{m.detail && <div className="hint">{m.detail}</div>}</div><span className="tag">{m.person}</span></li>)}</ul>;
 }
 function Goals({ app }: { app: App }) {
   const { data } = useMoney(app);
@@ -70,6 +79,7 @@ export function moneyPage(app: App, label: string): PageDef {
       { key: "alerts", title: "Alerts", node: <Alerts app={app} />, w: 5, h: 8 },
       { key: "bills", title: "Bills, next 30 days", node: <Bills app={app} days={30} />, w: 5, h: 12 },
       { key: "goals", title: "Goals", node: <Goals app={app} />, w: 7, h: 6 },
+      { key: "maturities", title: "Maturing soon", node: <Maturities app={app} />, w: 5, h: 5 },
       { key: "open", title: "Open Goblin-Bank", node: <AppTiles apps={[app]} />, w: 4, h: 3 },
     ] }) };
 }
