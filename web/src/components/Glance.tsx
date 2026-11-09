@@ -28,7 +28,9 @@ export function DayPlan({ date: fixed }: { date?: string }) {
 export function GlanceInbox() {
   const { data, error } = useFetch<any[]>("/api/allglance/dayglance-tasks", 300000);
   if (error) return <NotSet error={error} />;
-  const list = [...(data || [])].filter(t => !t.done).sort((a, b) => b.priority - a.priority || String(a.due || "9").localeCompare(String(b.due || "9")));
+  // The gateway returns every scheduled day now: show the inbox (no date) and the next week.
+  const horizon = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10);
+  const list = [...(data || [])].filter(t => !t.done && (!t.due || t.due <= horizon)).sort((a, b) => b.priority - a.priority || String(a.due || "9").localeCompare(String(b.due || "9")));
   if (!list.length) return <div className="empty">{data ? "dayGLANCE has no open tasks." : "Loading…"}</div>;
   return <><div>{list.slice(0, 30).map(t => <div key={t.id} className="task"><span className={PRIO_CLASS(t.priority)} title={`Priority: ${prioName(t.priority)}`}>{t.priority ? prioName(t.priority) : "·"}</span>
     <div className="grow"><span className="t">{t.title}</span>{t.start && <span className="hint"> · {t.start}</span>}</div>{t.due && <span className="due">{fmtDate(t.due)}</span>}</div>)}</div>

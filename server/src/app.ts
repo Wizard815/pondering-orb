@@ -39,7 +39,7 @@ export async function buildApp(o: AppOptions = {}) {
   const cfg = (): OrbConfig => {
     const s: any = store.get("settings", "app") || {};
     const c = s.connections || {};
-    return {
+    const out: OrbConfig = {
       ...base, logMax: Math.max(20, Math.min(200, Number(s.logMax) || base.logMax || 50)),
       golem: { ...base.golem, ...envSafe(s.golem) },
       upstream: { ...base.upstream, ...envSafe(c.upstream) },
@@ -50,6 +50,10 @@ export async function buildApp(o: AppOptions = {}) {
       hermes: { ...base.hermes, ...envSafe(c.hermes) },
       allglance: { ...base.allglance, ...envSafe(c.allglance) },
     };
+    // The ALLGlance stack serves Vikunja's CalDAV at the gateway's /dav: with
+    // no CalDAV URL of its own, Orb uses that one address for tasks too.
+    if (!out.caldav.url && out.allglance.baseUrl) out.caldav = { ...out.caldav, url: trimSlash(out.allglance.baseUrl) + "/dav/" };
+    return out;
   };
   const records = new Records(store, cfg);
   const outbox = new Outbox(store, () => records.emit("outbox")); // browsers refresh the "waiting to sync" pill
@@ -85,7 +89,7 @@ export async function buildApp(o: AppOptions = {}) {
   const glanceTools = () => !cfg().allglance.baseUrl ? [] : [
     { name: "allglance_day", description: "The day's plan from dayGLANCE through the ALLGlance gateway: time blocks with start time and length. date is YYYY-MM-DD (default today).",
       parameters: { type: "object", properties: { date: { type: "string" } } }, run: ({ date }: any) => glance.day(/^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : today()) },
-    { name: "allglance_dayglance_tasks", description: "dayGLANCE tasks (inbox and today) with priority 0 none to 5 do now.", parameters: { type: "object", properties: {} }, run: () => glance.dayglanceTasks() },
+    { name: "allglance_dayglance_tasks", description: "dayGLANCE tasks (the inbox and every scheduled day) with priority 0 none to 5 do now.", parameters: { type: "object", properties: {} }, run: () => glance.dayglanceTasks() },
   ];
   const appsYaml = () => String((store.get("settings", "apps") as any)?.yaml || "");
   /** Golem's read-only tools for Goblin-Bank and Omi, when they're in the apps YAML. */
@@ -214,7 +218,7 @@ export async function buildApp(o: AppOptions = {}) {
     return { project, logs, taskList: taskList || "" };
   });
 
-  const daily = dailyApi(app, { records, dav, cfg, guard, who });
+  const daily = dailyApi(app, { records, dav, cfg, guard, who, glance });
   const market = marketApi(app, { records, cfg, guard, who });
   robinhoodApi(app, { records, store, guard, who });
 
@@ -364,6 +368,16 @@ export async function buildApp(o: AppOptions = {}) {
   app.get("/api/allglance/chores", { preHandler: guard }, async (req: any) => glance.chores(req.query.owner));
   app.get("/api/allglance/milestones", { preHandler: guard }, async () => glance.milestones());
   app.get("/api/allglance/users", { preHandler: guard }, async () => glance.users());
+  /** Add an event to the family calendar (a dayGLANCE block) through the gateway. */
+  app.post("/api/allglance/events", { preHandler: guard }, async (req: any, reply) => {
+    const b = req.body || {}, title = String(b.title || "").trim();
+    if (!title) throw new HttpError(422, "An event needs a title.");
+    if (!isDay(String(b.date || ""))) throw new HttpError(422, "date must be YYYY-MM-DD.");
+    if (b.time && !/^\d{2}:\d{2}$/.test(String(b.time))) throw new HttpError(422, "time must be HH:MM.");
+    const minutes = b.minutes ? Math.max(5, Math.min(24 * 60, Math.round(Number(b.minutes)) || 0)) : undefined;
+    reply.code(201);
+    return glance.addEvent({ title: title.slice(0, 200), date: String(b.date), time: b.time ? String(b.time) : undefined, minutes, owner: b.owner ? String(b.owner) : undefined });
+  });
 
   // ---- Hermes Studio chats (read only) ----
   app.get("/api/hermes/sessions", { preHandler: guard }, async (req: any) => hermes.sessions(String(req.query.q || "")));

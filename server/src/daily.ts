@@ -8,6 +8,7 @@ import { parseEvents, type CalEvent } from "./integrations/ical.js";
 import { weather, news, quotes, type NewsItem } from "./integrations/daily.js";
 import { chat } from "./integrations/llm.js";
 import { companion, goblinSummary, omiDays, isOmiEvent } from "./integrations/companions.js";
+import type { AllGlance } from "./integrations/allglance.js";
 import { today, localDay, isDay, timeZone } from "./dates.js";
 
 /** Settings → Daily page. */
@@ -27,19 +28,29 @@ export const dailySettings = (records: Records): DailySettings => {
 const dayStart = (iso: string) => new Date(`${iso}T00:00:00`);
 const addDays = (iso: string, n: number) => localDay(dayStart(iso).getTime() + n * 864e5 + 3 * 3600e3); // +3h keeps DST changes on the right day
 
-export function dailyApi(app: FastifyInstance, deps: { records: Records; dav: CalDav; cfg: () => OrbConfig; guard: any; who: (req: any) => string }) {
+export function dailyApi(app: FastifyInstance, deps: { records: Records; dav: CalDav; cfg: () => OrbConfig; guard: any; who: (req: any) => string; glance?: AllGlance }) {
   const { records, dav, cfg, guard } = deps;
 
   /** CalDAV events (every calendar) plus Orb's own events, from a day for n days. */
   async function events(from: string, days: number): Promise<(CalEvent & { day: string })[]> {
     const out: (CalEvent & { day: string })[] = [];
     if (dav.configured) {
-      const lists = await dav.eventLists();
+      // A CalDAV problem drops only the CalDAV events, not the family calendar or Orb's own.
+      const lists = await dav.eventLists().catch(() => []);
       const a = dayStart(from), b = dayStart(addDays(from, days));
       // Omi's day reviews and conversation events are logs of what happened, not plans: the Omi panel shows them.
       for (const l of lists) for (const ics of await dav.events(l, a, b).catch(() => [] as string[])) for (const e of parseEvents(ics)) if (!isOmiEvent(e.uid)) out.push({ ...e, calendar: l.name, day: e.allDay ? e.start : localDay(Date.parse(e.start.endsWith("Z") ? e.start : e.start)) });
     }
     const last = addDays(from, days - 1);
+    // The family calendar: dayGLANCE blocks through the ALLGlance gateway (Vikunja has no events calendar).
+    const g = deps.glance;
+    if (g?.configured) {
+      const names = new Map((await g.users().catch(() => [])).map(u => [u.id, u.name]));
+      const dates = Array.from({ length: days }, (_, k) => addDays(from, k));
+      const plans = await Promise.all(dates.map(d => g.day(d).catch(() => null)));
+      for (const p of plans) for (const b of p?.blocks || []) out.push({ uid: `dayglance-${b.id}`, title: b.title + (b.owner && names.get(String(b.owner)) ? ` (${names.get(String(b.owner))})` : ""),
+        start: b.start ? `${p!.date}T${b.start}:00` : p!.date, end: "", allDay: !b.start, location: "", calendar: "Family", day: p!.date });
+    }
     for (const e of records.list("events") as any[]) if (e.date >= from && e.date <= last) out.push({ uid: e.id, title: e.title, start: e.time ? `${e.date}T${e.time}:00` : e.date, end: "", allDay: !e.time, location: "", calendar: "Orb", day: e.date });
     // An all-day event that spans several days shows on each of them.
     const spread = out.flatMap(e => {
@@ -115,7 +126,7 @@ export function dailyApi(app: FastifyInstance, deps: { records: Records; dav: Ca
   app.get("/api/daily/quotes", { preHandler: guard }, async () => quotes(dailySettings(records).watchlist));
   app.get("/api/daily/events", { preHandler: guard }, async (req: any) => {
     const from = req.query.from ? String(req.query.from) : today(); if (!isDay(from)) throw new HttpError(400, "from must be YYYY-MM-DD.");
-    return events(from, Math.max(1, Math.min(31, Number(req.query.days) || 7)));
+    return events(from, Math.max(1, Math.min(42, Number(req.query.days) || 7)));
   });
   app.post("/api/daily/brief", { preHandler: guard }, async (req: any) => {
     const day = req.body?.date ? String(req.body.date) : today(); if (!isDay(day)) throw new HttpError(400, "date must be YYYY-MM-DD.");
