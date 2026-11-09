@@ -1,44 +1,47 @@
-# Copy to config/orb.yaml. Secrets are never written here: *_env names an
-# environment variable that holds the value. Settings → Connections in the web
-# app can override any address saved here. A value set here beats the same
-# address passed as an environment variable (UPSTREAM_URL, WIKI_URL, ...).
+# Optional. Copy to config/orb.yaml for settings you'd rather keep in a file.
+#
+# Addresses: put them in .env (ALLGLANCE_URL, WIKI_URL, ...). An address set
+# here instead wins over .env; leave it "" to use .env. Settings →
+# Connections in the web app can change any of them later.
+#
+# Keys never go here: *_env names the environment variable (in .env) that
+# holds one.
 port: 8095
 log_max: 50          # most characters in one log entry
 poll_minutes: 15     # how often new commits are logged for linked projects
 
-golem:               # any OpenAI-compatible /v1 endpoint
-  base_url: http://argos:8080/v1
+golem:               # any OpenAI-compatible /v1 endpoint; "" = ARGOS_URL + /v1
+  base_url: ""       # e.g. http://argos:8080/v1, or https://openrouter.ai/api/v1
   model: ""
-  key_env: ""        # e.g. OPENROUTER_API_KEY for https://openrouter.ai/api/v1
+  key_env: ""        # e.g. OPENROUTER_API_KEY
   can_write: true
 
-upstream:            # UpstreamManager on another computer (start it with HOST=0.0.0.0)
-  base_url: http://192.168.20.10:5000
+upstream:            # UpstreamManager (start it with HOST=0.0.0.0); "" = UPSTREAM_URL
+  base_url: ""       # e.g. http://192.168.1.20:5000
 
-uptime:              # Uptime Kuma with a published status page
-  base_url: http://uptime-kuma:3001
+uptime:              # Uptime Kuma with a published status page; "" = UPTIME_URL
+  base_url: ""       # e.g. http://uptime-kuma:3001
   status_page: orb
 
-caldav:              # task lists. Empty url: the ALLGlance gateway's /dav/ (vikunja through the gateway)
+caldav:              # task lists. "" = the ALLGlance gateway's /dav/ (vikunja through the gateway)
   url: ""            # or a CalDAV server of its own, e.g. http://vikunja:3456/dav/principals/you/
   user_env: CALDAV_USER        # your vikunja login (or a CalDAV token)
   password_env: CALDAV_PASSWORD
   chores_list: Chores
 
-wiki:                # LLMWIKI: reads from the mount, writes over the REST API
-  base_url: http://llmwiki:27123
+wiki:                # LLMWIKI: reads the mounted vault, writes over the REST API; "" = WIKI_URL
+  base_url: ""       # e.g. http://llmwiki:27123
   token_env: WIKI_API_KEY
   vault: /vault
   area_hubs: { homelab: Homelab, ai: Local AI }
 
-allglance:           # the ALLGlance gateway: family calendar (dayGLANCE), lastGLANCE, lifeGLANCE, and vikunja's CalDAV at /dav
-  base_url: http://allglance-gateway:8090   # a LAN address (http://<host>:8090) if it runs in another compose project
+allglance:           # the ALLGlance gateway: family calendar, lastGLANCE, lifeGLANCE, vikunja's CalDAV at /dav; "" = ALLGLANCE_URL
+  base_url: ""       # e.g. http://<host>:8090
   token_env: ALLGLANCE_TOKEN   # same value as GATEWAY_TOKEN on the gateway
 
-hermes:
-  base_url: http://hermes-studio:6060
-  # Studio's address in your browser (for the Agents tab's Watch and Chat links), e.g. through the tunnel.
-  # public_url: https://studio.example.com
+hermes:              # Hermes Studio; "" = HERMES_URL
+  base_url: ""       # e.g. http://hermes-studio:6060
+  # public_url: https://studio.example.com   # Studio in your browser (Agents tab links); or HERMES_PUBLIC_URL
   user_env: HERMES_USER
   password_env: HERMES_PASSWORD
 

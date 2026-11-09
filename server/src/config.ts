@@ -64,7 +64,7 @@ export function loadConfig(path = process.env.ORB_CONFIG || "/config/orb.yaml", 
   };
   // Addresses can also come from the environment (docker-compose.example.yml).
   // orb.yaml wins when it sets the same thing, so editing the YAML always works.
-  const has = (sec: string, key: string) => raw[sec] && raw[sec][key] !== undefined;
+  const has = (sec: string, key: string) => raw[sec] && raw[sec][key] !== undefined && raw[sec][key] !== null && raw[sec][key] !== "";
   if (env.PORT && raw.port === undefined) c.port = Number(env.PORT);
   if (env.UPSTREAM_URL && !has("upstream", "baseUrl")) c.upstream.baseUrl = env.UPSTREAM_URL;
   if (env.UPTIME_URL && !has("uptime", "baseUrl")) c.uptime.baseUrl = env.UPTIME_URL;
