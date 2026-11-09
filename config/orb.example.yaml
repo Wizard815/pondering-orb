@@ -19,9 +19,9 @@ uptime:              # Uptime Kuma with a published status page
   base_url: http://uptime-kuma:3001
   status_page: orb
 
-caldav:              # calendar home that holds your task lists
-  url: http://vikunja:3456/dav/principals/you/
-  user_env: CALDAV_USER
+caldav:              # task lists. Empty url: the ALLGlance gateway's /dav/ (vikunja through the gateway)
+  url: ""            # or a CalDAV server of its own, e.g. http://vikunja:3456/dav/principals/you/
+  user_env: CALDAV_USER        # your vikunja login (or a CalDAV token)
   password_env: CALDAV_PASSWORD
   chores_list: Chores
 
@@ -31,9 +31,9 @@ wiki:                # LLMWIKI: reads from the mount, writes over the REST API
   vault: /vault
   area_hubs: { homelab: Homelab, ai: Local AI }
 
-# allglance:         # the ALLGlance gateway (dayGLANCE, lastGLANCE, lifeGLANCE); leave
-#   base_url: http://allglance-gateway:8090   # commented out until you run it
-#   token_env: ALLGLANCE_TOKEN   # same value as GATEWAY_TOKEN on the gateway
+allglance:           # the ALLGlance gateway: family calendar (dayGLANCE), lastGLANCE, lifeGLANCE, and vikunja's CalDAV at /dav
+  base_url: http://allglance-gateway:8090   # a LAN address (http://<host>:8090) if it runs in another compose project
+  token_env: ALLGLANCE_TOKEN   # same value as GATEWAY_TOKEN on the gateway
 
 hermes:
   base_url: http://hermes-studio:6060

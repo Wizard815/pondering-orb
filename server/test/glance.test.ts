@@ -49,3 +49,32 @@ test("TestAllGlance_ReadsDayInboxChoresWithToken", async () => {
     assert.equal(r.statusCode, 502); assert.match(r.json().error, /GATEWAY_TOKEN/);
   } finally { server.close(); }
 });
+
+test("TestAllGlance_CalDavThroughGatewayAndFamilyCalendar", async () => {
+  const { createServer } = await import("node:http");
+  const posts: any[] = [];
+  const day = new Intl.DateTimeFormat("en-CA").format(new Date());
+  const gw = createServer((req, res) => { let b = ""; req.on("data", d => (b += d)); req.on("end", () => {
+    const J = (c: number, o: unknown) => { res.writeHead(c, { "content-type": "application/json" }); res.end(JSON.stringify(o)); };
+    if (req.method === "POST" && req.url === "/api/allglance/tasks") { posts.push(JSON.parse(b)); return J(201, { source: "dayglance", task: { id: "t9" } }); }
+    if (req.url === "/api/allglance/users") return J(200, { users: [{ id: "u1", name: "Sam" }] });
+    if (req.url?.startsWith(`/api/allglance/days/${day}`)) return J(200, { date: day, blocks: [{ id: "b1", title: "School run", start_time: "08:15", duration_minutes: 30, owner_id: "u1" }], tasks: {} });
+    if (req.url?.startsWith("/api/allglance/days/")) return J(200, { date: req.url.split("/")[4], blocks: [] });
+    J(404, {});
+  }); }).listen(0, "127.0.0.1");
+  await new Promise(r => gw.once("listening", r));
+  const url = `http://127.0.0.1:${(gw.address() as any).port}`;
+  try {
+    const { app, cfg } = await buildApp({ config: { ...loadConfig("/nonexistent.yaml", {}), allglance: { baseUrl: url, tokenEnv: "" } } });
+    assert.equal(cfg().caldav.url, `${url}/dav/`, "no CalDAV URL of its own: the gateway's /dav");
+    // Family calendar: a timed event is a block, an untimed one an all-day task.
+    assert.equal((await app.inject({ method: "POST", url: "/api/allglance/events", payload: { title: "Dentist", date: "2026-11-12", time: "15:00", minutes: 45, owner: "u1" } })).statusCode, 201);
+    assert.equal((await app.inject({ method: "POST", url: "/api/allglance/events", payload: { title: "Bins", date: "2026-11-13" } })).statusCode, 201);
+    assert.equal((await app.inject({ method: "POST", url: "/api/allglance/events", payload: { title: "x", date: "13/11" } })).statusCode, 422);
+    assert.deepEqual(posts, [{ source: "dayglance", title: "Dentist", start: "2026-11-12 15:00", duration_minutes: 45, owner_id: "u1" }, { source: "dayglance", title: "Bins", due_date: "2026-11-13", all_day: true }]);
+    // dayGLANCE blocks show up in the Daily page's events, with the member's name.
+    const evs = (await app.inject({ method: "GET", url: "/api/daily/events?days=2" })).json();
+    const fam = evs.find((e: any) => e.calendar === "Family");
+    assert.equal(fam.title, "School run (Sam)"); assert.equal(fam.start, `${day}T08:15:00`); assert.equal(fam.allDay, false);
+  } finally { gw.close(); }
+});
