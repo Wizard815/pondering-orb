@@ -102,7 +102,7 @@ function PicksToday() {
 export const DailyPage: PageDef = {
   id: "daily", label: "Daily", title: "Morning Scroll", flavor: "The Golem's morning brief: weather, news, markets, your tasks and the week ahead.",
   usePanels: () => {
-    // Your apps can go on this page too (Edit layout → add). Goblin-Bank and Omi start here.
+    // Your apps can go on this page too (Edit layout → add). Firefly III, Omi and Goblin-Bank start here.
     const { panels: apps, widgetKeys } = useAppPanels();
     const own = [
       { key: "brief", title: "Morning brief", node: <Brief />, w: 8, h: 14 },
@@ -114,6 +114,6 @@ export const DailyPage: PageDef = {
       { key: "news", title: "News", node: <NewsList />, w: 6, h: 11 },
       { key: "picks", title: "Today's stock picks", node: <PicksToday />, w: 6, h: 7 },
     ];
-    return { panels: [...own, ...apps], defaults: [...own.map(p => p.key), ...widgetKeys("omi"), ...widgetKeys("goblinbank")] };
+    return { panels: [...own, ...apps], defaults: [...own.map(p => p.key), ...widgetKeys("firefly"), ...widgetKeys("omi"), ...widgetKeys("goblinbank")] };
   },
 };

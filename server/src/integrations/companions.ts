@@ -16,17 +16,17 @@ import { HttpError } from "../records.js";
 export type Companion = { name: string; url: string; keyEnv?: string; page?: string };
 
 /** The first app of a widget type in the apps YAML. */
-export function companion(yaml: string, type: "goblinbank" | "omi"): Companion | null {
+export function companion(yaml: string, type: "goblinbank" | "omi" | "firefly"): Companion | null {
   let c: any = {}; try { c = parse(yaml || "") || {}; } catch { return null; }
   for (const g of Array.isArray(c.groups) ? c.groups : []) for (const a of Array.isArray(g?.apps) ? g.apps : [])
     if (a?.widget?.type === type) return { name: String(a.name), url: String(a.widget.url || a.url || ""), keyEnv: a.widget.key_env || a.widget.keyEnv, page: pageLabel(a.widget.page, type) };
   return null;
 }
 /** `page: true` (or a tab name) in a widget turns on that app's full page. */
-const pageLabel = (v: unknown, type: string) => v === true ? (type === "goblinbank" ? "Money" : "Omi") : typeof v === "string" && v.trim() ? v.trim().slice(0, 24) : undefined;
+const pageLabel = (v: unknown, type: string) => v === true ? ({ goblinbank: "Goblin-Bank", firefly: "Money", omi: "Omi" } as Record<string, string>)[type] : typeof v === "string" && v.trim() ? v.trim().slice(0, 24) : undefined;
 /** Every app by name, for the per-app routes. */
 export function companionByName(yaml: string, name: string): (Companion & { type: string }) | null {
-  for (const type of ["goblinbank", "omi"] as const) { const c = companion(yaml, type); if (c && c.name === name) return { ...c, type }; }
+  for (const type of ["goblinbank", "omi", "firefly"] as const) { const c = companion(yaml, type); if (c && c.name === name) return { ...c, type }; }
   return null;
 }
 

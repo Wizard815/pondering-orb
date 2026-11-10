@@ -2,6 +2,7 @@ import { useFetch } from "../lib/useFetch";
 import { useColl } from "../lib/store";
 import { ago, sortTasks } from "../lib/util";
 import { TaskRows, fromOmi } from "./Common";
+import { BudgetBars, MonthBoxes, money } from "../pages/Finances";
 
 const usd = (n: number | null) => (n === null || n === undefined ? "—" : n.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: Math.abs(n) >= 1000 ? 0 : 2 }));
 
@@ -29,6 +30,16 @@ function GoblinBank({ data }: { data: any }) {
     {data.alerts?.filter((a: any) => a.severity !== "info").slice(0, 3).map((a: any, k: number) => <div key={k} className="small"><span className={"chip " + (a.severity === "critical" ? "bad" : "warn")}>{a.severity}</span> {a.title} <span className="hint">{a.person}</span></div>)}
     {data.bills?.length > 0 && <div className="small">Next bills: {data.bills.slice(0, 3).map((b: any) => `${b.name} ${b.date.slice(5)} ${usd(b.amount)}`).join(" · ")}</div>}
     <div className="hint">Read only, from Goblin-Bank's shared summary · {ago(data.at)}</div>
+  </>;
+}
+/** Firefly III: the month, the next unpaid bills and the budgets closest to their limit. */
+function Firefly({ data }: { data: any }) {
+  const today = new Intl.DateTimeFormat("en-CA").format(new Date()), due = (data.bills || []).filter((b: any) => !b.paid).slice(0, 4);
+  return <>
+    <MonthBoxes s={data.summary} />
+    {due.length > 0 && <div className="small" style={{ marginTop: 6 }}><span className="muted">Next bills:</span> {due.map((b: any) => `${b.name} ${b.date === today ? "today" : b.date.slice(5)} ${money(b.amount, b.currency)}`).join(" · ")}</div>}
+    {data.budgets?.some((b: any) => b.pct >= 80) && <div style={{ marginTop: 6 }}><BudgetBars budgets={data.budgets.filter((b: any) => b.pct >= 80)} limit={3} /></div>}
+    <div className="hint">Read only, from Firefly III · {ago(data.at)}</div>
   </>;
 }
 /** Omi: yesterday's recap and recent conversations from Omi; its action items from CalDAV. */
@@ -62,5 +73,6 @@ export function LiveWidget({ name }: { name: string }) {
       : <div className="empty small">Queue empty.</div>}</>;
   if (data.type === "goblinbank") return <GoblinBank data={data} />;
   if (data.type === "omi") return <Omi data={data} />;
+  if (data.type === "firefly") return <Firefly data={data} />;
   return null;
 }

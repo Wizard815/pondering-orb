@@ -13,6 +13,7 @@ import { hostStats, containers } from "./integrations/system.js";
 import { chat, chatStream, Msg, Tool } from "./integrations/llm.js";
 import { widgetsFrom, widgetData } from "./integrations/widgets.js";
 import { companion, companionByName, goblinSummary, omiDays, omiConversations, omiSearchMemories, isOmiTask } from "./integrations/companions.js";
+import { ffAccounts, ffOverview, ffRecent, ffSearch } from "./integrations/firefly.js";
 import { call, trimSlash } from "./integrations/http.js";
 import { orbTools } from "./tools.js";
 import { mountMcp } from "./mcp.js";
@@ -94,8 +95,15 @@ export async function buildApp(o: AppOptions = {}) {
   const appsYaml = () => String((store.get("settings", "apps") as any)?.yaml || "");
   /** Golem's read-only tools for Goblin-Bank and Omi, when they're in the apps YAML. */
   const companionTools = (): Tool[] => {
-    const gb = companion(appsYaml(), "goblinbank"), om = companion(appsYaml(), "omi");
+    const gb = companion(appsYaml(), "goblinbank"), om = companion(appsYaml(), "omi"), ff = companion(appsYaml(), "firefly");
     return [
+      ...(ff ? [
+        { name: "finance_summary", description: "Firefly III this month: net worth, balance, spent, earned, left to spend, bills paid and unpaid; plus bills due in the next 30 days, budgets (limit, spent, % used) and piggy banks. Read only.",
+          parameters: { type: "object", properties: {} }, run: () => ffOverview(ff) },
+        { name: "finance_accounts", description: "Firefly III asset and liability accounts with their current balances. Read only.", parameters: { type: "object", properties: {} }, run: () => ffAccounts(ff) },
+        { name: "finance_search_transactions", description: "Search Firefly III transactions with its search syntax, e.g. 'amazon', 'category:Groceries date_after:2026-10-01', 'amount_more:100'. Returns date, description, amount (negative = spent), category, budget, accounts. Read only.",
+          parameters: { type: "object", properties: { query: { type: "string" }, limit: { type: "number" } }, required: ["query"] }, run: ({ query, limit }: any) => ffSearch(ff, String(query || ""), Number(limit) || 25) },
+      ] : []),
       ...(gb ? [{ name: "money_summary", description: "Goblin-Bank's shared summary per person: net worth, monthly subscriptions, bills due soon, alert counts, savings (total and free), goal progress and Robinhood balances. Only what each person chose to share; no transactions. Read only.",
         parameters: { type: "object", properties: {} }, run: () => goblinSummary(gb) }] : []),
       ...(om ? [
@@ -404,6 +412,9 @@ export async function buildApp(o: AppOptions = {}) {
   // Full pages for Goblin-Bank and Omi (page: true in the apps YAML). Read only, like the widgets.
   const comp = (name: string, type: string) => { const c = companionByName(appsYaml(), name); if (!c || c.type !== type) throw new HttpError(404, `No ${type} app called ${name} in the apps YAML.`); return c; };
   app.get("/api/apps/:name/money", { preHandler: guard }, async (req: any) => goblinSummary(comp(req.params.name, "goblinbank")));
+  app.get("/api/apps/:name/firefly/overview", { preHandler: guard }, async (req: any) => ffOverview(comp(req.params.name, "firefly")));
+  app.get("/api/apps/:name/firefly/accounts", { preHandler: guard }, async (req: any) => ffAccounts(comp(req.params.name, "firefly")));
+  app.get("/api/apps/:name/firefly/transactions", { preHandler: guard }, async (req: any) => req.query.q ? ffSearch(comp(req.params.name, "firefly"), String(req.query.q), 50) : ffRecent(comp(req.params.name, "firefly"), Number(req.query.limit) || 25));
   app.get("/api/apps/:name/omi/days", { preHandler: guard }, async (req: any) => omiDays(comp(req.params.name, "omi"), Number(req.query.limit) || 14, "", Number(req.query.offset) || 0));
   app.get("/api/apps/:name/omi/conversations", { preHandler: guard }, async (req: any) => omiConversations(comp(req.params.name, "omi"), Number(req.query.limit) || 25));
   app.get("/api/apps/:name/omi/memories", { preHandler: guard }, async (req: any) => omiSearchMemories(comp(req.params.name, "omi"), String(req.query.q || ""), 20));

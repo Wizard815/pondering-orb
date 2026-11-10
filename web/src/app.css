@@ -60,3 +60,5 @@ div:not(.editing) > .react-grid-layout .react-resizable-handle { display: none; 
 .money-person { border: 1px solid var(--line); border-radius: 8px; padding: 8px }
 .omi-head { font-size: 1.1rem; margin: 8px 0 2px }
 .month .ev.fam { background: var(--ok-bg); color: var(--ok) }
+.ff-boxes { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px }
+.ff-box { border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px } .ff-box b { font-size: 1.15rem; font-variant-numeric: tabular-nums }

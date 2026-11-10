@@ -1,22 +1,60 @@
-# Goblin-Bank and Omi
+# Firefly III, Omi and Goblin-Bank
 
-Two of your own apps, read only. Add them as apps with a widget in Settings →
-Apps (the apps YAML):
+Your own apps, read only. Add them as apps with a widget in Settings → Apps
+(the apps YAML):
 
 ```yaml
 groups:
   - name: Household
     apps:
-      - name: Goblin-Bank
-        url: http://coingateway:8080
-        widget: { type: goblinbank, key_env: GOBLIN_ORB_KEY }
+      - name: Firefly III
+        url: http://firefly:8080
+        widget: { type: firefly, key_env: FIREFLY_TOKEN, page: true }
       - name: Omi
         url: http://192.168.20.5:8000
         widget: { type: omi, key_env: OMI_DEV_KEY }
 ```
 
-Put the keys in `.env` (`GOBLIN_ORB_KEY`, `OMI_DEV_KEY`). They stay on the
+Put the keys in `.env` (`FIREFLY_TOKEN`, `OMI_DEV_KEY`). They stay on the
 server; the browser only sees what Orb shows.
+
+## Firefly III (your finances)
+
+Orb reads Firefly III through its REST API with a **Personal Access Token**
+(Firefly → Options → Profile → OAuth → Personal access tokens). Put it in
+`.env` as `FIREFLY_TOKEN` and add the app:
+
+```yaml
+      - name: Firefly III
+        url: http://firefly:8080          # or http://<host>:<port>
+        widget: { type: firefly, key_env: FIREFLY_TOKEN, page: true }   # page: a "Money" tab
+```
+
+Every request is a GET; Orb never creates, edits or deletes anything there.
+
+| Firefly | Orb |
+| --- | --- |
+| `GET /api/v1/summary/basic` (this month, your primary currency) | net worth, balance, spent, earned, left to spend, bills paid and still to pay |
+| `GET /api/v1/bills?start&end` (`pay_dates`, `paid_dates`) | bills for the next 30 days, each marked paid when Firefly matched a payment; unpaid ones show in Daily's Today and This week |
+| `GET /api/v1/budget-limits`, `/budgets` | this month's budgets: limit, spent, % used |
+| `GET /api/v1/piggy-banks` | saved, target, % (Firefly's own 0–100) |
+| `GET /api/v1/accounts?type=asset` / `liabilities` | balances, and which count toward net worth |
+| `GET /api/v1/transactions`, `/search/transactions` | recent transactions and Firefly's search syntax |
+
+Where it shows up: the **Firefly III** panel (Main and Daily; the month, next
+bills, budgets near their limit), the **Money** tab with `page: true`, Daily's
+Today and This week (unpaid bills), the morning brief (bills this week,
+budgets near or over, spent / earned / left to spend), and Golem's read-only
+tools `finance_summary`, `finance_accounts` and `finance_search_transactions`.
+
+If Plaid feeds Firefly (for example through Goblin-Bank acting as a Plaid
+router), Orb doesn't need to know: it reads the result in Firefly.
+
+## Goblin-Bank (optional)
+
+Goblin-Bank can still be read the same way (its shared summary), but with
+Firefly III set up Orb uses Firefly for the brief and Daily's bills. Its tab is
+"Goblin-Bank" now; "Money" is Firefly's.
 
 ## Panel, or a full page
 
