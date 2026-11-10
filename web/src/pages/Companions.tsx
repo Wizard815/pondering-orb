@@ -2,88 +2,12 @@ import { useState } from "react";
 import type { PageDef } from "./types";
 import { useColl } from "../lib/store";
 import { useFetch } from "../lib/useFetch";
-import { ago, dayIn, fmtDate, sortTasks, todayISO } from "../lib/util";
+import { ago, sortTasks } from "../lib/util";
 import { TaskRows, fromOmi } from "../components/Common";
-import { AppTiles } from "../components/AppPanels";
 import type { App } from "../lib/apps";
 
-/** Full pages for your own apps, turned on with `page: true` (or a tab name)
- *  in the app's widget in the apps YAML. Everything here is read only. */
-const usd = (n: number | null | undefined) => (n === null || n === undefined ? "—" : n.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: Math.abs(n) >= 1000 ? 0 : 2 }));
-const SEV_CLS: Record<string, string> = { critical: "bad", warning: "warn", info: "" };
-const notShared = <span className="muted small">not shared</span>;
-
-// ---------------- Goblin-Bank ----------------
-function useMoney(app: App) { return useFetch<any>(`/api/apps/${encodeURIComponent(app.name)}/money`, 5 * 60000); }
-function People({ app }: { app: App }) {
-  const { data, error } = useMoney(app);
-  if (error) return <div className="err-inline">{error}</div>;
-  if (!data) return <div className="hint">Counting the hoard…</div>;
-  return <>
-    {data.netWorth !== null && <div className="row"><span className="wx-t">{usd(data.netWorth)}</span><span className="hint" title="Each person's net worth added up. An account two people both link (a joint account) counts once for each of them.">shared net worth, added up</span></div>}
-    <div className="money-people">{data.people.map((p: any) => <div key={p.name} className="money-person">
-      <div className="row"><b>{p.name}</b>{p.error && <span className="chip bad">{p.error}</span>}{p.alerts?.critical > 0 && <span className="chip bad">{p.alerts.critical} critical</span>}{p.alerts?.warning > 0 && <span className="chip warn">{p.alerts.warning} warning</span>}</div>
-      {!p.error && <table className="tbl small"><tbody>
-        <tr><td>Net worth</td><td className="num">{p.netWorth !== null ? usd(p.netWorth) : notShared}</td></tr>
-        <tr><td>Subscriptions</td><td className="num">{p.subscriptionsMonthly !== null ? `${usd(p.subscriptionsMonthly)}/mo` : notShared}</td></tr>
-        <tr><td>Bills, next 7 / 30 days</td><td className="num">{p.bills ? `${usd(p.bills.next7d)} / ${usd(p.bills.next30d)}` : notShared}</td></tr>
-        {p.bills?.next && <tr><td>Next bill</td><td className="num">{p.bills.next.name} · {fmtDate(p.bills.next.date)} · {usd(p.bills.next.amount)}</td></tr>}
-        <tr><td>Spending this month</td><td className="num">{p.spending ? <span title={`confidence: ${p.spending.confidence}`}>{usd(p.spending.soFar)} so far, on track for {usd(p.spending.projected)}{p.spending.pctProjected != null ? ` (${Math.round(p.spending.pctProjected * 100)}% of income)` : ""}{p.spending.leftAfter != null ? `, ${usd(p.spending.leftAfter)} left` : ""}</span> : notShared}</td></tr>
-        <tr><td>Savings (free / set aside)</td><td className="num">{p.savings ? `${usd(p.savings.total)} (${usd(p.savings.free)} / ${usd(p.savings.earmarked)})` : notShared}</td></tr>
-        {p.robinhoodMain && <tr><td>Robinhood</td><td className="num" title={`${p.robinhoodMain.source}, as of ${p.robinhoodMain.asOf}`}>{usd(p.robinhoodMain.equity)}</td></tr>}
-        {p.robinhoodAgent && <tr><td>Robinhood agentic account</td><td className="num" title={`as of ${p.robinhoodAgent.asOf}`}>{usd(p.robinhoodAgent.equity)}</td></tr>}
-      </tbody></table>}
-    </div>)}</div>
-    <div className="hint">Read only. Each person picks what Orb sees in Goblin-Bank → Settings → Sharing. Updated {ago(data.at)}.</div>
-  </>;
-}
-function Bills({ app, days }: { app: App; days: number }) {
-  const { data } = useMoney(app), today = todayISO();
-  if (!data) return <div className="hint">…</div>;
-  const end = dayIn(new Date(Date.now() + days * 864e5)), list = (data.bills || []).filter((b: any) => b.date >= today && b.date <= end);
-  if (!data.people.some((p: any) => p.billList)) return <div className="empty">Nobody shares a bill list yet (Goblin-Bank → Settings → Sharing → Bill list).</div>;
-  if (!list.length) return <div className="empty">No bills in the next {days} days.</div>;
-  const mine = list.filter((b: any) => b.paidBy === "me");
-  return <><ul className="list">{list.map((b: any, k: number) => <li key={k}><span className="date">{b.date === today ? "Today" : fmtDate(b.date)}</span>
-    <div className="grow">{b.name}<div className="hint">{b.person}{b.paidBy !== "me" ? ` · paid by ${b.paidBy}` : ""} · {b.category}</div></div><span className="num">{usd(b.amount)}</span></li>)}</ul>
-    <div className="hint">{mine.length} to pay, {usd(mine.reduce((a: number, b: any) => a + b.amount, 0))} in total.</div></>;
-}
-function Alerts({ app }: { app: App }) {
-  const { data } = useMoney(app);
-  if (!data) return <div className="hint">…</div>;
-  if (!data.people.some((p: any) => p.alertList)) return <div className="empty">Nobody shares an alert list yet (Goblin-Bank → Settings → Sharing → Alert list).</div>;
-  if (!data.alerts.length) return <div className="empty">All quiet in the vaults.</div>;
-  return <ul className="list">{data.alerts.map((a: any, k: number) => <li key={k}><span className={"chip " + SEV_CLS[a.severity]}>{a.severity}</span>
-    <div className="grow">{a.title}{a.detail && <div className="hint">{a.detail}</div>}</div>{a.date && <span className="date">{fmtDate(a.date)}</span>}<span className="tag">{a.person}</span></li>)}</ul>;
-}
-function Maturities({ app }: { app: App }) {
-  const { data } = useMoney(app), today = todayISO();
-  if (!data) return <div className="hint">…</div>;
-  const list = data.maturities || [];
-  if (!list.length) return <div className="empty">No CDs or bonds maturing soon{data.people.some((p: any) => p.alertList) ? "" : " (they come with the shared alert list)"}.</div>;
-  return <ul className="list">{list.map((m: any, k: number) => <li key={k}><span className="date">{m.date === today ? "Today" : fmtDate(m.date)}</span>
-    <div className="grow">{m.title}{m.detail && <div className="hint">{m.detail}</div>}</div><span className="tag">{m.person}</span></li>)}</ul>;
-}
-function Goals({ app }: { app: App }) {
-  const { data } = useMoney(app);
-  const goals = (data?.people || []).flatMap((p: any) => (p.goals || []).map((g: any) => ({ ...g, person: p.name })));
-  if (!data) return <div className="hint">…</div>;
-  if (!goals.length) return <div className="empty">No shared goals.</div>;
-  return <>{goals.map((g: any, k: number) => <div key={k} className="meter"><div className="lab"><span>{g.name} <span className="hint">{g.person}</span></span><b>{usd(g.allocated)} of {usd(g.target)}{g.pct != null ? ` · ${Math.round(g.pct * 100)}%` : ""}</b></div>
-    <div className="bar"><span style={{ width: Math.min(100, Math.round((g.pct ?? 0) * 100)) + "%" }} /></div></div>)}</>;
-}
-export function moneyPage(app: App, label: string): PageDef {
-  return { id: "goblinbank", label, title: "The Hoard", flavor: `${app.name}: what each of you shares, read only.`,
-    usePanels: () => ({ panels: [
-      { key: "people", title: "Everyone", node: <People app={app} />, w: 7, h: 12 },
-      { key: "alerts", title: "Alerts", node: <Alerts app={app} />, w: 5, h: 8 },
-      { key: "bills", title: "Bills, next 30 days", node: <Bills app={app} days={30} />, w: 5, h: 12 },
-      { key: "goals", title: "Goals", node: <Goals app={app} />, w: 7, h: 6 },
-      { key: "maturities", title: "Maturing soon", node: <Maturities app={app} />, w: 5, h: 5 },
-      { key: "open", title: "Open Goblin-Bank", node: <AppTiles apps={[app]} />, w: 4, h: 3 },
-    ] }) };
-}
-
+/** Omi's full page, turned on with `page: true` (or a tab name) in its widget
+ *  in the apps YAML. Read only. Firefly III's page is in Finances.tsx. */
 // ---------------- Omi ----------------
 function Days({ app }: { app: App }) {
   const [i, setI] = useState(0), { data, error } = useFetch<any[]>(`/api/apps/${encodeURIComponent(app.name)}/omi/days?limit=30`, 10 * 60000);

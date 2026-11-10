@@ -14,21 +14,8 @@ const serve = (h: (req: any, body: string, res: any) => void) => new Promise<{ u
 });
 const J = (res: any, o: unknown, code = 200) => { res.writeHead(code, { "content-type": "application/json" }); res.end(JSON.stringify(o)); };
 
-const todayIso = new Intl.DateTimeFormat("en-CA").format(new Date());
-test("TestCompanions_ReadOnlyWidgetsAndGolemTools", async () => {
-  process.env.GB_KEY = "orbkey"; process.env.OMI_KEY = "omi_dev_x";
-  const gb = await serve((req, _b, res) => req.url === "/api/v1/summary" && req.headers.authorization === "Bearer orbkey"
-    ? J(res, { goblins: { alice: { goblin: "alice", net_worth: 12000.5, subscriptions_monthly: 42.1, robinhood_agent: { as_of: "2026-11-07", balances: { equity: 510.25 } },
-        bills: { next_7d: 15.49, next_30d: 80, next: { name: "Netflix", date: todayIso, amount: 15.49 } }, alerts: { total: 2, critical: 1, warning: 0 },
-        bill_list: [{ date: todayIso, name: "Netflix", amount: 15.49, category: "Subscriptions", paid_by: "me" }, { date: "2099-01-01", name: "Far away", amount: 1, category: "x", paid_by: "me" }],
-        alert_list: [{ severity: "info", kind: "due_soon", title: "Netflix due", detail: "15.49" }, { severity: "critical", kind: "negative_balance", title: "Checking is overdrawn", detail: "Balance -20.00" },
-          { severity: "warning", kind: "maturing", title: `12-mo CD matures today`, detail: "Worth about 10,512.20; 1,512.20 free → Car 1,512.20. Nothing else needs it.", date: todayIso },
-          { severity: "info", kind: "maturing", title: "6-mo CD matures in 40 days (2099-02-01)", detail: "Worth about 5,100.00", date: "2099-02-01" },
-          { severity: "warning", kind: "matured_idle", title: "Old CD matured 12 days ago and is still sitting there", detail: "2,500.00 on it, 2,500.00 free. Roll it over, move it, or mark it handled.", date: "2026-10-26" }] },
-      bob: { error: "unavailable" }, carol: { goblin: "carol" },
-        dave: { goblin: "dave", net_worth: 5000, bills: { next_7d: 120.5, next_30d: 480, next: { name: "Netflix", date: "2026-11-09", amount: 15.49 } }, alerts: { total: 3, critical: 1, warning: 2 },
-          savings: { total: 10000, free: 0, earmarked: 10000 }, spending: { so_far: 818.55, projected: 3874.14, income_avg: 4761.64, pct_projected: 0.814, left_after: 887.5, confidence: "high" }, goals: [{ name: "House", target: 9000, allocated: 9000, pct: 1 }, { name: "Laptop", target: 1500, allocated: 0, pct: 0 }, { name: "", target: 1, allocated: 1, pct: 1 }] } } })
-    : J(res, { detail: "unauthorized" }, 401));
+test("TestCompanions_OmiReadOnlyWidgetAndPages", async () => {
+  process.env.OMI_KEY = "omi_dev_x";
   const omi = await serve((req, _b, res) => {
     const u = new URL(req.url, "http://x");
     if (req.headers.authorization !== "Bearer omi_dev_x") return J(res, {}, 401);
@@ -40,33 +27,20 @@ test("TestCompanions_ReadOnlyWidgetsAndGolemTools", async () => {
   clearCompanionCache();
   try {
     const { app } = await buildApp({ config: cfg() });
-    const yaml = `groups:\n  - name: Home\n    apps:\n      - name: Bank\n        url: ${gb.url}\n        widget: { type: goblinbank, key_env: GB_KEY }\n      - name: Omi\n        url: ${omi.url}\n        widget: { type: omi, key_env: OMI_KEY }\n`;
+    const yaml = `groups:\n  - name: Home\n    apps:\n      - name: Omi\n        url: ${omi.url}\n        widget: { type: omi, key_env: OMI_KEY }\n      - name: Old bank\n        url: http://127.0.0.1:9\n        widget: { type: goblinbank, key_env: X }\n`;
     await app.inject({ method: "PUT", url: "/api/c/settings/apps", payload: { yaml } });
-    const bank = (await app.inject({ method: "GET", url: "/api/widgets/Bank" })).json();
-    assert.equal(bank.netWorth, 17000.5, "only people who share net worth count (alice and dave)");
-    assert.equal(bank.people.find((p: any) => p.name === "alice").robinhoodAgent.equity, 510.25);
-    assert.equal(bank.people.find((p: any) => p.name === "bob").error, "unavailable");
-    // the newer shared fields: parsed when present, null when that person does not share them
-    const dave = bank.people.find((p: any) => p.name === "dave");
-    assert.deepEqual(dave.bills, { next7d: 120.5, next30d: 480, next: { name: "Netflix", date: "2026-11-09", amount: 15.49 } });
-    assert.deepEqual(dave.alerts, { total: 3, critical: 1, warning: 2 }); assert.deepEqual(dave.savings, { total: 10000, free: 0, earmarked: 10000 });
-    assert.deepEqual(dave.goals.map((g: any) => [g.name, g.pct]), [["House", 1], ["Laptop", 0]], "a goal without a name is dropped");
-    const carol = bank.people.find((p: any) => p.name === "carol");
-    assert.ok(carol.bills === null && carol.alerts === null && carol.savings === null && carol.goals === null && carol.billList === null && carol.alertList === null, "unshared means null, not zero");
     const o = (await app.inject({ method: "GET", url: "/api/widgets/Omi" })).json();
     assert.equal(o.day.headline, "Shipped the NAS fix"); assert.deepEqual(o.day.decisions, ["Move backups to Sunday"]); assert.equal(o.conversations[0].title, "NAS planning");
-    // Bills and alerts: merged across people, critical first; the full-page routes; bills for the Daily page.
-    assert.equal(bank.alerts[0].title, "Checking is overdrawn"); assert.equal(bank.alerts[0].person, "alice");
-    assert.equal(bank.people.find((p: any) => p.name === "alice").bills.next.name, "Netflix");
-    assert.equal((await app.inject({ method: "GET", url: "/api/apps/Bank/money" })).json().bills.length, 2);
-    assert.deepEqual((await app.inject({ method: "GET", url: "/api/daily/bills?days=7" })).json().map((b: any) => b.name), ["Netflix"]);
     assert.equal((await app.inject({ method: "GET", url: "/api/apps/Omi/omi/days?limit=5" })).json()[0].headline, "Shipped the NAS fix");
-    assert.equal((await app.inject({ method: "GET", url: "/api/apps/Omi/money" })).statusCode, 404, "a route only for its own app type");
     assert.equal((await app.inject({ method: "GET", url: "/api/apps/Omi/omi/memories?q=zfs" })).json()[0].content, "Prefers ZFS mirrors");
-    // Only GETs ever reached either app.
-    assert.ok([...gb.hits, ...omi.hits].every(h => h.method === "GET"), JSON.stringify([...gb.hits, ...omi.hits].map(h => h.method)));
+    assert.equal((await app.inject({ method: "GET", url: "/api/apps/Omi/firefly/overview" })).statusCode, 404, "a route only for its own app type");
+    // Goblin-Bank is gone: its widget type is unknown, and nothing reads money from it.
+    assert.equal((await app.inject({ method: "GET", url: "/api/widgets/Old%20bank" })).statusCode, 400);
+    assert.deepEqual((await app.inject({ method: "GET", url: "/api/daily/bills?days=7" })).json(), [], "no Firefly, no bills");
+    // Only GETs ever reached Omi, and never its action items (they come from CalDAV).
+    assert.ok(omi.hits.every(h => h.method === "GET"));
     assert.ok(!omi.hits.some(h => h.url.includes("action-items")), "Omi's action items are never read from Omi (they come from CalDAV)");
-  } finally { gb.close(); omi.close(); clearCompanionCache(); delete process.env.GB_KEY; delete process.env.OMI_KEY; }
+  } finally { omi.close(); clearCompanionCache(); delete process.env.OMI_KEY; }
 });
 
 test("TestCompanions_OmiTasksComeOnlyFromCalDavAndStayReadOnly", async () => {

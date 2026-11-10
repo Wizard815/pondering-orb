@@ -50,7 +50,7 @@ Each one is optional; leave its address empty and its panels say so.
 | **UpstreamManager** | Repos, approval requests (approve part of one), daily check, fetch, new commits logged per project | [docs/backend.md](docs/backend.md) |
 | **Hermes Studio** | Chats linked to projects; herdr coding agents on the Agents tab | |
 | **Uptime Kuma** | Monitors from a public status page | |
-| **Firefly III** | Read only: this month (net worth, spent, earned, left to spend), bills due and paid, budgets, piggy banks, accounts, transactions and search; bills also show in Today and This week, and in the brief | [docs/companions.md](docs/companions.md) |
+| **Firefly III** | Read only: this month (net worth, spent, earned, left to spend), bills due and paid, budgets, piggy banks, accounts, transactions and search; bills also show in Today and This week, and in the brief. Bank data reaches Firefly through [plaid-firefly-connector](https://github.com/Wizard815/plaid-firefly-connector) | [docs/companions.md](docs/companions.md) |
 | **Omi** (omi-local) | Read only: daily recaps, conversations, memory search; its action items come through CalDAV, once | [docs/companions.md](docs/companions.md) |
 | **Robinhood** | Its Trading MCP (OAuth): the agentic account, and orders for picks you approve, within caps you set | [docs/picks.md](docs/picks.md) |
 | **Plex**, **SABnzbd** | Live panels | |
@@ -183,7 +183,7 @@ npm run build   # server/dist and web/dist
   REST API, MCP tools, CalDAV, the wiki rules
 - [docs/allglance.md](docs/allglance.md): the ALLGlance stack, priorities,
   the family calendar
-- [docs/companions.md](docs/companions.md): Firefly III and Omi (and Goblin-Bank)
+- [docs/companions.md](docs/companions.md): Firefly III and Omi
 - [docs/picks.md](docs/picks.md): the Daily page, stock picks, the decision
   model and Robinhood
 - [docs/miladash.md](docs/miladash.md): the ideas board and Miladash

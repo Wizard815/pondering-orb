@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import type { PageDef } from "./types";
 import { useColl } from "../lib/store";
 import { parseApps, DEFAULT_APPS } from "../lib/apps";
-import { moneyPage, omiPage } from "./Companions";
+import { omiPage } from "./Companions";
 import { fireflyPage } from "./Finances";
 import { MainPage } from "./Main";
 import { ProjectsPage } from "./Projects";
@@ -22,7 +22,7 @@ import { AgentsPage } from "./Agents";
 export const PAGES: PageDef[] = [MainPage, DailyPage, ProjectsPage, AgentsPage, IdeasPage, TodoPage, WikiPage, CalendarPage, PicksPage, UpkeepPage, UptimePage, SystemPage, SettingsPage];
 
 /** Full pages for apps whose widget says `page: true` (or a tab name):
- *  Goblin-Bank and Omi. They sit after Picks. */
+ *  Firefly III and Omi. They sit after Picks. */
 let current: PageDef[] = PAGES;
 export function usePages(): PageDef[] {
   const yaml = useColl("settings").find(d => d.id === "apps")?.yaml as string | undefined;
@@ -31,7 +31,7 @@ export function usePages(): PageDef[] {
     for (const a of parseApps(yaml ?? DEFAULT_APPS).groups.flatMap(g => g.apps)) {
       const w: any = a.widget, label = w?.page === true ? "" : typeof w?.page === "string" ? w.page.trim().slice(0, 24) : null;
       if (label === null || !w) continue;
-      const def = w.type === "firefly" ? fireflyPage(a, label || "Money") : w.type === "goblinbank" ? moneyPage(a, label || "Goblin-Bank") : w.type === "omi" ? omiPage(a, label || "Omi") : null;
+      const def = w.type === "firefly" ? fireflyPage(a, label || "Money") : w.type === "omi" ? omiPage(a, label || "Omi") : null;
       if (def && !used.has(def.id)) { used.add(def.id); extra.push(def); }
     }
     const at = PAGES.indexOf(PicksPage) + 1;
