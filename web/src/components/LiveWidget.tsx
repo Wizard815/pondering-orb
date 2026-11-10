@@ -4,34 +4,6 @@ import { ago, sortTasks } from "../lib/util";
 import { TaskRows, fromOmi } from "./Common";
 import { BudgetBars, MonthBoxes, money } from "../pages/Finances";
 
-const usd = (n: number | null) => (n === null || n === undefined ? "—" : n.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: Math.abs(n) >= 1000 ? 0 : 2 }));
-
-/** Goblin-Bank: only what each person shares (no transactions). */
-function GoblinBank({ data }: { data: any }) {
-  const bits = (p: any) => [
-    p.bills?.next7d != null && `bills ${usd(p.bills.next7d)} this week${p.bills.next30d != null ? `, ${usd(p.bills.next30d)} in 30 days` : ""}`,
-    p.bills?.next && `next: ${p.bills.next.name} ${String(p.bills.next.date).slice(5)}`,
-    p.savings?.total != null && `savings ${usd(p.savings.total)}${p.savings.free != null ? `, ${usd(p.savings.free)} free` : ""}`,
-    p.spending?.projected != null && `spending ${usd(p.spending.soFar)} so far, on track for ${usd(p.spending.projected)}${p.spending.pctProjected != null ? ` (${Math.round(p.spending.pctProjected * 100)}% of income)` : ""}`,
-  ].filter(Boolean) as string[];
-  return <>
-    {data.netWorth !== null && <div className="row"><span className="wx-t">{usd(data.netWorth)}</span><span className="hint" title="Each person's net worth added up; a joint account both of you link counts twice.">net worth, shared</span></div>}
-    <table className="tbl small"><tbody>{data.people.map((p: any) => <tr key={p.name}><td><b>{p.name}</b></td>
-      {p.error ? <td colSpan={3} className="err-inline">{p.error}</td> : <>
-        <td className="num">{p.netWorth !== null ? usd(p.netWorth) : <span className="muted">not shared</span>}</td>
-        <td className="num">{p.subscriptionsMonthly !== null ? `${usd(p.subscriptionsMonthly)}/mo` : ""}</td>
-        <td className="num">{p.robinhoodAgent?.equity != null ? <span title={`agentic account, as of ${p.robinhoodAgent.asOf}`}>RH agent {usd(p.robinhoodAgent.equity)}</span> : p.robinhoodMain?.equity != null ? <span title={`${p.robinhoodMain.source}, as of ${p.robinhoodMain.asOf}`}>RH {usd(p.robinhoodMain.equity)}</span> : ""}</td></>}
-    </tr>)}</tbody></table>
-    {data.people.filter((p: any) => !p.error && (bits(p).length || p.alerts?.total || p.goals?.length || p.spending)).map((p: any) => <div key={p.name} className="small" style={{ marginTop: 6 }}>
-      <b>{p.name}</b> <span className="muted">{bits(p).join(" · ")}</span>
-      {p.alerts?.total > 0 && <span className={p.alerts.critical ? "err-inline" : "hint"}> · {p.alerts.total} alert{p.alerts.total === 1 ? "" : "s"}{p.alerts.critical ? `, ${p.alerts.critical} critical` : ""}</span>}
-      {p.goals?.length > 0 && <div className="muted">{p.goals.map((g: any) => `${g.name} ${g.pct != null ? Math.round(g.pct * 100) + "%" : ""}`).join(" · ")}</div>}
-    </div>)}
-    {data.alerts?.filter((a: any) => a.severity !== "info").slice(0, 3).map((a: any, k: number) => <div key={k} className="small"><span className={"chip " + (a.severity === "critical" ? "bad" : "warn")}>{a.severity}</span> {a.title} <span className="hint">{a.person}</span></div>)}
-    {data.bills?.length > 0 && <div className="small">Next bills: {data.bills.slice(0, 3).map((b: any) => `${b.name} ${b.date.slice(5)} ${usd(b.amount)}`).join(" · ")}</div>}
-    <div className="hint">Read only, from Goblin-Bank's shared summary · {ago(data.at)}</div>
-  </>;
-}
 /** Firefly III: the month, the next unpaid bills and the budgets closest to their limit. */
 function Firefly({ data }: { data: any }) {
   const today = new Intl.DateTimeFormat("en-CA").format(new Date()), due = (data.bills || []).filter((b: any) => !b.paid).slice(0, 4);
@@ -71,7 +43,6 @@ export function LiveWidget({ name }: { name: string }) {
     <div className="row small mono" style={{ justifyContent: "space-between" }}><span>{data.paused ? "paused" : data.speed || "idle"}</span><span>{data.timeleft ? `${data.timeleft} left` : ""}{data.sizeLeft ? ` · ${data.sizeLeft}` : ""}</span></div>
     {data.queue.length ? data.queue.map((q: any, i: number) => <div key={i} className="lv"><div className="row" style={{ justifyContent: "space-between" }}><span className="grow" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{q.name}</span><span className="mono small">{q.pct}%</span></div>{bar(q.pct)}</div>)
       : <div className="empty small">Queue empty.</div>}</>;
-  if (data.type === "goblinbank") return <GoblinBank data={data} />;
   if (data.type === "omi") return <Omi data={data} />;
   if (data.type === "firefly") return <Firefly data={data} />;
   return null;

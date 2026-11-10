@@ -56,7 +56,6 @@ test("TestFirefly_ReadOnlySummaryBillsBudgetsAndTools", async () => {
     const g: any = await daily.gather();
     assert.equal(g.finances.leftToSpend, 312.4); assert.deepEqual(g.finances.billsThisWeek.map((b: any) => b.name), ["Netflix"]);
     assert.deepEqual(g.finances.budgetsNearLimit.map((b: any) => b.name), ["Groceries"]);
-    assert.equal(g.money, null, "Goblin-Bank isn't asked when Firefly is set up");
     // Only GETs, always with the token.
     assert.ok(hits.length > 0 && hits.every(h => h.method === "GET" && h.auth === "Bearer pat"));
   } finally { s.close(); clearFireflyCache(); delete process.env.FIREFLY_TOKEN; }

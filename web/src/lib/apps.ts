@@ -23,7 +23,7 @@ groups:
         rune: Up
         url: http://upstream-manager:5000
         description: Upstreams, branches, approval requests
-  # Live panels: give an app a widget (plex, sabnzbd, firefly, omi or goblinbank) and the name of the
+  # Live panels: give an app a widget (plex, sabnzbd, firefly or omi) and the name of the
   # environment variable that holds its key on the Orb server.
   # - name: Media
   #   apps:

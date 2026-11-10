@@ -12,7 +12,7 @@ import { uptime } from "./integrations/uptime.js";
 import { hostStats, containers } from "./integrations/system.js";
 import { chat, chatStream, Msg, Tool } from "./integrations/llm.js";
 import { widgetsFrom, widgetData } from "./integrations/widgets.js";
-import { companion, companionByName, goblinSummary, omiDays, omiConversations, omiSearchMemories, isOmiTask } from "./integrations/companions.js";
+import { companion, companionByName, omiDays, omiConversations, omiSearchMemories, isOmiTask } from "./integrations/companions.js";
 import { ffAccounts, ffOverview, ffRecent, ffSearch } from "./integrations/firefly.js";
 import { call, trimSlash } from "./integrations/http.js";
 import { orbTools } from "./tools.js";
@@ -93,9 +93,9 @@ export async function buildApp(o: AppOptions = {}) {
     { name: "allglance_dayglance_tasks", description: "dayGLANCE tasks (the inbox and every scheduled day) with priority 0 none to 5 do now.", parameters: { type: "object", properties: {} }, run: () => glance.dayglanceTasks() },
   ];
   const appsYaml = () => String((store.get("settings", "apps") as any)?.yaml || "");
-  /** Golem's read-only tools for Goblin-Bank and Omi, when they're in the apps YAML. */
+  /** Golem's read-only tools for Firefly III and Omi, when they're in the apps YAML. */
   const companionTools = (): Tool[] => {
-    const gb = companion(appsYaml(), "goblinbank"), om = companion(appsYaml(), "omi"), ff = companion(appsYaml(), "firefly");
+    const om = companion(appsYaml(), "omi"), ff = companion(appsYaml(), "firefly");
     return [
       ...(ff ? [
         { name: "finance_summary", description: "Firefly III this month: net worth, balance, spent, earned, left to spend, bills paid and unpaid; plus bills due in the next 30 days, budgets (limit, spent, % used) and piggy banks. Read only.",
@@ -104,8 +104,6 @@ export async function buildApp(o: AppOptions = {}) {
         { name: "finance_search_transactions", description: "Search Firefly III transactions with its search syntax, e.g. 'amazon', 'category:Groceries date_after:2026-10-01', 'amount_more:100'. Returns date, description, amount (negative = spent), category, budget, accounts. Read only.",
           parameters: { type: "object", properties: { query: { type: "string" }, limit: { type: "number" } }, required: ["query"] }, run: ({ query, limit }: any) => ffSearch(ff, String(query || ""), Number(limit) || 25) },
       ] : []),
-      ...(gb ? [{ name: "money_summary", description: "Goblin-Bank's shared summary per person: net worth, monthly subscriptions, bills due soon, alert counts, savings (total and free), goal progress and Robinhood balances. Only what each person chose to share; no transactions. Read only.",
-        parameters: { type: "object", properties: {} }, run: () => goblinSummary(gb) }] : []),
       ...(om ? [
         { name: "omi_search_memories", description: "Search the user's Omi memories (things Omi learned from their conversations). Read only.", parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
           run: ({ query }: any) => omiSearchMemories(om, String(query || ""), 10) },
@@ -409,9 +407,8 @@ export async function buildApp(o: AppOptions = {}) {
   app.delete("/api/outbox/:id", { preHandler: guard }, async (req: any, reply) => { outbox.drop(req.params.id); reply.code(204).send(); });
 
   // ---- live app panels (Plex, SABnzbd) from the apps YAML ----
-  // Full pages for Goblin-Bank and Omi (page: true in the apps YAML). Read only, like the widgets.
+  // Full pages for Firefly III and Omi (page: true in the apps YAML). Read only, like the widgets.
   const comp = (name: string, type: string) => { const c = companionByName(appsYaml(), name); if (!c || c.type !== type) throw new HttpError(404, `No ${type} app called ${name} in the apps YAML.`); return c; };
-  app.get("/api/apps/:name/money", { preHandler: guard }, async (req: any) => goblinSummary(comp(req.params.name, "goblinbank")));
   app.get("/api/apps/:name/firefly/overview", { preHandler: guard }, async (req: any) => ffOverview(comp(req.params.name, "firefly")));
   app.get("/api/apps/:name/firefly/accounts", { preHandler: guard }, async (req: any) => ffAccounts(comp(req.params.name, "firefly")));
   app.get("/api/apps/:name/firefly/transactions", { preHandler: guard }, async (req: any) => req.query.q ? ffSearch(comp(req.params.name, "firefly"), String(req.query.q), 50) : ffRecent(comp(req.params.name, "firefly"), Number(req.query.limit) || 25));

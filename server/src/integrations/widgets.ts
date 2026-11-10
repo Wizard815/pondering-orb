@@ -2,7 +2,7 @@ import { parse } from "yaml";
 import { call, trimSlash } from "./http.js";
 import { secret } from "../config.js";
 import { HttpError } from "../records.js";
-import { goblinSummary, omiDays, omiConversations } from "./companions.js";
+import { omiDays, omiConversations } from "./companions.js";
 import { ffOverview } from "./firefly.js";
 
 /** Live app panels. Each app in the apps YAML may have
@@ -42,8 +42,6 @@ export async function widgetData(name: string, w: WidgetCfg) {
     const q = r.body?.queue || {};
     data = { type: "sabnzbd", speed: q.speed ? `${q.speed}B/s` : "", timeleft: q.timeleft || "", paused: !!q.paused, sizeLeft: q.sizeleft || "",
       queue: (q.slots || []).slice(0, 8).map((s: any) => ({ name: s.filename, pct: Number(s.percentage) || 0, size: s.size || "", status: s.status || "" })) };
-  } else if (w.type === "goblinbank") {
-    data = { type: "goblinbank", ...(await goblinSummary({ name, url: w.url, keyEnv: w.keyEnv })) };
   } else if (w.type === "firefly") {
     data = { type: "firefly", ...(await ffOverview({ name, url: w.url, keyEnv: w.keyEnv })) };
   } else if (w.type === "omi") {
