@@ -3,6 +3,7 @@ import type { PageDef } from "./types";
 import { useColl } from "../lib/store";
 import { parseApps, DEFAULT_APPS } from "../lib/apps";
 import { moneyPage, omiPage } from "./Companions";
+import { fireflyPage } from "./Finances";
 import { MainPage } from "./Main";
 import { ProjectsPage } from "./Projects";
 import { IdeasPage } from "./Ideas";
@@ -30,7 +31,7 @@ export function usePages(): PageDef[] {
     for (const a of parseApps(yaml ?? DEFAULT_APPS).groups.flatMap(g => g.apps)) {
       const w: any = a.widget, label = w?.page === true ? "" : typeof w?.page === "string" ? w.page.trim().slice(0, 24) : null;
       if (label === null || !w) continue;
-      const def = w.type === "goblinbank" ? moneyPage(a, label || "Money") : w.type === "omi" ? omiPage(a, label || "Omi") : null;
+      const def = w.type === "firefly" ? fireflyPage(a, label || "Money") : w.type === "goblinbank" ? moneyPage(a, label || "Goblin-Bank") : w.type === "omi" ? omiPage(a, label || "Omi") : null;
       if (def && !used.has(def.id)) { used.add(def.id); extra.push(def); }
     }
     const at = PAGES.indexOf(PicksPage) + 1;

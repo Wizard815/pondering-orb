@@ -14,7 +14,7 @@ export function useAppPanels(): { panels: PanelDef[]; groups: ReturnType<typeof 
   const apps = useColl("settings").find(d => d.id === "apps");
   const { groups } = parseApps(apps?.yaml ?? DEFAULT_APPS);
   const all = groups.flatMap(g => g.apps);
-  const big = (t?: string) => t === "omi" || t === "goblinbank";
+  const big = (t?: string) => t === "omi" || t === "goblinbank" || t === "firefly";
   const panels: PanelDef[] = [
     ...groups.map(g => ({ key: "group:" + g.name, title: g.name, node: <AppTiles apps={g.apps} />, w: 6, h: 5 })),
     ...all.map(a => ({ key: "app:" + a.name, title: a.name, node: a.widget ? <><AppTiles apps={[a]} /><LiveWidget name={a.name} /></> : <AppTiles apps={[a]} />,

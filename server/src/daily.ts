@@ -8,6 +8,7 @@ import { parseEvents, type CalEvent } from "./integrations/ical.js";
 import { weather, news, quotes, type NewsItem } from "./integrations/daily.js";
 import { chat } from "./integrations/llm.js";
 import { companion, goblinSummary, omiDays, isOmiEvent } from "./integrations/companions.js";
+import { ffBills, ffOverview } from "./integrations/firefly.js";
 import type { AllGlance } from "./integrations/allglance.js";
 import { today, localDay, isDay, timeZone } from "./dates.js";
 
@@ -77,8 +78,11 @@ export function dailyApi(app: FastifyInstance, deps: { records: Records; dav: Ca
       .map(t => ({ title: t.title, list: t.list, due: t.due || "", priority: PRIO[t.priority] || "", overdue: !!t.due && t.due < day, dueToday: t.due === day, fromOmi: t.source === "omi" }));
     const chores = (records.list("chores") as any[]).map(c => ({ name: c.name, due: c.lastDone ? addDays(c.lastDone, Number(c.everyDays) || 7) : day })).filter(c => c.due <= addDays(day, 2)).sort((a, b) => a.due.localeCompare(b.due));
     // Your own apps, read only: Goblin-Bank's shared summary and Omi's recap of yesterday.
-    const yaml = String((records.get("settings", "apps") as any)?.yaml || ""), gb = companion(yaml, "goblinbank"), om = companion(yaml, "omi");
+    const yaml = String((records.get("settings", "apps") as any)?.yaml || ""), ff = companion(yaml, "firefly"), om = companion(yaml, "omi");
+    // Finances: Firefly III when it's set up; Goblin-Bank's shared summary otherwise.
+    const gb = ff ? null : companion(yaml, "goblinbank");
     const money = gb ? await safe("Goblin-Bank", () => goblinSummary(gb)) : null;
+    const fin = ff ? await safe("Firefly III", () => ffOverview(ff)) : null;
     const omi = om ? await safe("Omi", async () => (await omiDays(om, 1, addDays(day, -1)))[0] || null) : null;
     const omiTasks = tasks.filter(t => t.fromOmi).length;
     return { day, timeZone: timeZone(), weather: wx, news: headlines || [], stocks: prices || [], events: cal || [], tasks, chores, notes,
@@ -87,6 +91,9 @@ export function dailyApi(app: FastifyInstance, deps: { records: Records; dav: Ca
         billsThisWeek: money.bills.filter(b => b.date <= addDays(day, 6)).map(b => ({ day: b.date, name: b.name, amount: b.amount, person: b.person, paidBy: b.paidBy })),
         maturitiesThisWeek: money.maturities.filter(m => m.date <= addDays(day, 6)).map(m => ({ day: m.date, title: m.title, detail: m.detail, person: m.person })),
         alerts: money.alerts.filter(a => a.severity !== "info").map(a => ({ severity: a.severity, title: a.title, person: a.person })) },
+      finances: fin && { currency: fin.summary.currency, netWorth: fin.summary.netWorth, spentThisMonth: fin.summary.spent, earnedThisMonth: fin.summary.earned, leftToSpend: fin.summary.leftToSpend, billsUnpaid: fin.summary.billsUnpaid,
+        billsThisWeek: fin.bills.filter(b => !b.paid && b.date <= addDays(day, 6)).map(b => ({ day: b.date, name: b.name, amount: b.amount })),
+        budgetsNearLimit: fin.budgets.filter(b => b.pct >= 90).map(b => ({ name: b.name, spent: b.spent, limit: b.amount, pctUsed: b.pct })) },
       omiYesterday: omi && { headline: omi.headline, overview: omi.overview.slice(0, 800), decisions: omi.decisions, questions: omi.questions }, omiOpenTasks: omiTasks };
   }
 
@@ -102,7 +109,7 @@ export function dailyApi(app: FastifyInstance, deps: { records: Records; dav: Ca
     let text = "";
     try {
       const r = await chat({ baseUrl: g.baseUrl, model: g.model, key: secret(g.keyEnv), who, tools: [], maxRounds: 1, messages: [
-        { role: "system", content: "You are Golem, the stone servant of the Pondering Orb, writing the user's morning brief. Plain, warm and short, with a light touch of wizard flavour. Markdown. Sections in this order: a one-line greeting with the weather; **Today** (events with times, tasks due or overdue, chores due); **This week** (the notable events); **Tasks to pick up** (top 3 by priority; tasks marked fromOmi came from Omi); **Money** (only if money is present: bills due this week with amounts, any critical or warning alerts, and one line per person on spending this month: on track for projected, pctOfIncome % of income); **Yesterday, per Omi** (two lines from omiYesterday, only if present); **News** (5 bullets, one line each, most important first); **Markets** (one line on the watchlist, and net worth from money only if present). Use only the data given; never invent events, tasks or prices. If a source failed, say so in one short line." },
+        { role: "system", content: "You are Golem, the stone servant of the Pondering Orb, writing the user's morning brief. Plain, warm and short, with a light touch of wizard flavour. Markdown. Sections in this order: a one-line greeting with the weather; **Today** (events with times, tasks due or overdue, chores due); **This week** (the notable events); **Tasks to pick up** (top 3 by priority; tasks marked fromOmi came from Omi); **Money** (only if finances or money is present. From finances (Firefly III): bills due this week with amounts, budgets near or over their limit, and one line on this month: spent, earned, left to spend. From money (Goblin-Bank): bills due this week, critical or warning alerts, and spending per person); **Yesterday, per Omi** (two lines from omiYesterday, only if present); **News** (5 bullets, one line each, most important first); **Markets** (one line on the watchlist, and net worth from money only if present). Use only the data given; never invent events, tasks or prices. If a source failed, say so in one short line." },
         { role: "user", content: `Today is ${day} (${data.timeZone}). Data:\n${JSON.stringify(compact).slice(0, 24000)}` }] });
       text = r.text;
     } catch (e: any) { text = `_The Golem couldn't write today's brief: ${e.message}_`; }
@@ -110,10 +117,12 @@ export function dailyApi(app: FastifyInstance, deps: { records: Records; dav: Ca
     return records.get("daily", id) ? records.put("daily", id, doc) : records.create("daily", doc, id);
   }
 
-  /** Bills from Goblin-Bank's shared bill lists, for Today and This week. */
+  /** Bills still to pay, for Today and This week: Firefly III's bills when it's set up, else Goblin-Bank's shared bill lists. */
   app.get("/api/daily/bills", { preHandler: guard }, async (req: any) => {
-    const gb = companion(String((records.get("settings", "apps") as any)?.yaml || ""), "goblinbank"); if (!gb) return [];
+    const yaml = String((records.get("settings", "apps") as any)?.yaml || ""), ff = companion(yaml, "firefly");
     const from = today(), to = addDays(from, Math.max(1, Math.min(31, Number(req.query.days) || 7)) - 1);
+    if (ff) return (await ffBills(ff, from, to)).filter(b => !b.paid).map(b => ({ date: b.date, name: b.name, amount: b.amount, person: "", paidBy: "me" }));
+    const gb = companion(yaml, "goblinbank"); if (!gb) return [];
     return (await goblinSummary(gb)).bills.filter(b => b.date >= from && b.date <= to);
   });
   /** CDs and bonds about to mature, from Goblin-Bank's shared alert list, for Today and This week. */

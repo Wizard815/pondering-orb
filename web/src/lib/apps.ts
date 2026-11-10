@@ -23,7 +23,7 @@ groups:
         rune: Up
         url: http://upstream-manager:5000
         description: Upstreams, branches, approval requests
-  # Live panels: give an app a widget (plex, sabnzbd, goblinbank or omi) and the name of the
+  # Live panels: give an app a widget (plex, sabnzbd, firefly, omi or goblinbank) and the name of the
   # environment variable that holds its key on the Orb server.
   # - name: Media
   #   apps:
@@ -33,12 +33,12 @@ groups:
   #     - name: SABnzbd
   #       url: http://sabnzbd:8085
   #       widget: { type: sabnzbd, url: http://sabnzbd:8085, key_env: SABNZBD_API_KEY }
-  # Your own apps, read only:
+  # Your own apps, read only (add page: true for a full tab):
   # - name: Household
   #   apps:
-  #     - name: Goblin-Bank
-  #       url: http://coingateway:8080
-  #       widget: { type: goblinbank, key_env: GOBLIN_ORB_KEY }   # the gateway's read-only Orb key
+  #     - name: Firefly III
+  #       url: http://firefly:8080
+  #       widget: { type: firefly, key_env: FIREFLY_TOKEN, page: true }   # a Personal Access Token
   #     - name: Omi
   #       url: http://192.168.20.5:8000
   #       widget: { type: omi, key_env: OMI_DEV_KEY }             # an omi_dev_ key with read scopes

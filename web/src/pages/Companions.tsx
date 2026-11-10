@@ -73,7 +73,7 @@ function Goals({ app }: { app: App }) {
     <div className="bar"><span style={{ width: Math.min(100, Math.round((g.pct ?? 0) * 100)) + "%" }} /></div></div>)}</>;
 }
 export function moneyPage(app: App, label: string): PageDef {
-  return { id: "money", label, title: "The Hoard", flavor: `${app.name}: what each of you shares, read only.`,
+  return { id: "goblinbank", label, title: "The Hoard", flavor: `${app.name}: what each of you shares, read only.`,
     usePanels: () => ({ panels: [
       { key: "people", title: "Everyone", node: <People app={app} />, w: 7, h: 12 },
       { key: "alerts", title: "Alerts", node: <Alerts app={app} />, w: 5, h: 8 },

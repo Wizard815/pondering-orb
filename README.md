@@ -14,7 +14,7 @@ layout**. Drag a tab onto another to show two pages side by side.
 
 | Tab | What it shows |
 | --- | --- |
-| **Main** | The Golem, favorite projects, open and top-priority tasks, today's family calendar, the log, chores, uptime, UpstreamManager, system, and a panel per app (with live views for Plex, SABnzbd, Goblin-Bank and Omi) |
+| **Main** | The Golem, favorite projects, open and top-priority tasks, today's family calendar, the log, chores, uptime, UpstreamManager, system, and a panel per app (with live views for Plex, SABnzbd, Firefly III and Omi) |
 | **Daily** | The morning brief, written by the Golem from the weather, news, your watchlist, tasks, chores, bills and every calendar; plus Today and This week |
 | **Projects** | Kanban board (next, active, blocked, paused, shipped) and the log; each project has a page with its tasks, log, wiki note, repository and linked chats |
 | **Agents** | Coding agents running in herdr through Hermes Studio: watch them, or send a project or task to a new one |
@@ -23,7 +23,7 @@ layout**. Drag a tab onto another to show two pages side by side.
 | **Wiki** | The LLMWIKI vault: tree, notes, search, section edits, related links |
 | **Calendar** | Month and next two weeks: your events, the family calendar, CalDAV calendars, task due dates and chores |
 | **Picks** | Daily stock research, a verdict per stock from your self-hosted decision model, your call with an amount, an order on Robinhood when you confirm it, and what every pick did afterwards |
-| **Money**, **Omi** | Optional full pages for Goblin-Bank and Omi (`page: true` in the apps YAML) |
+| **Money**, **Omi** | Optional full pages for Firefly III (this month, bills, budgets, accounts, piggy banks, transactions) and Omi (`page: true` in the apps YAML) |
 | **Upkeep** | UpstreamManager's repos, approval requests and daily check, and your chores |
 | **Uptime** | Monitors from an Uptime Kuma status page |
 | **System** | btop-style cores, memory, disks and containers (with CPU and memory), or real btop |
@@ -34,7 +34,7 @@ layout**. Drag a tab onto another to show two pages side by side.
 The assistant on Main. It runs on any OpenAI-compatible endpoint: a local
 model (Argos, llama-server, Ollama) or a frontier API such as OpenRouter. It
 streams its replies. With tools it reads projects, logs, tasks, chores, the
-wiki, linked chats, ALLGlance, Goblin-Bank and Omi. When writing is allowed,
+wiki, linked chats, ALLGlance, Firefly III and Omi. When writing is allowed,
 it adds logs and tasks and completes them. Settings → Golem picks the model
 and whether it may write.
 
@@ -50,7 +50,7 @@ Each one is optional; leave its address empty and its panels say so.
 | **UpstreamManager** | Repos, approval requests (approve part of one), daily check, fetch, new commits logged per project | [docs/backend.md](docs/backend.md) |
 | **Hermes Studio** | Chats linked to projects; herdr coding agents on the Agents tab | |
 | **Uptime Kuma** | Monitors from a public status page | |
-| **Goblin-Bank** | Read only: each person's shared net worth, bills, alerts, savings, goals, spending and Robinhood balances; never transactions | [docs/companions.md](docs/companions.md) |
+| **Firefly III** | Read only: this month (net worth, spent, earned, left to spend), bills due and paid, budgets, piggy banks, accounts, transactions and search; bills also show in Today and This week, and in the brief | [docs/companions.md](docs/companions.md) |
 | **Omi** (omi-local) | Read only: daily recaps, conversations, memory search; its action items come through CalDAV, once | [docs/companions.md](docs/companions.md) |
 | **Robinhood** | Its Trading MCP (OAuth): the agentic account, and orders for picks you approve, within caps you set | [docs/picks.md](docs/picks.md) |
 | **Plex**, **SABnzbd** | Live panels | |
@@ -110,7 +110,7 @@ Start from [`.env.example`](.env.example). Values here never reach the browser.
 | `OPENROUTER_API_KEY` (or any name) | A frontier model key, named in Settings → Golem |
 | `DECIDER_KEY` (or any name) | Key for your self-hosted decision model, if it needs one |
 | `TIINGO_API_KEY` | Free key for stock prices (else Yahoo, then Stooq) |
-| `GOBLIN_ORB_KEY`, `OMI_DEV_KEY` | Read-only keys for Goblin-Bank and Omi |
+| `FIREFLY_TOKEN`, `OMI_DEV_KEY` | A Firefly III Personal Access Token and a read-only Omi key |
 | `PLEX_TOKEN`, `SABNZBD_API_KEY` (or any name) | Keys for live app panels, named in the apps YAML |
 | `BTOP_AUTH` | Optional `user:password` for the btop terminal |
 
@@ -154,7 +154,7 @@ and `.env`. Stopping the container cleanly is enough for a consistent copy.
   for a private LAN, and the server warns about it on start.
 - Requests from other websites are refused, and the Docker socket is only
   reachable read-only through the proxy.
-- Goblin-Bank and Omi are read only. Robinhood orders need your confirmation
+- Firefly III and Omi are read only. Robinhood orders need your confirmation
   each time, stay within your caps, and are off until you turn them on.
 - Never put keys in `orb.yaml`, the apps YAML or Settings. Those only name the
   environment variable that holds the key.
@@ -183,7 +183,7 @@ npm run build   # server/dist and web/dist
   REST API, MCP tools, CalDAV, the wiki rules
 - [docs/allglance.md](docs/allglance.md): the ALLGlance stack, priorities,
   the family calendar
-- [docs/companions.md](docs/companions.md): Goblin-Bank and Omi
+- [docs/companions.md](docs/companions.md): Firefly III and Omi (and Goblin-Bank)
 - [docs/picks.md](docs/picks.md): the Daily page, stock picks, the decision
   model and Robinhood
 - [docs/miladash.md](docs/miladash.md): the ideas board and Miladash
