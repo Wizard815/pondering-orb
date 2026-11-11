@@ -1,9 +1,11 @@
 import { call, trimSlash } from "./http.js";
 import { HttpError } from "../records.js";
 
-/** Hermes Studio: its chats and Hermes Agent's sessions (read only), and its herdr
- *  agents: a list to watch, and a launch that hands a plan to a new agent.
- *  Signs in with a user and password from the environment and keeps the JWT. */
+/** Hermes Studio: its chats and Hermes Agent's sessions (read only), and Orb's
+ *  work in Studio: Studio chats working on Orb tasks and projects, and a way to
+ *  hand a plan to a new one (Ekko, Hermes or a coding agent). Everything goes
+ *  through Studio's own API. Signs in with a user and password from the
+ *  environment and keeps the JWT. */
 export type OrbRef = { task?: { title: string; list: string }; project?: string };
 
 export class Hermes {
@@ -32,32 +34,30 @@ export class Hermes {
     if (!r.ok) throw new HttpError(r.status === 409 || r.status === 400 ? r.status : 502, r.body?.error || `Hermes Studio answered ${r.status}.`);
     return r.body;
   }
-  /** Coding agents running in herdr panes, as Studio's herdr bridge sees them. */
+  /** Studio chats working on Orb tasks and projects, with the state Studio follows. */
   async agents() {
-    const r = await this.get("/api/coding-agents/herdr");
-    const bridge = r?.bridge || { workspaces: [], panes: [], connected: false };
-    const spaces = new Map<string, string>((bridge.workspaces || []).map((w: any) => [String(w.workspace_id), String(w.label || w.workspace_id)]));
-    const agents = (bridge.panes || []).filter((p: any) => p.agent).map((p: any) => ({
-      paneId: String(p.pane_id), space: spaces.get(String(p.workspace_id)) || String(p.workspace_id), agent: String(p.agent),
-      status: String(p.agent_status || "unknown"), title: String(p.label || p.terminal_title_stripped || p.agent), cwd: String(p.foreground_cwd || p.cwd || ""),
-      chatId: p.studioSessionId ? String(p.studioSessionId) : null }));
-    return { enabled: !!r?.settings?.enabled, connected: !!bridge.connected, // Studio reports the address browsers reach it on (its tunnel), so links work without setup.
-    studioUrl: trimSlash(this.publicBase() || (typeof r?.publicUrl === "string" ? r.publicUrl : "") || this.base()), agents };
+    const r = await this.get("/api/studio/orb/work");
+    const agents = (r?.work || []).map((w: any) => ({
+      chatId: String(w.sessionId), agent: String(w.agentId || ""), status: String(w.status || "idle"), title: String(w.title || ""),
+      task: w.orb?.task ? { title: String(w.orb.task.title || ""), list: String(w.orb.task.list || "") } : null,
+      project: w.orb?.project ? String(w.orb.project) : null, updatedAt: Number(w.updatedAt) || 0 }));
+    return { connected: true, studioUrl: trimSlash(this.publicBase() || this.base()), agents };
   }
-  /** Agents Studio has installed that herdr can run. */
+  /** Agents Studio can run for Orb: its own Ekko and Hermes, and the coding agents it has installed. */
   async agentKinds() {
-    const r = await this.get("/api/coding-agents");
-    const runnable = new Set(["claude-code", "codex", "pi", "grok", "opencode", "cursor", "antigravity", "qwen", "kimi", "qoder", "copilot"]);
-    return (r?.tools || []).filter((t: any) => t.installed && runnable.has(t.id)).map((t: any) => ({ id: String(t.id), name: String(t.name || t.id) }));
+    const r = await this.get("/api/coding-agents").catch(() => ({ tools: [] }));
+    const coding = new Set(["claude-code", "codex", "pi", "grok", "opencode"]);
+    return [{ id: "ekko-agent", name: "Ekko" }, { id: "hermes", name: "Hermes" },
+      ...(r?.tools || []).filter((t: any) => t.installed && coding.has(t.id)).map((t: any) => ({ id: String(t.id), name: String(t.name || t.id) }))];
   }
-  /** Start an agent in herdr through Studio with a plan or task as its first prompt. */
-  /** `orb` names the Orb task or project the agent is for, so Studio marks it in
-   *  progress once the agent starts working (Studio needs this Orb connected). */
+  /** Start a new Studio chat with a plan or task as its first message. `orb`
+   *  names the Orb task or project it is for: Studio reports how it goes
+   *  (working, needs you, done) back to Orb (Studio needs this Orb connected). */
   async launch(input: { agentId: string; title: string; prompt: string; workspace?: string; orb?: OrbRef }) {
-    const r = await this.send("POST", "/api/coding-agents/herdr/agents", { agentId: input.agentId, title: input.title.slice(0, 48), prompt: input.prompt, ...(input.workspace ? { workspace: input.workspace } : {}), ...(input.orb ? { orb: input.orb } : {}) },
-      // Studio answers once herdr has the agent running, which can take a while on a cold start.
-      120_000);
-    return { paneId: String(r?.link?.paneId || ""), workspaceId: String(r?.link?.workspaceId || "") };
+    const r = await this.send("POST", "/api/studio/orb/work", { agentId: input.agentId, title: input.title.slice(0, 80), prompt: input.prompt, ...(input.workspace ? { workspace: input.workspace } : {}), ...(input.orb ? { orb: input.orb } : {}) },
+      // Studio answers once the chat's run is under way.
+      60_000);
+    return { chatId: String(r?.work?.sessionId || "") };
   }
   /** One chat's newest messages as plain text (for Golem, read only). */
   async session(id: string, limit = 20) {

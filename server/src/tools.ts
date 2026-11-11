@@ -11,7 +11,7 @@ const prioName = (p: number) => LEVELS[[0, 5, 4, 3, 3, 2, 1, 1, 1, 1][Math.max(0
 const PRIO: Record<string, number> = { none: 0, low: 9, medium: 5, high: 3, urgent: 2, do_now: 1, "do now": 1 };
 const byName = (r: Records, name: string) => r.list("projects").find((p: any) => String(p.name).toLowerCase() === String(name || "").toLowerCase()) as any;
 const listOf = (t: any) => t.list || t.project || "Inbox";
-/** herdr's agent states, plus gone (the pane closed). */
+/** The states of the agent working on a task or project (as Hermes Studio reports them), plus gone (it stopped). */
 const AGENT_STATUSES = ["working", "blocked", "done", "idle", "gone"];
 
 /** The tools Golem uses and the MCP endpoint serves. Same rules either way:
@@ -66,7 +66,7 @@ export function orbTools(r: Records): Tool[] {
         if (p) { try { r.create("logs", { project: p.name, text: `Started: ${t.title}`.slice(0, r.logMax()), by }); } catch { /* too long etc */ } }
         return { title: t.title, list: listOf(t), inProgress: true };
       } },
-    { name: "orb_set_agent_status", write: true, description: "Record the live status of the coding agent working on a task or project, as herdr shows it: working, blocked (needs you), done (finished its turn), idle, or gone (its pane closed). The first working marks a task in progress and moves a project to active; gone puts an unfinished task back to open.",
+    { name: "orb_set_agent_status", write: true, description: "Record the live status of the agent working on a task or project, as Hermes Studio reports it: working, blocked (needs you), done (finished its turn), idle, or gone (it stopped). The first working marks a task in progress and moves a project to active; gone puts an unfinished task back to open.",
       parameters: { type: "object", properties: { task: { type: "object", properties: { title: { type: "string" }, list: { type: "string" } } }, project: { type: "string" }, status: { type: "string", enum: AGENT_STATUSES }, agent: { type: "string" } }, required: ["status"] },
       run: ({ task, project, status, agent }, who) => {
         if (!AGENT_STATUSES.includes(status)) throw new Error(`Status must be one of ${AGENT_STATUSES.join(", ")}`);

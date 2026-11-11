@@ -28,7 +28,7 @@ export function PrioSelect({ value, onChange }: { value: number; onChange: (cal:
     {[...PRIO_LEVELS].reverse().map(l => <option key={l.level} value={l.cal}>{l.level ? l.name : "No priority"}</option>)}</select>;
 }
 
-/** The agent on a task or project, with herdr's glyphs and colors (Studio uses the same). */
+/** The agent on a task or project, with the glyphs and colors Hermes Studio uses. */
 const AGENT_LOOK: Record<string, { g: string; cls: string; label: string }> = {
   working: { g: "◐", cls: "st-paused", label: "agent working" },
   blocked: { g: "×", cls: "st-blocked", label: "agent needs you" },

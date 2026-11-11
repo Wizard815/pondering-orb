@@ -17,7 +17,7 @@ layout**. Drag a tab onto another to show two pages side by side.
 | **Main** | The Golem, favorite projects, open and top-priority tasks, today's family calendar, the log, chores, uptime, UpstreamManager, system, and a panel per app (with live views for Plex, SABnzbd, Firefly III and Omi) |
 | **Daily** | The morning brief, written by the Golem from the weather, news, your watchlist, tasks, chores, bills and every calendar; plus Today and This week |
 | **Projects** | Kanban board (next, active, blocked, paused, shipped) and the log; each project has a page with its tasks, log, wiki note, repository and linked chats |
-| **Agents** | Coding agents running in herdr through Hermes Studio: watch them, or send a project or task to a new one |
+| **Agents** | Hermes Studio chats working on your plans: watch them, or send a project or task to a new one (Ekko, Hermes or a coding agent) |
 | **Ideas** | A board in Milaclone's style: cards, columns, nested boards, arrows, to-do cards |
 | **To-do** | CalDAV task lists with priorities, plus dayGLANCE's tasks |
 | **Wiki** | The LLMWIKI vault: tree, notes, search, section edits, related links |
@@ -48,7 +48,7 @@ Each one is optional; leave its address empty and its panels say so.
 | Any **CalDAV** server | Task lists, chores (as recurring to-dos) and calendars; changes that fail wait in a retry queue | [docs/backend.md](docs/backend.md) |
 | **LLMWIKI** (Obsidian Local REST API) | Reads the vault (mounted read only); writes only through the REST API, following the vault's rules; a daily digest line if you want one | [docs/backend.md](docs/backend.md) |
 | **UpstreamManager** | Repos, approval requests (approve part of one), daily check, fetch, new commits logged per project | [docs/backend.md](docs/backend.md) |
-| **Hermes Studio** | Chats linked to projects; herdr coding agents on the Agents tab | |
+| **Hermes Studio** | Chats linked to projects; work sent to Studio on the Agents tab, with its status reported back | |
 | **Uptime Kuma** | Monitors from a public status page | |
 | **Firefly III** | Read only: this month (net worth, spent, earned, left to spend), bills due and paid, budgets, piggy banks, accounts, transactions and search; bills also show in Today and This week, and in the brief. Bank data reaches Firefly through [plaid-firefly-connector](https://github.com/Wizard815/plaid-firefly-connector) | [docs/companions.md](docs/companions.md) |
 | **Omi** (omi-local) | Read only: daily recaps, conversations, memory search; its action items come through CalDAV, once | [docs/companions.md](docs/companions.md) |
