@@ -27,7 +27,12 @@ layout**. Drag a tab onto another to show two pages side by side.
 | **Upkeep** | UpstreamManager's repos, approval requests and daily check, and your chores |
 | **Uptime** | Monitors from an Uptime Kuma status page |
 | **System** | btop-style cores, memory, disks and containers (with CPU and memory), or real btop |
-| **Settings** | Connections, Golem, appearance and themes, Daily page, stock picks, Robinhood, apps YAML, what's waiting to sync |
+| **Settings** | Connections, Golem, appearance and themes, which pages show, Daily page, stock picks, Robinhood, apps YAML, what's waiting to sync |
+
+Pages that need an app you haven't set up stay out of the tabs: Agents (Hermes
+Studio), Wiki (the vault mount or its REST key), Upkeep (UpstreamManager, or
+any chores), Uptime (Uptime Kuma) and Picks (stock picks turned on). Settings →
+Pages can always show or hide any page except Main and Settings.
 
 ### The Golem
 
@@ -59,6 +64,19 @@ Each one is optional; leave its address empty and its panels say so.
 
 Every key stays on the server. Settings and the apps YAML only name the
 environment variable that holds it.
+
+## Try the demo
+
+A full Orb with synthetic data: every app it talks to is replaced by a small
+fake server, so every tab has something in it. Nothing touches your real apps.
+
+```bash
+cd demo/stack
+docker compose up -d --build
+```
+
+Open `http://localhost:8095` and sign in with `demo`. See
+[demo/stack/README.md](demo/stack/README.md).
 
 ## Run it with Docker
 

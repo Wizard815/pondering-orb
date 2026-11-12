@@ -8,6 +8,7 @@ import { parseApps, DEFAULT_APPS } from "../lib/apps";
 import { getZone, listOf } from "../lib/util";
 import { OutboxPanel } from "../components/Outbox";
 import { useFetch } from "../lib/useFetch";
+import { useAllPages, usePageSetup, pageMode } from "./index";
 
 const CONNS: { id: string; name: string; fields: [string, string][]; note?: string }[] = [
   { id: "upstream", name: "UpstreamManager", fields: [["baseUrl", "Base URL (on its own computer, e.g. http://192.168.1.20:5000)"]], note: "Start it there with HOST=0.0.0.0 and allow only this server in its firewall." },
@@ -76,6 +77,17 @@ function AppsYaml() {
       <button className="btn" onClick={() => setText(null)}>Discard changes</button></div>{error && <div className="err">{error}</div>}</>;
 }
 
+/** Which tabs show. Auto shows a page once its app is set up. */
+function PagesSetting() {
+  const ui = useUi(), s = useSettings(), all = useAllPages(), setup = usePageSetup();
+  const rows = all.filter(p => p.id !== "main" && p.id !== "config");
+  const set = (id: string, v: string) => { const next = { ...(s.pages || {}) }; if (v === "auto") delete next[id]; else next[id] = v; saveSettings({ pages: next }).catch(ui.error); };
+  return <><p className="hint" style={{ margin: 0 }}>Auto shows a page when what it needs is set up: Agents (Hermes Studio), Wiki (the vault or its REST key), Upkeep (UpstreamManager or chores), Uptime (Uptime Kuma), Picks (stock picks turned on).</p>
+    <ul className="list">{rows.map(p => { const st = setup[p.id], shown = pageMode(s, p.id) === "show" || (pageMode(s, p.id) === "auto" && st !== false);
+      return <li key={p.id}><div className="grow"><label htmlFor={"pg-" + p.id}>{p.label}</label><div className="hint">{p.id in setup ? (st === undefined ? "checking…" : st ? "set up" : "not set up") : "always available"} · {shown ? "shown" : "hidden"}</div></div>
+        <select id={"pg-" + p.id} value={pageMode(s, p.id)} onChange={e => set(p.id, e.target.value)}><option value="auto">Auto</option><option value="show">Always show</option><option value="hide">Hide</option></select></li>; })}</ul></>;
+}
+
 function MainLists() {
   const s = useSettings(), tasks = useColl("tasks"), lists = [...new Set(tasks.map(listOf))].sort(), sel: string[] = s.mainLists || [];
   return <><div className="cfg">{lists.map(l => <li key={l}><label><input type="checkbox" checked={sel.includes(l)} onChange={e => saveSettings({ mainLists: e.target.checked ? [...sel, l] : sel.filter(x => x !== l) })} /> {l}</label></li>)}</div>
@@ -89,6 +101,7 @@ export const SettingsPage: PageDef = {
     return { panels: [
       { key: "golem", title: "Golem", node: <GolemSettings />, w: 6, h: 11 },
       { key: "appearance", title: "Appearance", node: <Appearance />, w: 6, h: 11 },
+      { key: "pages", title: "Pages", node: <PagesSetting />, w: 6, h: 17 },
       { key: "connections", title: "Connections", node: <Connections />, w: 12, h: 12 },
       { key: "logs", title: "Logs", node: <form className="setting" onSubmit={e => { e.preventDefault(); const v = Number(new FormData(e.currentTarget).get("logmax")); saveSettings({ logMax: Math.max(20, Math.min(200, v || 50)) }).then(() => ui.status("Log length saved.")).catch(ui.error); }}>
           <div><label htmlFor="logmax">Log entry length</label><div className="d">Most characters in one entry, for you, Golem and agents. 20 to 200.</div></div>

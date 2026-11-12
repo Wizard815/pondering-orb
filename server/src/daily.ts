@@ -11,7 +11,7 @@ import { companion, omiDays, isOmiEvent } from "./integrations/companions.js";
 import { ffBills, ffOverview } from "./integrations/firefly.js";
 import { cpSummary } from "./integrations/coinpile.js";
 import type { AllGlance } from "./integrations/allglance.js";
-import { today, localDay, isDay, timeZone } from "./dates.js";
+import { today, localDay, localClock, isDay, timeZone } from "./dates.js";
 
 /** Settings → Daily page. */
 export type DailySettings = { location: string; units: "F" | "C"; feeds: string[]; watchlist: string[]; briefOn: boolean; briefHour: number };
@@ -60,7 +60,7 @@ export function dailyApi(app: FastifyInstance, deps: { records: Records; dav: Ca
       const days: typeof out = []; for (let d = e.start; d < e.end && days.length < 31; d = addDays(d, 1)) if (d >= from && d <= last) days.push({ ...e, day: d });
       return days;
     });
-    return spread.filter(e => e.day >= from && e.day <= last).sort((x, y) => x.day.localeCompare(y.day) || Number(y.allDay) - Number(x.allDay) || x.start.localeCompare(y.start));
+    return spread.filter(e => e.day >= from && e.day <= last).sort((x, y) => x.day.localeCompare(y.day) || Number(y.allDay) - Number(x.allDay) || (Date.parse(x.start) || 0) - (Date.parse(y.start) || 0) || x.start.localeCompare(y.start));
   }
 
   const PRIO: Record<number, string> = { 1: "Do now", 2: "Urgent", 3: "High", 4: "High", 5: "Medium", 6: "Low", 7: "Low", 8: "Low", 9: "Low" };
@@ -104,7 +104,7 @@ export function dailyApi(app: FastifyInstance, deps: { records: Records; dav: Ca
       ...data,
       news: data.news.slice(0, 12).map((n: NewsItem) => ({ title: n.title, source: n.source })),
       stocks: data.stocks.map((q: any) => q.error ? { symbol: q.symbol, error: q.error } : { symbol: q.symbol, price: +q.price.toFixed(2), changePct: +q.changePct.toFixed(2) }),
-      events: data.events.map(e => ({ day: e.day, time: e.allDay ? "all day" : e.start.slice(11, 16) || e.start, title: e.title, calendar: e.calendar })),
+      events: data.events.map(e => ({ day: e.day, time: e.allDay ? "all day" : localClock(e.start) || e.start, title: e.title, calendar: e.calendar })),
     };
     let text = "";
     try {
