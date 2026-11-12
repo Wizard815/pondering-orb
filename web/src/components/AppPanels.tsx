@@ -9,12 +9,12 @@ export const AppTiles = ({ apps }: { apps: App[] }) => <div className="apps">{ap
 
 /** One panel per app group and per app from the apps YAML, so any page can
  *  add them in Edit layout. Apps with a live widget (Plex, SABnzbd,
- *  Firefly III, Omi) show it under their link. */
+ *  Firefly III, Coinpile, Omi) show it under their link. */
 export function useAppPanels(): { panels: PanelDef[]; groups: ReturnType<typeof parseApps>["groups"]; widgetKeys: (type?: string) => string[] } {
   const apps = useColl("settings").find(d => d.id === "apps");
   const { groups } = parseApps(apps?.yaml ?? DEFAULT_APPS);
   const all = groups.flatMap(g => g.apps);
-  const big = (t?: string) => t === "omi" || t === "firefly";
+  const big = (t?: string) => t === "omi" || t === "firefly" || t === "coinpile";
   const panels: PanelDef[] = [
     ...groups.map(g => ({ key: "group:" + g.name, title: g.name, node: <AppTiles apps={g.apps} />, w: 6, h: 5 })),
     ...all.map(a => ({ key: "app:" + a.name, title: a.name, node: a.widget ? <><AppTiles apps={[a]} /><LiveWidget name={a.name} /></> : <AppTiles apps={[a]} />,

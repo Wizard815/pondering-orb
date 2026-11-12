@@ -3,6 +3,7 @@ import { useColl } from "../lib/store";
 import { ago, sortTasks } from "../lib/util";
 import { TaskRows, fromOmi } from "./Common";
 import { BudgetBars, MonthBoxes, money } from "../pages/Finances";
+import { AlertList, Forecast, GoalBars } from "../pages/Coinpile";
 
 /** Firefly III: the month, the next unpaid bills and the budgets closest to their limit. */
 function Firefly({ data }: { data: any }) {
@@ -12,6 +13,19 @@ function Firefly({ data }: { data: any }) {
     {due.length > 0 && <div className="small" style={{ marginTop: 6 }}><span className="muted">Next bills:</span> {due.map((b: any) => `${b.name} ${b.date === today ? "today" : b.date.slice(5)} ${money(b.amount, b.currency)}`).join(" · ")}</div>}
     {data.budgets?.some((b: any) => b.pct >= 80) && <div style={{ marginTop: 6 }}><BudgetBars budgets={data.budgets.filter((b: any) => b.pct >= 80)} limit={3} /></div>}
     <div className="hint">Read only, from Firefly III · {ago(data.at)}</div>
+  </>;
+}
+/** Coinpile: what Firefly can't hold: savings, the forecast, alerts, goals, maturities. */
+function Coinpile({ data: d }: { data: any }) {
+  const alerts = (d.alertList || []).filter((a: any) => a.severity !== "info");
+  return <>
+    <div className="small">{d.savings && <div>Savings {money(d.savings.total)}: <b>{money(d.savings.free)}</b> free, {money(d.savings.earmarked)} set aside</div>}
+      {d.spending && <div>Spending: <Forecast s={d.spending} /></div>}
+      {(d.robinhoodAgent || d.robinhoodMain) && <div>Robinhood {money((d.robinhoodMain?.value ?? 0) + (d.robinhoodAgent?.value ?? 0))}</div>}
+      {(() => { const m = (d.maturities || []).find((x: any) => x.kind === "maturing"); return m ? <div>Next to mature: {m.title}</div> : null; })()}</div>
+    {alerts.length > 0 ? <div style={{ marginTop: 6 }}><AlertList alerts={alerts} limit={3} /></div> : d.alerts && d.alerts.total > 0 ? <div className="small">{d.alerts.total} alerts, {d.alerts.critical} critical</div> : null}
+    {d.goals?.length > 0 && <div style={{ marginTop: 6 }}><GoalBars goals={d.goals} limit={3} /></div>}
+    <div className="hint">Read only, from Coinpile · {ago(d.at)}</div>
   </>;
 }
 /** Omi: yesterday's recap and recent conversations from Omi; its action items from CalDAV. */
@@ -45,5 +59,6 @@ export function LiveWidget({ name }: { name: string }) {
       : <div className="empty small">Queue empty.</div>}</>;
   if (data.type === "omi") return <Omi data={data} />;
   if (data.type === "firefly") return <Firefly data={data} />;
+  if (data.type === "coinpile") return <Coinpile data={data} />;
   return null;
 }

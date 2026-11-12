@@ -9,6 +9,7 @@ import { weather, news, quotes, type NewsItem } from "./integrations/daily.js";
 import { chat } from "./integrations/llm.js";
 import { companion, omiDays, isOmiEvent } from "./integrations/companions.js";
 import { ffBills, ffOverview } from "./integrations/firefly.js";
+import { cpSummary } from "./integrations/coinpile.js";
 import type { AllGlance } from "./integrations/allglance.js";
 import { today, localDay, isDay, timeZone } from "./dates.js";
 
@@ -80,12 +81,19 @@ export function dailyApi(app: FastifyInstance, deps: { records: Records; dav: Ca
     // Your own apps, read only: Firefly III's month and Omi's recap of yesterday.
     const yaml = String((records.get("settings", "apps") as any)?.yaml || ""), ff = companion(yaml, "firefly"), om = companion(yaml, "omi");
     const fin = ff ? await safe("Firefly III", () => ffOverview(ff)) : null;
+    // Coinpile adds what Firefly has no place for: savings, goals, alerts (CD maturities), the forecast, Robinhood.
+    const cp = companion(yaml, "coinpile"), coin = cp ? await safe("Coinpile", () => cpSummary(cp)) : null;
     const omi = om ? await safe("Omi", async () => (await omiDays(om, 1, addDays(day, -1)))[0] || null) : null;
     const omiTasks = tasks.filter(t => t.fromOmi).length;
     return { day, timeZone: timeZone(), weather: wx, news: headlines || [], stocks: prices || [], events: cal || [], tasks, chores, notes,
       finances: fin && { currency: fin.summary.currency, netWorth: fin.summary.netWorth, spentThisMonth: fin.summary.spent, earnedThisMonth: fin.summary.earned, leftToSpend: fin.summary.leftToSpend, billsUnpaid: fin.summary.billsUnpaid,
         billsThisWeek: fin.bills.filter(b => !b.paid && b.date <= addDays(day, 6)).map(b => ({ day: b.date, name: b.name, amount: b.amount })),
         budgetsNearLimit: fin.budgets.filter(b => b.pct >= 90).map(b => ({ name: b.name, spent: b.spent, limit: b.amount, pctUsed: b.pct })) },
+      coinpile: coin && { netWorth: fin ? undefined : coin.netWorth, savings: coin.savings, goals: coin.goals?.map(g => ({ name: g.name, pctFunded: g.pct !== null ? Math.round(g.pct * 100) : null })),
+        spendingForecast: coin.spending && { soFar: coin.spending.soFar, projected: coin.spending.projected, pctOfIncome: coin.spending.pctOfIncome !== null ? Math.round(coin.spending.pctOfIncome * 100) : null, leftAfter: coin.spending.leftAfter },
+        alerts: (coin.alertList || []).filter(a => a.severity !== "info").map(a => ({ severity: a.severity, title: a.title })),
+        maturitiesThisWeek: coin.maturities.filter(m => m.date <= addDays(day, 6)).map(m => ({ day: m.date, title: m.title, detail: m.detail })),
+        billsThisWeek: fin ? undefined : (coin.billList || []).filter(b => b.date >= day && b.date <= addDays(day, 6)).map(b => ({ day: b.date, name: b.name, amount: b.amount })) },
       omiYesterday: omi && { headline: omi.headline, overview: omi.overview.slice(0, 800), decisions: omi.decisions, questions: omi.questions }, omiOpenTasks: omiTasks };
   }
 
@@ -101,7 +109,7 @@ export function dailyApi(app: FastifyInstance, deps: { records: Records; dav: Ca
     let text = "";
     try {
       const r = await chat({ baseUrl: g.baseUrl, model: g.model, key: secret(g.keyEnv), who, tools: [], maxRounds: 1, messages: [
-        { role: "system", content: "You are Golem, the stone servant of the Pondering Orb, writing the user's morning brief. Plain, warm and short, with a light touch of wizard flavour. Markdown. Sections in this order: a one-line greeting with the weather; **Today** (events with times, tasks due or overdue, chores due); **This week** (the notable events); **Tasks to pick up** (top 3 by priority; tasks marked fromOmi came from Omi); **Money** (only if finances is present: bills due this week with amounts, budgets near or over their limit, and one line on this month: spent, earned, left to spend); **Yesterday, per Omi** (two lines from omiYesterday, only if present); **News** (5 bullets, one line each, most important first); **Markets** (one line on the watchlist, and net worth from finances only if present). Use only the data given; never invent events, tasks or prices. If a source failed, say so in one short line." },
+        { role: "system", content: "You are Golem, the stone servant of the Pondering Orb, writing the user's morning brief. Plain, warm and short, with a light touch of wizard flavour. Markdown. Sections in this order: a one-line greeting with the weather; **Today** (events with times, tasks due or overdue, chores due); **This week** (the notable events); **Tasks to pick up** (top 3 by priority; tasks marked fromOmi came from Omi); **Money** (only if finances or coinpile is present: bills due this week with amounts, budgets near or over their limit, one line on this month (spent, earned, left to spend), the spending forecast as a share of income, critical or warning alerts, and CDs maturing this week); **Yesterday, per Omi** (two lines from omiYesterday, only if present); **News** (5 bullets, one line each, most important first); **Markets** (one line on the watchlist, and net worth from finances only if present). Use only the data given; never invent events, tasks or prices. If a source failed, say so in one short line." },
         { role: "user", content: `Today is ${day} (${data.timeZone}). Data:\n${JSON.stringify(compact).slice(0, 24000)}` }] });
       text = r.text;
     } catch (e: any) { text = `_The Golem couldn't write today's brief: ${e.message}_`; }
@@ -113,8 +121,17 @@ export function dailyApi(app: FastifyInstance, deps: { records: Records; dav: Ca
   app.get("/api/daily/bills", { preHandler: guard }, async (req: any) => {
     const yaml = String((records.get("settings", "apps") as any)?.yaml || ""), ff = companion(yaml, "firefly");
     const from = today(), to = addDays(from, Math.max(1, Math.min(31, Number(req.query.days) || 7)) - 1);
-    if (!ff) return [];
-    return (await ffBills(ff, from, to)).filter(b => !b.paid).map(b => ({ date: b.date, name: b.name, amount: b.amount, person: "", paidBy: "me" }));
+    // Firefly's bills when it's set up (Coinpile's list holds the same bills); Coinpile's list otherwise.
+    if (ff) return (await ffBills(ff, from, to)).filter(b => !b.paid).map(b => ({ date: b.date, name: b.name, amount: b.amount, person: "", paidBy: "me" }));
+    const cp = companion(yaml, "coinpile"); if (!cp) return [];
+    return ((await cpSummary(cp)).billList || []).filter(b => b.date >= from && b.date <= to).map(b => ({ date: b.date, name: b.name, amount: b.amount, person: "", paidBy: "me" }));
+  });
+  /** CDs and bonds maturing (or matured and sitting idle), from Coinpile's shared alert list, for Today and This week. */
+  app.get("/api/daily/maturities", { preHandler: guard }, async (req: any) => {
+    const cp = companion(String((records.get("settings", "apps") as any)?.yaml || ""), "coinpile"); if (!cp) return [];
+    const from = today(), to = addDays(from, Math.max(1, Math.min(60, Number(req.query.days) || 7)) - 1);
+    // A matured CD still sitting there stays on Today until it is handled.
+    return (await cpSummary(cp)).maturities.filter(m => (m.kind === "matured_idle" ? m.date <= to : m.date >= from && m.date <= to)).map(m => ({ ...m, date: m.kind === "matured_idle" && m.date < from ? from : m.date }));
   });
   app.get("/api/daily/weather", { preHandler: guard }, async () => { const s = dailySettings(records); return weather(s.location, s.units); });
   app.get("/api/daily/news", { preHandler: guard }, async () => news(dailySettings(records).feeds, 25));
