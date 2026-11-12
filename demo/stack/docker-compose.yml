@@ -1,0 +1,114 @@
+# Pondering Orb demo: Orb plus synthetic stand-ins for every app it talks to.
+# Nothing here touches your real apps, and every name and number is made up.
+#
+#   cd demo/stack
+#   docker compose up -d --build      # first run builds Orb from this repo
+#   open http://localhost:8095        # password: demo
+#
+#   docker compose down -v            # stop and forget everything
+#
+# Services:
+#   fakes   ALLGlance gateway (+ CalDAV), Firefly III, Coinpile, Omi, Uptime Kuma,
+#           UpstreamManager, Hermes Studio, LLMWIKI REST, Plex, SABnzbd, a model
+#           for the Golem, a decision model, weather, prices and news
+#   orb     Pondering Orb, built from this repo, pointed at the fakes
+#   seed    one-shot: projects, log, ideas, past picks, settings, then a sync,
+#           today's research and the morning brief
+#   docker-proxy  the read-only Docker socket proxy (the System tab is real)
+
+name: orb-demo
+
+services:
+  fakes:
+    image: node:22-slim
+    command: ["node", "/fakes/server.mjs"]
+    environment:
+      TZ: ${TZ:-America/Chicago}
+      VAULT: /vault
+    volumes:
+      - ./fakes:/fakes:ro
+      - ./vault:/vault:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8300/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    networks: [demo]
+
+  orb:
+    build: ../..
+    image: pondering-orb:demo
+    init: true
+    ports:
+      - "${ORB_PORT:-8095}:8095"
+    environment:
+      TZ: ${TZ:-America/Chicago}
+      ORB_PASSWORD: demo
+      ORB_HOSTNAME: demo-tower
+      ORB_DEMO_SOURCES: http://fakes:8300          # weather, prices and news from the fakes
+      ALLGLANCE_URL: http://fakes:8300/glance        # also CalDAV at /glance/dav/
+      ALLGLANCE_TOKEN: demo
+      CALDAV_USER: demo
+      CALDAV_PASSWORD: demo
+      UPSTREAM_URL: http://fakes:8300/um
+      UPTIME_URL: http://fakes:8300/uptime
+      HERMES_URL: http://fakes:8300/hermes
+      HERMES_USER: demo
+      HERMES_PASSWORD: demo
+      ARGOS_URL: http://fakes:8300/llm               # the Golem's model
+      WIKI_URL: http://fakes:8300/wiki
+      WIKI_API_KEY: demo
+      FIREFLY_TOKEN: demo
+      COINPILE_TOKEN: demo
+      OMI_DEV_KEY: demo
+      PLEX_TOKEN: demo
+      SABNZBD_API_KEY: demo
+      ORB_PROC: /host/proc
+      DOCKER_HOST: tcp://docker-proxy:2375
+    volumes:
+      - orb-data:/data
+      - ./vault:/vault:ro
+      - /proc:/host/proc:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8095/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+    depends_on:
+      fakes: { condition: service_healthy }
+      docker-proxy: { condition: service_started }
+    networks: [demo, dockerapi]
+
+  seed:
+    image: node:22-slim
+    command: ["node", "/seed/seed.mjs"]
+    environment:
+      TZ: ${TZ:-America/Chicago}
+      ORB_URL: http://orb:8095
+      FAKES_URL: http://fakes:8300
+      ORB_PASSWORD: demo
+      ORB_PUBLIC: http://localhost:${ORB_PORT:-8095}
+    volumes:
+      - ./seed:/seed:ro
+    depends_on:
+      orb: { condition: service_healthy }
+    restart: "no"
+    networks: [demo]
+
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:v0.5.0
+    environment:
+      CONTAINERS: 1
+      INFO: 1
+      POST: 0
+      DISABLE_IPV6: 1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [dockerapi]
+
+volumes:
+  orb-data:
+
+networks:
+  demo:
+  dockerapi:

@@ -318,7 +318,7 @@ export async function buildApp(o: AppOptions = {}) {
       // Variable names (never their values), so the Settings forms show them.
       upstream: { baseUrl: c.upstream.baseUrl, headerEnv: c.upstream.headerEnv || "" }, uptime: c.uptime,
       caldav: { url: c.caldav.url, choresList: c.caldav.choresList, userEnv: c.caldav.userEnv, passwordEnv: c.caldav.passwordEnv, userSet: !!secret(c.caldav.userEnv) },
-      wiki: { baseUrl: c.wiki.baseUrl, tokenEnv: c.wiki.tokenEnv, keySet: !!secret(c.wiki.tokenEnv), vault: c.wiki.vault },
+      wiki: { baseUrl: c.wiki.baseUrl, tokenEnv: c.wiki.tokenEnv, keySet: !!secret(c.wiki.tokenEnv), vault: c.wiki.vault, mount: await wiki.hasMount() },
       hermes: { baseUrl: c.hermes.baseUrl, userEnv: c.hermes.userEnv, passwordEnv: c.hermes.passwordEnv, userSet: !!secret(c.hermes.userEnv) },
       allglance: { baseUrl: c.allglance.baseUrl, tokenEnv: c.allglance.tokenEnv, tokenSet: !!secret(c.allglance.tokenEnv) } };
   });
