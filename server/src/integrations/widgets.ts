@@ -4,6 +4,7 @@ import { secret } from "../config.js";
 import { HttpError } from "../records.js";
 import { omiDays, omiConversations } from "./companions.js";
 import { ffOverview } from "./firefly.js";
+import { cpSummary } from "./coinpile.js";
 
 /** Live app panels. Each app in the apps YAML may have
  *    widget: { type: plex | sabnzbd, url: http://..., key_env: NAME }
@@ -44,6 +45,8 @@ export async function widgetData(name: string, w: WidgetCfg) {
       queue: (q.slots || []).slice(0, 8).map((s: any) => ({ name: s.filename, pct: Number(s.percentage) || 0, size: s.size || "", status: s.status || "" })) };
   } else if (w.type === "firefly") {
     data = { type: "firefly", ...(await ffOverview({ name, url: w.url, keyEnv: w.keyEnv })) };
+  } else if (w.type === "coinpile") {
+    data = { type: "coinpile", ...(await cpSummary({ name, url: w.url, keyEnv: w.keyEnv })) };
   } else if (w.type === "omi") {
     const c = { name, url: w.url, keyEnv: w.keyEnv };
     const [days, convs] = await Promise.all([omiDays(c, 2), omiConversations(c, 5)]);

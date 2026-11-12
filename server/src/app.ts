@@ -14,6 +14,7 @@ import { chat, chatStream, Msg, Tool } from "./integrations/llm.js";
 import { widgetsFrom, widgetData } from "./integrations/widgets.js";
 import { companion, companionByName, omiDays, omiConversations, omiSearchMemories, isOmiTask } from "./integrations/companions.js";
 import { ffAccounts, ffOverview, ffRecent, ffSearch } from "./integrations/firefly.js";
+import { cpSummary } from "./integrations/coinpile.js";
 import { call, trimSlash } from "./integrations/http.js";
 import { orbTools } from "./tools.js";
 import { mountMcp } from "./mcp.js";
@@ -95,8 +96,10 @@ export async function buildApp(o: AppOptions = {}) {
   const appsYaml = () => String((store.get("settings", "apps") as any)?.yaml || "");
   /** Golem's read-only tools for Firefly III and Omi, when they're in the apps YAML. */
   const companionTools = (): Tool[] => {
-    const om = companion(appsYaml(), "omi"), ff = companion(appsYaml(), "firefly");
+    const om = companion(appsYaml(), "omi"), ff = companion(appsYaml(), "firefly"), cp = companion(appsYaml(), "coinpile");
     return [
+      ...(cp ? [{ name: "coinpile_summary", description: "Coinpile (the friendly view over Firefly III): what you share with the Orb: net worth, subscriptions per month, bills due, savings set aside vs free, goals and their progress (pct 0-1), alerts (CDs maturing, a bank to sign in again, accounts running short), this month's spending forecast and Robinhood value. Read only; never transactions.",
+        parameters: { type: "object", properties: {} }, run: () => cpSummary(cp) }] : []),
       ...(ff ? [
         { name: "finance_summary", description: "Firefly III this month: net worth, balance, spent, earned, left to spend, bills paid and unpaid; plus bills due in the next 30 days, budgets (limit, spent, % used) and piggy banks. Read only.",
           parameters: { type: "object", properties: {} }, run: () => ffOverview(ff) },
@@ -409,6 +412,7 @@ export async function buildApp(o: AppOptions = {}) {
   // ---- live app panels (Plex, SABnzbd) from the apps YAML ----
   // Full pages for Firefly III and Omi (page: true in the apps YAML). Read only, like the widgets.
   const comp = (name: string, type: string) => { const c = companionByName(appsYaml(), name); if (!c || c.type !== type) throw new HttpError(404, `No ${type} app called ${name} in the apps YAML.`); return c; };
+  app.get("/api/apps/:name/coinpile", { preHandler: guard }, async (req: any) => cpSummary(comp(req.params.name, "coinpile")));
   app.get("/api/apps/:name/firefly/overview", { preHandler: guard }, async (req: any) => ffOverview(comp(req.params.name, "firefly")));
   app.get("/api/apps/:name/firefly/accounts", { preHandler: guard }, async (req: any) => ffAccounts(comp(req.params.name, "firefly")));
   app.get("/api/apps/:name/firefly/transactions", { preHandler: guard }, async (req: any) => req.query.q ? ffSearch(comp(req.params.name, "firefly"), String(req.query.q), 50) : ffRecent(comp(req.params.name, "firefly"), Number(req.query.limit) || 25));

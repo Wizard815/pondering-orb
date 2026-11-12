@@ -23,7 +23,7 @@ layout**. Drag a tab onto another to show two pages side by side.
 | **Wiki** | The LLMWIKI vault: tree, notes, search, section edits, related links |
 | **Calendar** | Month and next two weeks: your events, the family calendar, CalDAV calendars, task due dates and chores |
 | **Picks** | Daily stock research, a verdict per stock from your self-hosted decision model, your call with an amount, an order on Robinhood when you confirm it, and what every pick did afterwards |
-| **Money**, **Omi** | Optional full pages for Firefly III (this month, bills, budgets, accounts, piggy banks, transactions) and Omi (`page: true` in the apps YAML) |
+| **Money**, **Coinpile**, **Omi** | Optional full pages for Firefly III (this month, bills, budgets, accounts, piggy banks, transactions), Coinpile (savings, goals, alerts, maturities, forecast) and Omi (`page: true` in the apps YAML) |
 | **Upkeep** | UpstreamManager's repos, approval requests and daily check, and your chores |
 | **Uptime** | Monitors from an Uptime Kuma status page |
 | **System** | btop-style cores, memory, disks and containers (with CPU and memory), or real btop |
@@ -51,6 +51,7 @@ Each one is optional; leave its address empty and its panels say so.
 | **Hermes Studio** | Chats linked to projects; work sent to Studio on the Agents tab, with its status reported back | |
 | **Uptime Kuma** | Monitors from a public status page | |
 | **Firefly III** | Read only: this month (net worth, spent, earned, left to spend), bills due and paid, budgets, piggy banks, accounts, transactions and search; bills also show in Today and This week, and in the brief. Bank data reaches Firefly through [plaid-firefly-connector](https://github.com/Wizard815/plaid-firefly-connector) | [docs/companions.md](docs/companions.md) |
+| **Coinpile** | Read only: what you share with the Orb: savings (free vs set aside), goals, alerts (a bank to sign in again, CDs maturing), the spending forecast, Robinhood value | [docs/companions.md](docs/companions.md) |
 | **Omi** (omi-local) | Read only: daily recaps, conversations, memory search; its action items come through CalDAV, once | [docs/companions.md](docs/companions.md) |
 | **Robinhood** | Its Trading MCP (OAuth): the agentic account, and orders for picks you approve, within caps you set | [docs/picks.md](docs/picks.md) |
 | **Plex**, **SABnzbd** | Live panels | |
@@ -110,7 +111,7 @@ Start from [`.env.example`](.env.example). Values here never reach the browser.
 | `OPENROUTER_API_KEY` (or any name) | A frontier model key, named in Settings → Golem |
 | `DECIDER_KEY` (or any name) | Key for your self-hosted decision model, if it needs one |
 | `TIINGO_API_KEY` | Free key for stock prices (else Yahoo, then Stooq) |
-| `FIREFLY_TOKEN`, `OMI_DEV_KEY` | A Firefly III Personal Access Token and a read-only Omi key |
+| `FIREFLY_TOKEN`, `COINPILE_TOKEN`, `OMI_DEV_KEY` | A Firefly III Personal Access Token, a Coinpile token with the `orb` scope, and a read-only Omi key |
 | `PLEX_TOKEN`, `SABNZBD_API_KEY` (or any name) | Keys for live app panels, named in the apps YAML |
 | `BTOP_AUTH` | Optional `user:password` for the btop terminal |
 
@@ -154,7 +155,7 @@ and `.env`. Stopping the container cleanly is enough for a consistent copy.
   for a private LAN, and the server warns about it on start.
 - Requests from other websites are refused, and the Docker socket is only
   reachable read-only through the proxy.
-- Firefly III and Omi are read only. Robinhood orders need your confirmation
+- Firefly III, Coinpile and Omi are read only. Robinhood orders need your confirmation
   each time, stay within your caps, and are off until you turn them on.
 - Never put keys in `orb.yaml`, the apps YAML or Settings. Those only name the
   environment variable that holds the key.
@@ -183,7 +184,7 @@ npm run build   # server/dist and web/dist
   REST API, MCP tools, CalDAV, the wiki rules
 - [docs/allglance.md](docs/allglance.md): the ALLGlance stack, priorities,
   the family calendar
-- [docs/companions.md](docs/companions.md): Firefly III and Omi
+- [docs/companions.md](docs/companions.md): Firefly III, Coinpile and Omi
 - [docs/picks.md](docs/picks.md): the Daily page, stock picks, the decision
   model and Robinhood
 - [docs/miladash.md](docs/miladash.md): the ideas board and Miladash

@@ -9,7 +9,7 @@
 #
 # This starts Orb and a read-only proxy for the Docker socket, nothing else.
 # Apps you already run (Hermes Studio, Argos, LLMWIKI, UpstreamManager, the
-# ALLGlance gateway, Firefly III, Omi, Uptime Kuma) stay where they are; Orb
+# ALLGlance gateway, Firefly III, Coinpile, Omi, Uptime Kuma) stay where they are; Orb
 # connects to them by address (.env, config/orb.yaml or Settings -> Connections).
 #
 # Optional extras:
@@ -54,6 +54,7 @@ services:
       DECIDER_KEY: ${DECIDER_KEY:-}
       TIINGO_API_KEY: ${TIINGO_API_KEY:-}
       FIREFLY_TOKEN: ${FIREFLY_TOKEN:-}
+      COINPILE_TOKEN: ${COINPILE_TOKEN:-}
       OMI_DEV_KEY: ${OMI_DEV_KEY:-}
       PLEX_TOKEN: ${PLEX_TOKEN:-}
       SABNZBD_API_KEY: ${SABNZBD_API_KEY:-}

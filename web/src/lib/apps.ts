@@ -23,7 +23,7 @@ groups:
         rune: Up
         url: http://upstream-manager:5000
         description: Upstreams, branches, approval requests
-  # Live panels: give an app a widget (plex, sabnzbd, firefly or omi) and the name of the
+  # Live panels: give an app a widget (plex, sabnzbd, firefly, coinpile or omi) and the name of the
   # environment variable that holds its key on the Orb server.
   # - name: Media
   #   apps:
@@ -39,6 +39,9 @@ groups:
   #     - name: Firefly III
   #       url: http://firefly:8080
   #       widget: { type: firefly, key_env: FIREFLY_TOKEN, page: true }   # a Personal Access Token
+  #     - name: Coinpile
+  #       url: http://coinpile:8000
+  #       widget: { type: coinpile, key_env: COINPILE_TOKEN }               # a token with the "orb" scope
   #     - name: Omi
   #       url: http://192.168.20.5:8000
   #       widget: { type: omi, key_env: OMI_DEV_KEY }             # an omi_dev_ key with read scopes
