@@ -4,7 +4,6 @@ import { fileURLToPath } from "node:url";
 import { buildApp } from "./app.js";
 import { logCommits } from "./pollers.js";
 import { badTimeZone, timeZone } from "./dates.js";
-import { sources } from "./integrations/daily.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const dataDir = process.env.ORB_DATA || "/data";
@@ -17,10 +16,6 @@ try {
     `On the host, make the folder you mounted there writable for that user, e.g.:\n  mkdir -p data && sudo chown ${uid}:${uid} data`);
   process.exit(1);
 }
-// The demo stack (demo/stack) points weather, prices and news at its own
-// synthetic server. Never set this for a real Orb.
-const demo = (process.env.ORB_DEMO_SOURCES || "").replace(/\/+$/, "");
-if (demo) Object.assign(sources, { geocode: `${demo}/geo`, forecast: `${demo}/wx`, yahoo: `${demo}/chart`, stooq: `${demo}/none`, tiingo: `${demo}/none`, googleNews: `${demo}/news` });
 const { app, auth, records, upstream, cfg, sync, outbox, writeDigest, daily, market } = await buildApp({
   dataFile: resolve(dataDir, "orb.db"),
   webDir: process.env.ORB_WEB || resolve(here, "../../web/dist"),
@@ -28,7 +23,6 @@ const { app, auth, records, upstream, cfg, sync, outbox, writeDigest, daily, mar
 });
 if (badTimeZone()) app.log.warn(`TZ=${process.env.TZ} isn't a time zone Orb knows (use a name like Europe/London or America/Chicago); using UTC.`);
 app.log.info(`Days follow the ${timeZone()} time zone (set TZ in .env to change it).`);
-if (demo) app.log.warn(`Demo mode: weather, prices and news come from ${demo} (synthetic).`);
 if (auth.open) app.log.warn("No ORB_PASSWORD or ORB_API_TOKENS set: anyone who can reach this port can use Orb. Fine on a private LAN, never on a tunnel.");
 
 const port = cfg().port, host = process.env.HOST || "0.0.0.0";
