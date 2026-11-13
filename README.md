@@ -65,19 +65,6 @@ Each one is optional; leave its address empty and its panels say so.
 Every key stays on the server. Settings and the apps YAML only name the
 environment variable that holds it.
 
-## Try the demo
-
-A full Orb with synthetic data: every app it talks to is replaced by a small
-fake server, so every tab has something in it. Nothing touches your real apps.
-
-```bash
-cd demo/stack
-docker compose up -d --build
-```
-
-Open `http://localhost:8095` and sign in with `demo`. See
-[demo/stack/README.md](demo/stack/README.md).
-
 ## Run it with Docker
 
 ```bash
