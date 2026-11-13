@@ -62,3 +62,22 @@ div:not(.editing) > .react-grid-layout .react-resizable-handle { display: none; 
 .month .ev.fam { background: var(--ok-bg); color: var(--ok) }
 .ff-boxes { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px }
 .ff-box { border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px } .ff-box b { font-size: 1.15rem; font-variant-numeric: tabular-nums }
+
+/* Journal */
+.jd { gap: 6px; flex-wrap: nowrap; } .jd input[type=date] { width: auto; } .jd-name { font-family: var(--f-display); letter-spacing: .04em; color: var(--muted); }
+.jl { display: flex; flex-direction: column; gap: 6px; } .jl-sec { margin-top: 4px; } .jl-quote { border-left: 2px solid var(--line-hi); padding-left: 8px; margin-top: 4px; color: var(--muted); white-space: pre-wrap; }
+.jl-omi p { margin: 4px 0; }
+.jl-money { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 8px; } .jl-money .big { font-family: var(--f-mono); font-size: 1.35rem; }
+.jn { display: flex; flex-direction: column; gap: 8px; height: 100%; } .jn-text { flex: 1; min-height: 220px; width: 100%; resize: vertical; font: inherit; line-height: 1.6; }
+.btn.on { border-color: var(--gold); color: var(--gold); background: var(--gold-soft); }
+.ink { display: flex; flex-direction: column; gap: 10px; } .ink-head { flex-wrap: wrap; gap: 8px; }
+.ink-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; position: sticky; top: 0; z-index: 2; background: var(--panel); padding: 6px 0; }
+.ink-tools .btn { min-height: 40px; } .ink-sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 2px; }
+.ink-color { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--line); cursor: pointer; padding: 0; } .ink-color.on { outline: 3px solid var(--gold); outline-offset: 2px; }
+.ink-pen { display: inline-flex; align-items: center; gap: 4px; }
+.ink-page { margin: 0; display: flex; flex-direction: column; gap: 6px; max-width: 900px; } .ink-page figcaption { flex-wrap: wrap; gap: 6px; }
+.ink-wrap { position: relative; width: 100%; } .ink-wrap.big { flex: 1; min-height: 0; display: flex; justify-content: center; align-items: flex-start; overflow: auto; }
+.ink-canvas { display: block; touch-action: none; border: 1px solid var(--line); border-radius: 4px; box-shadow: 0 2px 10px -6px rgba(0,0,0,.4); cursor: crosshair; background: #fffdf7; }
+.ink-canvas.erasing { cursor: cell; } .ink-loading { position: absolute; top: 12px; left: 12px; }
+.ink-full { position: fixed; inset: 0; z-index: 1000; background: var(--bg); display: flex; flex-direction: column; gap: 8px; padding: 8px; }
+.ink-full-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; } .ink-full-bar .ink-tools { position: static; padding: 0; background: none; }

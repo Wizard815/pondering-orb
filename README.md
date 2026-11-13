@@ -16,6 +16,7 @@ layout**. Drag a tab onto another to show two pages side by side.
 | --- | --- |
 | **Main** | The Golem, favorite projects, open and top-priority tasks, today's family calendar, the log, chores, uptime, UpstreamManager, system, and a panel per app (with live views for Plex, SABnzbd, Firefly III and Omi) |
 | **Daily** | The morning brief, written by the Golem from the weather, news, your watchlist, tasks, chores, bills and every calendar; plus Today and This week |
+| **Journal** | One page per day: Orb's log of the day (money spent and earned, tasks and chores done, commits, UpstreamManager requests, Hermes Studio agent work, Omi's recap, alerts), your typed notes, and pages to write or draw on with a pen or tablet, blank or over an image or PDF you bring in |
 | **Projects** | Kanban board (next, active, blocked, paused, shipped) and the log; each project has a page with its tasks, log, wiki note, repository and linked chats |
 | **Agents** | Hermes Studio chats working on your plans: watch them, or send a project or task to a new one (Ekko, Hermes or a coding agent) |
 | **Ideas** | A board in Milaclone's style: cards, columns, nested boards, arrows, to-do cards |
@@ -139,7 +140,8 @@ another compose project or on another machine just need
 docker compose pull && docker compose up -d   # or: git pull && docker compose up -d --build
 ```
 
-Everything Orb keeps is in `data/orb.db` (SQLite). Back up the `data` folder
+Everything Orb keeps is in `data/orb.db` (SQLite), plus images brought into
+the Journal in `data/journal/`. Back up the `data` folder
 and `.env`. Stopping the container cleanly is enough for a consistent copy.
 
 ### If something's wrong
@@ -190,6 +192,8 @@ npm run build   # server/dist and web/dist
 - [docs/allglance.md](docs/allglance.md): the ALLGlance stack, priorities,
   the family calendar
 - [docs/companions.md](docs/companions.md): Firefly III, Coinpile and Omi
+- [docs/journal.md](docs/journal.md): the Journal, its day log, notes and
+  drawing pages
 - [docs/picks.md](docs/picks.md): the Daily page, stock picks, the decision
   model and Robinhood
 - [docs/miladash.md](docs/miladash.md): the ideas board and Miladash

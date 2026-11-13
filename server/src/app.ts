@@ -2,7 +2,9 @@ import Fastify, { FastifyInstance } from "fastify";
 import cookie from "@fastify/cookie";
 import fstatic from "@fastify/static";
 import { existsSync } from "node:fs";
-import { hostname } from "node:os";
+import { hostname, tmpdir } from "node:os";
+import { mkdtempSync } from "node:fs";
+import { dirname, join as pjoin } from "node:path";
 import { Store } from "./db.js";
 import { Records, HttpError, isColl, Change } from "./records.js";
 import { Auth } from "./auth.js";
@@ -28,11 +30,12 @@ import { Outbox } from "./outbox.js";
 import { dailyApi } from "./daily.js";
 import { marketApi } from "./market.js";
 import { robinhoodApi } from "./robinhood.js";
+import { journalApi } from "./journal.js";
 import { today, localDay, isDay, timeZone } from "./dates.js";
 
 export const VERSION = "0.1.0";
 
-export interface AppOptions { dataFile?: string; config?: OrbConfig; webDir?: string; password?: string; tokens?: string; logger?: boolean }
+export interface AppOptions { filesDir?: string; dataFile?: string; config?: OrbConfig; webDir?: string; password?: string; tokens?: string; logger?: boolean }
 
 export async function buildApp(o: AppOptions = {}) {
   const store = new Store(o.dataFile ?? ":memory:");
@@ -125,6 +128,10 @@ export async function buildApp(o: AppOptions = {}) {
       { name: "wiki_read", description: "Read one LLMWIKI note (front-matter and body) by its path, e.g. wiki/1-projects/Argos.md. Read only.", parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] },
         run: async ({ path }: any) => { const n = await wiki.note(notePath(path)); return { ...n, body: n.body.slice(0, 12000) }; } },
     ] : []),
+    { name: "journal_day", description: "The user's journal for a day: what they typed, how many drawing pages, and the day's log Orb put together (money spent and earned, tasks and chores done, log entries, commits, UpstreamManager requests, Hermes Studio agent work, Omi's recap, calendar, stock-pick calls, alerts). date is YYYY-MM-DD (default today). Read only.",
+      parameters: { type: "object", properties: { date: { type: "string" } } },
+      run: async ({ date }: any) => { const d = isDay(date) && date <= today() ? date : today(); const j: any = records.get("journal", d) || {};
+        return { date: d, text: String(j.text || "").slice(0, 8000), drawingPages: (j.pages || []).length, log: await journal.autoFor(d) }; } },
     ...companionTools(),
     ...(cfg().hermes.baseUrl ? [
       { name: "project_chats", description: "The Hermes chats linked to a project, with their newest messages. Read only.", parameters: { type: "object", properties: { project: { type: "string" } }, required: ["project"] },
@@ -179,7 +186,7 @@ export async function buildApp(o: AppOptions = {}) {
     if (c === "settings" && who(req) !== "you") throw new HttpError(403, "Only a signed-in person can change settings.");
     // The brief, research and stock picks are written by Orb; only you decide on a pick.
     if (c === "orders") throw new HttpError(403, "Orders are written by Orb when you place one.");
-    if ((c === "daily" || c === "picks" || c === "research") && who(req) !== "you") throw new HttpError(403, "Only a signed-in person can change these.");
+    if ((c === "daily" || c === "picks" || c === "research" || c === "journal" || c === "ink") && who(req) !== "you") throw new HttpError(403, "Only a signed-in person can change these.");
     const raw = req.body ?? {};
     if (typeof raw !== "object" || Array.isArray(raw)) throw new HttpError(400, "Send a JSON object.");
     const body: Record<string, any> = { ...raw };
@@ -190,6 +197,8 @@ export async function buildApp(o: AppOptions = {}) {
       if (c === "tasks" && isOmiTask(cur?.caldav?.uid)) throw new HttpError(403, "This task comes from Omi. Change it in Omi; Orb only reads it.");
       delete body.caldav; delete body.source; if (cur?.caldav && req.method === "PUT") { body.caldav = cur.caldav; body.source = cur.source; }
     }
+    // The journal's day log is Orb's to write; a save from the page keeps it.
+    if (c === "journal") { delete body.auto; const cur: any = id && records.get("journal", id); if (cur?.auto && req.method === "PUT") body.auto = cur.auto; }
     if (c === "logs" && who(req) !== "you" && (req.method === "POST" || "by" in body)) body.by = who(req);
     return body;
   };
@@ -208,7 +217,7 @@ export async function buildApp(o: AppOptions = {}) {
     const c = coll(req.params.coll);
     // Deletes follow the same rules as writes (an agent can't remove settings, picks or orders).
     if (c === "orders") throw new HttpError(403, "Orders are kept as a record.");
-    if (["settings", "daily", "picks", "research"].includes(c) && who(req) !== "you") throw new HttpError(403, "Only a signed-in person can delete these.");
+    if (["settings", "daily", "picks", "research", "journal", "ink"].includes(c) && who(req) !== "you") throw new HttpError(403, "Only a signed-in person can delete these.");
     if (c === "tasks" && isOmiTask((records.get("tasks", req.params.id) as any)?.caldav?.uid)) throw new HttpError(403, "This task comes from Omi. Change it in Omi; Orb only reads it.");
     records.remove(c, req.params.id); reply.code(204).send();
   });
@@ -230,6 +239,8 @@ export async function buildApp(o: AppOptions = {}) {
   const daily = dailyApi(app, { records, dav, cfg, guard, who, glance });
   const market = marketApi(app, { records, cfg, guard, who });
   robinhoodApi(app, { records, store, guard, who });
+  const journal = journalApi(app, { records, cfg, guard, who, upstream, hermes, outbox, appsYaml, events: daily.events,
+    filesDir: o.filesDir ?? (o.dataFile && o.dataFile !== ":memory:" ? pjoin(dirname(o.dataFile), "journal") : mkdtempSync(pjoin(tmpdir(), "orb-journal-"))) });
 
   // ---- live updates (Server-Sent Events) ----
   app.get("/api/stream", { preHandler: guard }, (req, reply) => {
@@ -472,5 +483,5 @@ export async function buildApp(o: AppOptions = {}) {
     app.setNotFoundHandler((req, reply) => req.url.startsWith("/api/") || req.url.startsWith("/mcp") ? reply.code(404).send({ error: "Not found." }) : reply.sendFile("index.html"));
   }
 
-  return { app, records, store, auth, upstream, cfg, sync, outbox, writeDigest, daily, market };
+  return { app, records, store, auth, upstream, cfg, sync, outbox, writeDigest, daily, market, journal };
 }
