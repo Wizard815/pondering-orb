@@ -110,6 +110,16 @@ const txRows = (groups: any[]): FfTx[] => groups.flatMap((g: any) => (g.attribut
 export async function ffRecent(c: Companion, limit = 20): Promise<FfTx[]> {
   return cached(`ff:t:${c.url}:${limit}`, 2 * 60000, async () => txRows((await get(c, `/api/v1/transactions?limit=${Math.max(1, Math.min(100, limit))}&page=1`, "transactions"))?.data || []).slice(0, limit));
 }
+/** One day's money: what went out (withdrawals) and came in (deposits), with
+ *  the transactions. Transfers between your own accounts count as neither. */
+export type FfDay = { date: string; spent: number; income: number; currency: string; items: FfTx[] };
+export async function ffDay(c: Companion, date: string): Promise<FfDay> {
+  return cached(`ff:d:${c.url}:${date}`, 2 * 60000, async () => {
+    const items = txRows(await all(c, `/api/v1/transactions?type=all&start=${date}&end=${date}`, "transactions", 300)).filter(t => t.date === date);
+    const sum = (k: string) => +items.filter(t => t.type === k).reduce((a, t) => a + Math.abs(t.amount), 0).toFixed(2);
+    return { date, spent: sum("withdrawal"), income: sum("deposit"), currency: items[0]?.currency || "", items };
+  });
+}
 /** Firefly's own search ("amazon", "category:Groceries", "date_after:2026-10-01"). */
 export async function ffSearch(c: Companion, query: string, limit = 25): Promise<FfTx[]> {
   const q = query.trim().slice(0, 300); if (!q) throw new HttpError(400, "Search for something.");

@@ -6,7 +6,7 @@ import { isNoteName, notePath } from "./integrations/wiki.js";
 
 /** Collections the web app and agents may read and write through
  *  /api/c/<name>. Anything else is refused. */
-export const COLLECTIONS = ["projects", "logs", "tasks", "chores", "canvas", "edges", "events", "layouts", "settings", "chats", "daily", "picks", "research", "orders"] as const;
+export const COLLECTIONS = ["projects", "logs", "tasks", "chores", "canvas", "edges", "events", "layouts", "settings", "chats", "daily", "picks", "research", "orders", "journal", "ink"] as const;
 export type Coll = typeof COLLECTIONS[number];
 export const isColl = (c: string): c is Coll => (COLLECTIONS as readonly string[]).includes(c);
 

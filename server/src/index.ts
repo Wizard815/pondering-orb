@@ -16,7 +16,7 @@ try {
     `On the host, make the folder you mounted there writable for that user, e.g.:\n  mkdir -p data && sudo chown ${uid}:${uid} data`);
   process.exit(1);
 }
-const { app, auth, records, upstream, cfg, sync, outbox, writeDigest, daily, market } = await buildApp({
+const { app, auth, records, upstream, cfg, sync, outbox, writeDigest, daily, market, journal } = await buildApp({
   dataFile: resolve(dataDir, "orb.db"),
   webDir: process.env.ORB_WEB || resolve(here, "../../web/dist"),
   logger: true,
@@ -48,5 +48,9 @@ setTimeout(() => { writeDigest().catch(() => {}); }, 20000).unref();
 // research run on market days; both are checked every five minutes.
 setInterval(() => { daily.morningTick().catch(e => app.log.warn({ err: e.message }, "morning brief failed")); market.tick().catch(e => app.log.warn({ err: e.message }, "market research failed")); }, 5 * 60000).unref();
 setTimeout(() => { daily.morningTick().catch(() => {}); }, 30000).unref();
+
+// Save yesterday's journal log once the day is over (checked every half hour).
+setInterval(() => { journal.tick().catch(e => app.log.warn({ err: e.message }, "journal log failed")); }, 30 * 60000).unref();
+setTimeout(() => { journal.tick().catch(() => {}); }, 45000).unref();
 
 for (const sig of ["SIGINT", "SIGTERM"] as const) process.on(sig, async () => { await app.close(); process.exit(0); });
