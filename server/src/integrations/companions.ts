@@ -10,13 +10,14 @@ import { HttpError } from "../records.js";
  *  Every request here is a GET. Omi's action items are NOT read from Omi:
  *  Omi already writes them to CalDAV (UID omi-task-...@omi-local), and Orb
  *  reads every task from that one CalDAV server, so nothing is listed twice. */
-export type Companion = { name: string; url: string; keyEnv?: string; page?: string };
+export type Companion = { name: string; url: string; keyEnv?: string; page?: string; /** Coinpile: env var holding a token with the "mcp" scope, for Golem's Coinpile tools. */ mcpKeyEnv?: string };
 
 /** The first app of a widget type in the apps YAML. */
 export function companion(yaml: string, type: "omi" | "firefly" | "coinpile"): Companion | null {
   let c: any = {}; try { c = parse(yaml || "") || {}; } catch { return null; }
   for (const g of Array.isArray(c.groups) ? c.groups : []) for (const a of Array.isArray(g?.apps) ? g.apps : [])
-    if (a?.widget?.type === type) return { name: String(a.name), url: String(a.widget.url || a.url || ""), keyEnv: a.widget.key_env || a.widget.keyEnv, page: pageLabel(a.widget.page, type) };
+    if (a?.widget?.type === type) return { name: String(a.name), url: String(a.widget.url || a.url || ""), keyEnv: a.widget.key_env || a.widget.keyEnv, page: pageLabel(a.widget.page, type),
+      ...(a.widget.mcp_key_env || a.widget.mcpKeyEnv ? { mcpKeyEnv: String(a.widget.mcp_key_env || a.widget.mcpKeyEnv) } : {}) };
   return null;
 }
 /** `page: true` (or a tab name) in a widget turns on that app's full page. */

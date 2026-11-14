@@ -22,7 +22,10 @@ function Coinpile({ data: d }: { data: any }) {
     <div className="small">{d.savings && <div>Savings {money(d.savings.total)}: <b>{money(d.savings.free)}</b> free, {money(d.savings.earmarked)} set aside</div>}
       {d.spending && <div>Spending: <Forecast s={d.spending} /></div>}
       {(d.robinhoodAgent || d.robinhoodMain) && <div>Robinhood {money((d.robinhoodMain?.value ?? 0) + (d.robinhoodAgent?.value ?? 0))}</div>}
-      {(() => { const m = (d.maturities || []).find((x: any) => x.kind === "maturing"); return m ? <div>Next to mature: {m.title}</div> : null; })()}</div>
+      {(() => { const m = (d.maturities || []).find((x: any) => x.kind === "maturing"); return m ? <div>Next to mature: {m.title}</div> : null; })()}
+      {d.budgets && d.budgets.limit != null && <div>Budgets: <b>{money(d.budgets.left)}</b> left of {money(d.budgets.limit)}{(() => { const over = d.budgets.items.filter((b: any) => b.limit && b.spent / b.limit >= 0.9); return over.length ? <span className="muted"> · near limit: {over.map((b: any) => b.name).join(", ")}</span> : null; })()}</div>}
+      {d.paycheck && <div>Next paycheck {d.paycheck.date}: {money(d.paycheck.amount)} → {money(d.paycheck.bills)} bills{d.paycheck.piggyBanks ? `, ${money(d.paycheck.piggyBanks)} piggy banks` : ""}, <b>{money(d.paycheck.left)}</b> left</div>}
+      {d.week && <div>This week: {money(d.week.moneyOut)} out{d.week.outChange != null ? <span className="muted"> ({d.week.outChange >= 0 ? "+" : ""}{money(d.week.outChange)} vs last week)</span> : null}</div>}</div>
     {alerts.length > 0 ? <div style={{ marginTop: 6 }}><AlertList alerts={alerts} limit={3} /></div> : d.alerts && d.alerts.total > 0 ? <div className="small">{d.alerts.total} alerts, {d.alerts.critical} critical</div> : null}
     {d.goals?.length > 0 && <div style={{ marginTop: 6 }}><GoalBars goals={d.goals} limit={3} /></div>}
     <div className="hint">Read only, from Coinpile · {ago(d.at)}</div>

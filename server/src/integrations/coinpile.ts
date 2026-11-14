@@ -2,6 +2,8 @@ import { call, trimSlash } from "./http.js";
 import { secret } from "../config.js";
 import { HttpError } from "../records.js";
 import type { Companion } from "./companions.js";
+import type { Tool } from "./llm.js";
+import { McpClient } from "./mcpclient.js";
 
 /** Coinpile (the friendly view over Firefly III, formerly Goblin-Bank), read
  *  only. A Coinpile API token with the `orb` scope reads
@@ -24,8 +26,14 @@ export type CpSummary = {
   bills: { next7d: number | null; next30d: number | null; next: { name: string; date: string; amount: number | null } | null } | null;
   alerts: { total: number; critical: number; warning: number } | null;
   savings: { total: number | null; free: number | null; earmarked: number | null } | null;
-  /** pct is 0–1 (Coinpile's own scale). */
-  goals: { name: string; target: number | null; allocated: number | null; pct: number | null }[] | null;
+  /** Coinpile's goals are the user's Firefly III piggy banks. pct is 0–1 (Coinpile's own scale); by is the target date when set. */
+  goals: { name: string; target: number | null; allocated: number | null; pct: number | null; by: string | null }[] | null;
+  /** Firefly III budgets this month, when shared. */
+  budgets: { month: string; limit: number | null; spent: number | null; left: number | null; items: { name: string; limit: number | null; spent: number | null; left: number | null }[] } | null;
+  /** The next paycheck split, when shared: bills due before the one after it, the piggy banks' share, what is left. */
+  paycheck: { date: string; amount: number | null; bills: number | null; piggyBanks: number | null; left: number | null; until: string } | null;
+  /** This week against last week, when shared (totals and the 3 biggest payments by name; no transactions list). */
+  week: { from: string; to: string; moneyIn: number | null; moneyOut: number | null; outChange: number | null; netWorthChange: number | null; billsNext7Days: number | null; biggest: { name: string; amount: number | null }[]; alerts: number } | null;
   /** pctOfIncome is worked out here (projected / average income, 0–1+). */
   spending: { soFar: number | null; projected: number | null; incomeAvg: number | null; leftAfter: number | null; pctOfIncome: number | null } | null;
   robinhoodMain: { value: number | null; asOf: string } | null; robinhoodAgent: { value: number | null; asOf: string } | null;
@@ -67,7 +75,14 @@ export async function cpSummary(c: Companion): Promise<CpSummary> {
       next: g.bills.next && typeof g.bills.next === "object" ? { name: String(g.bills.next.name || ""), date: String(g.bills.next.date || ""), amount: num(g.bills.next.amount) } : null } : null,
     alerts: g.alerts && typeof g.alerts === "object" ? { total: Number(g.alerts.total) || 0, critical: Number(g.alerts.critical) || 0, warning: Number(g.alerts.warning) || 0 } : null,
     savings: g.savings && typeof g.savings === "object" ? { total: num(g.savings.total), free: num(g.savings.free), earmarked: num(g.savings.earmarked) } : null,
-    goals: Array.isArray(g.goals) ? g.goals.slice(0, 20).map((x: any) => ({ name: String(x?.name || ""), target: num(x?.target), allocated: num(x?.allocated), pct: num(x?.pct) })).filter((x: any) => x.name) : null,
+    goals: Array.isArray(g.goals) ? g.goals.slice(0, 20).map((x: any) => ({ name: String(x?.name || ""), target: num(x?.target), allocated: num(x?.allocated), pct: num(x?.pct), by: isDay(x?.by) ? String(x.by) : null })).filter((x: any) => x.name) : null,
+    budgets: g.budgets && typeof g.budgets === "object" ? { month: String(g.budgets.month || ""), limit: num(g.budgets.limit), spent: num(g.budgets.spent), left: num(g.budgets.left),
+      items: (Array.isArray(g.budgets.items) ? g.budgets.items : []).slice(0, 30).map((b: any) => ({ name: String(b?.name || ""), limit: num(b?.limit), spent: num(b?.spent), left: num(b?.left) })).filter((b: any) => b.name) } : null,
+    paycheck: g.paycheck && typeof g.paycheck === "object" && isDay(g.paycheck.date) ? { date: String(g.paycheck.date), amount: num(g.paycheck.amount), bills: num(g.paycheck.bills), piggyBanks: num(g.paycheck.piggy_banks),
+      left: num(g.paycheck.left), until: isDay(g.paycheck.until) ? String(g.paycheck.until) : "" } : null,
+    week: g.week && typeof g.week === "object" ? { from: String(g.week.from || ""), to: String(g.week.to || ""), moneyIn: num(g.week.money_in), moneyOut: num(g.week.money_out), outChange: num(g.week.out_change),
+      netWorthChange: num(g.week.net_worth_change), billsNext7Days: num(g.week.bills_next_7_days), alerts: Number(g.week.alerts) || 0,
+      biggest: (Array.isArray(g.week.biggest) ? g.week.biggest : []).slice(0, 3).map((b: any) => ({ name: String(b?.name || ""), amount: num(b?.amount) })).filter((b: any) => b.name) } : null,
     spending: sp ? { soFar: num(sp.so_far), projected: num(sp.projected), incomeAvg: num(sp.income_avg), leftAfter: num(sp.left_after),
       pctOfIncome: num(sp.projected) !== null && num(sp.income_avg) ? +(sp.projected / sp.income_avg).toFixed(3) : null } : null,
     robinhoodMain: rh(g.robinhood_main), robinhoodAgent: rh(g.robinhood_agent),
@@ -77,4 +92,39 @@ export async function cpSummary(c: Companion): Promise<CpSummary> {
     at: Date.now(),
   };
   cache.set(c.url, { at: Date.now(), v }); return v;
+}
+
+/** Golem's Coinpile tools: Coinpile's own agent tools over MCP (POST /api/v1/mcp), with a Coinpile token that has the "mcp" scope
+ *  (mcp_key_env in the coinpile widget). Read tools read the user's Firefly III through Coinpile; tools Coinpile marks as not read-only
+ *  only ASK: the request waits for the user's Yes on Coinpile's Agent page, so nothing changes from here. Listed once every 10 minutes. */
+const mcpClients = new Map<string, { client: McpClient; tools?: { at: number; list: Tool[] } }>();
+export const clearCoinpileMcp = () => mcpClients.clear();
+
+export async function cpMcpTools(c: Companion | null): Promise<Tool[]> {
+  if (!c?.mcpKeyEnv || !secret(c.mcpKeyEnv) || !trimSlash(c.url)) return [];
+  const key = `${trimSlash(c.url)}|${c.mcpKeyEnv}`;
+  let e = mcpClients.get(key);
+  if (!e) {
+    const client = new McpClient(() => `${trimSlash(c.url)}/api/v1/mcp`, async () => secret(c.mcpKeyEnv) || "",
+      async () => { throw new HttpError(502, `${c.name} refused the token in ${c.mcpKeyEnv}: it needs the "mcp" scope (Coinpile → Settings → Home Assistant & API).`); });
+    e = { client }; mcpClients.set(key, e);
+  }
+  if (e.tools && Date.now() - e.tools.at < 10 * 60000) return e.tools.list;
+  let listed;
+  try { listed = await e.client.tools(); } catch { e.client.reset(); return []; }     // Coinpile down: Golem still works without these
+  const client = e.client;
+  const list: Tool[] = listed.map(t => {
+    const asks = t.annotations?.readOnlyHint === false;
+    return {
+      name: `coinpile_${t.name}`.slice(0, 64),
+      description: `Coinpile (the user's money, from their Firefly III)${asks ? ", ASKS FIRST: only creates a request the user approves on Coinpile's Agent page; tell them that" : ""}: ${String(t.description || "").replace(/^ASKS THE USER FIRST, nothing happens until they say yes\. /, "")}`.slice(0, 1024),
+      parameters: t.inputSchema && typeof t.inputSchema === "object" ? t.inputSchema : { type: "object", properties: {} },
+      run: async (args: any) => {
+        const r = await client.call(t.name, args && typeof args === "object" ? args : {});
+        let out: unknown; try { out = JSON.parse(r.text); } catch { out = r.text; }
+        return r.isError ? { error: typeof out === "string" ? out : (out as any)?.error || out } : out;
+      },
+    };
+  });
+  e.tools = { at: Date.now(), list }; return list;
 }
