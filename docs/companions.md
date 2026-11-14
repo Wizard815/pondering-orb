@@ -54,6 +54,15 @@ Bank data reaches Firefly through your
 [plaid-firefly-connector](https://github.com/Wizard815/plaid-firefly-connector);
 Orb doesn't talk to Plaid or the connector, it reads the result in Firefly.
 
+**Joint accounts.** People on the connector can share a bank account with
+each other: one asks, the other accepts, no admin needed (see the
+connector's README). An accepted account lands in the other person's
+Firefly III as a new account ("Shared by <name>") or in one they already
+have, so Orb shows it like any other account. Firefly III holds the whole
+balance, so Orb's Firefly III net worth counts all of it; Coinpile counts
+only your share (below). When a share stops, the account stays in Firefly III
+with its history and gets no new transactions.
+
 ## Coinpile (savings, goals, alerts, the forecast)
 
 [Coinpile](https://github.com/Wizard815/coinpile) is the friendly view over
@@ -101,6 +110,26 @@ and Coinpile's calculator (Golem is told to use it for every sum). Tools that
 would change something only **ask**: the request waits on Coinpile's Agent
 page for your Yes, so nothing changes from Orb. Without `mcp_key_env`, or if
 Coinpile is down, Golem works as before.
+
+### Joint accounts and linked people
+
+In Coinpile, two linked people can tie their copies of a joint account
+together and agree a split. Coinpile then counts only your share, so the
+savings, net worth and goals Orb gets from Coinpile are your part. They can
+differ from Firefly III's net worth, which counts the whole account.
+
+Orb never gets the other person's numbers:
+
+- The summary (`orb` token) is built only from your own data. It doesn't
+  include what a linked person shows you or their side of a joint account.
+- Over MCP, Golem can use `coinpile_shared_expenses` and
+  `coinpile_shared_with_me`. It sees your own side of each joint account:
+  your account, your share and what you put in this month. The other
+  person's side is answered with "withheld": what they put in, their
+  balance, their name for the account, the settle-up line, and anything
+  else they share with you. Golem asks you for their figure when it needs
+  one. To use those numbers, ask Coinpile's own agent with a model that runs
+  on your machine.
 
 ## Panel, or a full page
 
