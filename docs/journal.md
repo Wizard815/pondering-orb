@@ -1,7 +1,6 @@
 # The Journal
 
-One page per day: the day as Orb saw it, your notes, and pages to write or
-draw on. Open the **Journal** tab and step through days with ‹ › or the date.
+One page per day: the day as Orb saw it, and your notes. Open the **Journal** tab and step through days with ‹ › or the date.
 
 ## The day's log (automatic)
 
@@ -38,33 +37,6 @@ next to `spending` under Settings → Home Assistant & API).
 
 Type with a keyboard. Markdown works; **Read** shows it formatted. It saves
 as you type.
-
-## Pages: writing and drawing
-
-- **New page** starts a blank page (the shape of a BOOX Note Air page).
-- **Bring in an image or PDF** (or drop files on the panel): each image
-  becomes a page, and each PDF page becomes a page (up to 40), so you can
-  export a note from your BOOX as a PDF or PNG and keep writing on it here.
-- Pen, highlighter and eraser; five colours; three widths; Undo and Redo.
-- **Full screen** fills the screen with one page and its tools; ‹ › move
-  between pages.
-- **Save as PNG** downloads the page with everything drawn on it.
-
-On a tablet, the pen's pressure sets the line width. Once Orb sees a pen it
-turns on **Pen only**, so a palm resting on the screen draws nothing (turn
-it off to draw with a finger). A drawing pad (Wacom and the like) works too.
-
-Two devices can write on the same page (the BOOX and a laptop, say). Each
-saves only on top of what it last saw; if the other saved in between, Orb
-merges the two (both sides' new strokes stay, both sides' erasing holds) and
-saves again. An open page picks up the other device's strokes when you come
-back to the tab, and every half minute.
-
-An imported image can't be deleted while a page still uses it.
-
-Strokes are kept as lines, not pictures, so they stay sharp and can be erased
-or undone later. Imported images are kept in `data/journal/` (back it up with
-the rest of `data/`).
 
 ## Who can change it
 

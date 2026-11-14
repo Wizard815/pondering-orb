@@ -1,3 +1,4 @@
+import { positions } from "./stocks.js";
 import type { FastifyInstance } from "fastify";
 import type { Records } from "./records.js";
 import { HttpError } from "./records.js";
@@ -80,7 +81,10 @@ export function marketApi(app: FastifyInstance, deps: { records: Records; cfg: (
     const history = q.history.filter(b => b.date < day || q.at < Date.now() - 6 * 3600e3);
     const ind = indicators(history.length > 1 ? history : q.history, idx.filter(b => b.date <= (history.at(-1)?.date || day)));
     const headlines = (await newsSearch(`${c.symbol} stock`, 8).catch(() => [])).map(n => ({ title: n.title, source: n.source, date: n.published ? new Date(n.published).toISOString().slice(0, 10) : "" }));
+    // What you already hold, from your Robinhood history (if imported).
+    const held = positions((records.list("trades") as any[]).filter(t => t.symbol === q.symbol))[0];
     const state = { as_of: ind?.as_of || day, symbol: q.symbol, name: q.name, price: +q.price.toFixed(2), strategy: s.strategy, thesis: c.thesis, catalyst: c.catalyst, indicators: ind,
+      ...(held?.shares ? { you_own: { shares: held.shares, avg_cost: +held.avgCost.toFixed(2) } } : {}),
       index: { symbol: s.index, ...(indicators(idx) || {}) }, headlines, track_record: trackRecord() };
     const qs = questions(state.as_of), d = s.decider, key = secret(d.keyEnv);
     let verdict: Verdict;

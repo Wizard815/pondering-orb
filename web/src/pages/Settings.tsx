@@ -16,6 +16,7 @@ const CONNS: { id: string; name: string; fields: [string, string][]; note?: stri
   { id: "caldav", name: "CalDAV tasks", fields: [["url", "CalDAV URL (empty: the ALLGlance gateway's /dav/)"], ["userEnv", "User variable"], ["passwordEnv", "Password variable"], ["choresList", "List that holds chores"]] },
   { id: "wiki", name: "LLMWIKI", fields: [["baseUrl", "REST API URL"], ["tokenEnv", "API key variable"], ["vault", "Vault folder in the container (read only)"]] },
   { id: "allglance", name: "ALLGlance gateway", fields: [["baseUrl", "Base URL (e.g. http://allglance-gateway:8090)"], ["tokenEnv", "Token variable (same value as GATEWAY_TOKEN)"]], note: "Brings in dayGLANCE's day plan and inbox, lastGLANCE chores and lifeGLANCE milestones. vikunja tasks still come over CalDAV." },
+  { id: "milaclone", name: "Milaclone (Ideas)", fields: [["url", "Address in your browser (e.g. http://tower:4321)"]], note: "The Ideas tab shows Milaclone: boards, mind maps and drawings." },
   { id: "unraid", name: "Unraid Management Agent", fields: [["baseUrl", "Agent address (e.g. http://tower:8043)"], ["tokenEnv", "Token variable (the agent's API token)"], ["linkHost", "Address for app links (empty: the agent's host)"]], note: "Lists every container with its ports for the Links page. Unraid's WebUI and icon for each container come from Docker labels, through the socket proxy." },
   { id: "hermes", name: "Hermes Studio", fields: [["baseUrl", "Base URL"], ["userEnv", "User variable"], ["passwordEnv", "Password variable"]] },
 ];
@@ -96,7 +97,7 @@ function PagesSetting() {
   const ui = useUi(), s = useSettings(), all = useAllPages(), setup = usePageSetup();
   const rows = all.filter(p => p.id !== "main" && p.id !== "config");
   const set = (id: string, v: string) => { const next = { ...(s.pages || {}) }; if (v === "auto") delete next[id]; else next[id] = v; saveSettings({ pages: next }).catch(ui.error); };
-  return <><p className="hint" style={{ margin: 0 }}>Auto shows a page when what it needs is set up: Agents (Hermes Studio), Wiki (the vault or its REST key), Upkeep (UpstreamManager or chores), Uptime (Uptime Kuma), Picks (stock picks turned on).</p>
+  return <><p className="hint" style={{ margin: 0 }}>Auto shows a page when what it needs is set up: Agents (Hermes Studio), Wiki (the vault or its REST key), Upkeep (UpstreamManager or chores), Uptime (Uptime Kuma), Picks (stock picks turned on), Ideas (Milaclone).</p>
     <ul className="list">{rows.map(p => { const st = setup[p.id], shown = pageMode(s, p.id) === "show" || (pageMode(s, p.id) === "auto" && (!(p.id in setup) || st === true));
       return <li key={p.id}><div className="grow"><label htmlFor={"pg-" + p.id}>{p.label}</label><div className="hint">{p.id in setup ? (st === undefined ? "checking…" : st ? "set up" : "not set up") : "always available"} · {shown ? "shown" : "hidden"}</div></div>
         <select id={"pg-" + p.id} value={pageMode(s, p.id)} onChange={e => set(p.id, e.target.value)}><option value="auto">Auto</option><option value="show">Always show</option><option value="hide">Hide</option></select></li>; })}</ul></>;
@@ -145,11 +146,17 @@ function DailySettingsForm() {
   const ui = useUi(), d = useSettings().daily || {};
   const feeds: string[] = d.feeds || ["https://feeds.npr.org/1001/rss.xml", "https://feeds.bbci.co.uk/news/world/rss.xml", "https://www.cnbc.com/id/100003114/device/rss/rss.html"];
   return <form className="editor" key={JSON.stringify(d)} onSubmit={e => { e.preventDefault(); const f = new FormData(e.currentTarget);
-    saveSettings({ daily: { location: String(f.get("location") || "").trim(), units: f.get("units") === "C" ? "C" : "F", feeds: lines(f.get("feeds")), watchlist: lines(f.get("watchlist")).map(x => x.toUpperCase()),
-      briefOn: !!f.get("briefOn"), briefHour: Number(f.get("briefHour")) || 7 } }).then(() => ui.status("Daily page saved.")).catch(ui.error); }}>
-    <div className="row"><label className="small" style={{ flex: 1 }}>Location (for weather)<input type="text" name="location" defaultValue={d.location || ""} placeholder="Chicago, US  or  41.88,-87.63" /></label>
+    // Keep what this form doesn't show (the favourite feed), and only change the rest.
+    saveSettings({ daily: { ...d, location: String(f.get("location") || "").trim(), places: lines(f.get("places")), units: f.get("units") === "C" ? "C" : "F", feeds: lines(f.get("feeds")), watchlist: lines(f.get("watchlist")).map(x => x.toUpperCase()),
+      briefOn: !!f.get("briefOn"), briefHour: Number(f.get("briefHour")) || 7,
+      coverage: { on: !!f.get("covOn"), label: String(f.get("covLabel") || "").trim() || "Ground News", template: String(f.get("covTemplate") || "").trim() || "https://ground.news/search?query={q}" } } }).then(() => ui.status("Daily page saved.")).catch(ui.error); }}>
+    <div className="row"><label className="small" style={{ flex: 1 }}>Favourite place (weather, the brief)<input type="text" name="location" defaultValue={d.location || ""} placeholder="Chicago, US  or  41.88,-87.63" /></label>
       <label className="small">Units<select name="units" defaultValue={d.units || "F"}><option value="F">°F</option><option value="C">°C</option></select></label></div>
-    <label className="small">News feeds (RSS or Atom, one per line)<textarea name="feeds" rows={4} defaultValue={feeds.join("\n")} /></label>
+    <label className="small">Other places (one per line; pick them on the Weather panel)<textarea name="places" rows={2} defaultValue={(d.places || []).join("\n")} /></label>
+    <label className="small">News feeds (RSS or Atom, one per line; any feed works, e.g. weather alerts for a region)<textarea name="feeds" rows={4} defaultValue={feeds.join("\n")} /></label>
+    <div className="row"><label className="small row" style={{ gap: 4 }}><input type="checkbox" name="covOn" defaultChecked={d.coverage?.on !== false} /> Link each headline to its coverage on</label>
+      <input type="text" name="covLabel" defaultValue={d.coverage?.label || "Ground News"} aria-label="Coverage site name" style={{ width: "10em" }} /></div>
+    <label className="small">Coverage link ({"{q}"} is the headline)<input type="text" name="covTemplate" defaultValue={d.coverage?.template || "https://ground.news/search?query={q}"} /></label>
     <label className="small">Watchlist (tickers, comma or line separated)<input type="text" name="watchlist" defaultValue={(d.watchlist || ["SPY", "QQQ", "DIA"]).join(", ")} /></label>
     <div className="row"><label className="small row" style={{ gap: 4 }}><input type="checkbox" name="briefOn" defaultChecked={d.briefOn !== false} /> Write the morning brief each day after</label>
       <input type="number" name="briefHour" min={0} max={23} defaultValue={d.briefHour ?? 7} aria-label="Hour" style={{ width: 64 }} /><span className="small">:00 ({getZone() || "server time"})</span></div>

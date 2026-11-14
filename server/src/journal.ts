@@ -1,6 +1,3 @@
-import { randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile, unlink } from "node:fs/promises";
-import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
 import type { Records } from "./records.js";
 import { HttpError } from "./records.js";
@@ -15,10 +12,8 @@ import { cpSummary } from "./integrations/coinpile.js";
 import { today, localDay, localClock, isDay } from "./dates.js";
 
 /** The Journal: one record per day ("journal", id = YYYY-MM-DD) holding what
- *  you wrote (text) and your drawing pages, plus the day's log that Orb puts
- *  together from everything it can see. Ink strokes live in "ink" (one record
- *  per page) so a busy page doesn't make the day's record heavy. Images and
- *  PDF pages you bring in are files in <data>/journal/.
+ *  you wrote (text), plus the day's log that Orb puts together from
+ *  everything it can see.
  *
  *  The day's log is worked out live for today; after the day ends it is
  *  saved into the record (`auto`), so it still says what happened even when
@@ -42,26 +37,15 @@ export type AutoLog = {
   notes: string[];
 };
 
-const FILE = /^[a-f0-9]{32}\.(png|jpg|webp|gif)$/;
-const TYPES: Record<string, string> = { png: "image/png", jpg: "image/jpeg", webp: "image/webp", gif: "image/gif" };
-/** The file's real type from its first bytes; the Content-Type header alone isn't trusted. */
-export function sniff(b: Buffer): keyof typeof TYPES | null {
-  if (b.length > 8 && b[0] === 0x89 && b.toString("latin1", 1, 4) === "PNG") return "png";
-  if (b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "jpg";
-  if (b.length > 12 && b.toString("latin1", 0, 4) === "RIFF" && b.toString("latin1", 8, 12) === "WEBP") return "webp";
-  if (b.length > 6 && /^GIF8[79]a$/.test(b.toString("latin1", 0, 6))) return "gif";
-  return null;
-}
-
 const dayOfIso = (s: string) => { if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; const t = Date.parse(s); return Number.isNaN(t) ? "" : localDay(t); };
 const clockOf = (ms: number) => localClock(new Date(ms).toISOString());
 
 export function journalApi(app: FastifyInstance, deps: {
-  records: Records; cfg: () => OrbConfig; guard: any; who: (req: any) => string; filesDir: string;
+  records: Records; cfg: () => OrbConfig; guard: any; who: (req: any) => string; 
   upstream: Upstream; hermes: Hermes; outbox: Outbox; appsYaml: () => string;
   events: (from: string, days: number) => Promise<{ title: string; start: string; allDay: boolean; calendar?: string; day: string }[]>;
 }) {
-  const { records, cfg, guard, filesDir } = deps;
+  const { records, cfg, guard } = deps;
 
   async function build(day: string): Promise<AutoLog> {
     const notes: string[] = [], isToday = day === today();
@@ -162,34 +146,6 @@ export function journalApi(app: FastifyInstance, deps: {
 
   // Reading never writes. Refresh saves a past day's log again, and only you can ask for that.
   app.get("/api/journal/:day/auto", { preHandler: guard }, async (req: any) => { const refresh = req.query.refresh === "1"; if (refresh) you(req); return autoFor(dayParam(req.params.day), refresh); });
-
-  // Images (and PDF pages, which the browser turns into images) for drawing pages.
-  // The image body parser lives in its own scope, so no other route accepts a 25 MB image body,
-  // and sign-in is checked before the body is read.
-  app.register(async scope => {
-    scope.addContentTypeParser(/^image\/(png|jpeg|webp|gif)$/, { parseAs: "buffer", bodyLimit: 25 * 1024 * 1024 }, (_req, body, done) => done(null, body));
-    scope.post("/api/journal/files", { onRequest: [guard, async (req: any) => you(req)], bodyLimit: 25 * 1024 * 1024 }, upload);
-  });
-  async function upload(req: any) {
-    const b = req.body; if (!Buffer.isBuffer(b) || !b.length) throw new HttpError(400, "Send the image itself (PNG, JPEG, WebP or GIF) as the request body.");
-    const ext = sniff(b); if (!ext) throw new HttpError(415, "That isn't a PNG, JPEG, WebP or GIF image.");
-    await mkdir(filesDir, { recursive: true });
-    const id = `${randomUUID().replace(/-/g, "")}.${ext}`; await writeFile(join(filesDir, id), b);
-    return { id, type: TYPES[ext], bytes: b.length };
-  }
-  app.get("/api/journal/files/:id", { preHandler: guard }, async (req: any, reply) => {
-    const id = String(req.params.id); if (!FILE.test(id)) throw new HttpError(404, "No such file.");
-    const data = await readFile(join(filesDir, id)).catch(() => { throw new HttpError(404, "No such file."); });
-    reply.header("Content-Type", TYPES[id.split(".")[1]]).header("X-Content-Type-Options", "nosniff").header("Content-Security-Policy", "default-src 'none'").header("Cache-Control", "private, max-age=31536000, immutable");
-    return reply.send(data);
-  });
-  app.delete("/api/journal/files/:id", { preHandler: guard }, async (req: any, reply) => {
-    you(req); const id = String(req.params.id); if (!FILE.test(id)) throw new HttpError(404, "No such file.");
-    // Still on a page (of any day): keep it.
-    const used = (records.list("journal") as any[]).find(j => (j.pages || []).some((p: any) => p?.bg === id));
-    if (used) throw new HttpError(409, `That image is still on a page of ${used.date || used.id}.`);
-    await unlink(join(filesDir, id)).catch(() => {}); reply.code(204).send();
-  });
 
   /** After midnight, yesterday's log is saved for good. */
   async function tick() { const y = localDay(Date.now() - 864e5); const cur: any = records.get("journal", y); if (!cur?.auto?.final) await snapshot(y, true); }

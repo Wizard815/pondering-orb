@@ -1,5 +1,9 @@
 # Miladash: the ideas board
 
+> Orb's own board is gone: the **Ideas** tab now shows Milaclone (Miladash)
+> itself. Set `MILACLONE_URL` (or Settings → Connections → Milaclone) to the
+> address your browser uses for it. The notes below are the design background.
+
 Miladash is a branch of Milaclone, trimmed and restyled to be Pondering Orb's
 ideas board. This file covers what good canvas boards do, what the demo got
 wrong, and what to carry over from Milaclone.

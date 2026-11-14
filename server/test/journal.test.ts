@@ -12,7 +12,6 @@ const serve = (h: (req: any, res: any, body: string) => void) => new Promise<{ u
   const s = createServer((req, res) => { let b = ""; req.on("data", c => (b += c)); req.on("end", () => h(req, res, b)); }).listen(0, "127.0.0.1", () => ok({ url: `http://127.0.0.1:${(s.address() as any).port}`, close: () => s.close() }));
 });
 const J = (res: any, o: unknown, c = 200) => { res.writeHead(c, { "content-type": "application/json" }); res.end(JSON.stringify(o)); };
-const PNG = Buffer.from("89504e470d0a1a0a0000000d4948445200000001000000010806000000", "hex");
 
 test("TestJournal_DayLogMoneyWorkOmiAndSnapshots", async () => {
   process.env.JF_TOKEN = "pat"; process.env.JO_KEY = "omi"; process.env.JC_TOKEN = "cp";
@@ -87,24 +86,6 @@ test("TestJournal_DayLogMoneyWorkOmiAndSnapshots", async () => {
     const j: any = records.get("journal", day(-1)); assert.equal(j.text, "Long day."); assert.equal(j.auto.money.spent, 50);
     assert.equal((await app.inject({ method: "GET", url: `/api/journal/${day(1)}/auto`, cookies: cookie })).statusCode, 400, "no log for tomorrow");
 
-    // Images for drawing pages: real images only, served as what they are.
-    const up = await app.inject({ method: "POST", url: "/api/journal/files", cookies: cookie, headers: { "content-type": "image/png" }, payload: PNG });
-    assert.equal(up.statusCode, 200); const id = up.json().id; assert.match(id, /^[a-f0-9]{32}\.png$/);
-    const got = await app.inject({ method: "GET", url: `/api/journal/files/${id}`, cookies: cookie });
-    assert.equal(got.headers["content-type"], "image/png"); assert.equal(got.headers["x-content-type-options"], "nosniff"); assert.equal(got.rawPayload.length, PNG.length);
-    assert.equal((await app.inject({ method: "POST", url: "/api/journal/files", cookies: cookie, headers: { "content-type": "image/png" }, payload: Buffer.from("<svg onload=alert(1)>") })).statusCode, 415);
-    assert.equal((await app.inject({ method: "POST", url: "/api/journal/files", headers: { ...bot, "content-type": "image/png" }, payload: PNG })).statusCode, 403);
-    assert.equal((await app.inject({ method: "GET", url: "/api/journal/files/..%2Forb.db", cookies: cookie })).statusCode, 404);
-    // An image still on a page can't be deleted; once no page uses it, it can.
-    records.create("journal", { date: day(-3), text: "", pages: [{ id: "pg1", w: 10, h: 10, bg: id }] }, day(-3));
-    assert.equal((await app.inject({ method: "DELETE", url: `/api/journal/files/${id}`, cookies: cookie })).statusCode, 409);
-    records.patch("journal", day(-3), { pages: [] });
-    assert.equal((await app.inject({ method: "DELETE", url: `/api/journal/files/${id}`, cookies: cookie })).statusCode, 204);
-    assert.equal((await app.inject({ method: "GET", url: `/api/journal/files/${id}`, cookies: cookie })).statusCode, 404);
-    // The big image body is only for the upload route, and only after sign-in.
-    const big = Buffer.alloc(5 * 1024 * 1024, 1);
-    assert.equal((await app.inject({ method: "POST", url: "/api/journal/files", headers: { "content-type": "image/png" }, payload: big })).statusCode, 401);
-    assert.notEqual((await app.inject({ method: "POST", url: "/api/c/tasks", cookies: cookie, headers: { "content-type": "image/png" }, payload: PNG })).statusCode, 201, "other routes don't take images");
     await app.close();
   } finally { ff.close(); omi.close(); cp.close(); um.close(); hs.close(); clearCoinpileCache(); delete process.env.JF_TOKEN; delete process.env.JO_KEY; delete process.env.JC_TOKEN; }
 });

@@ -36,6 +36,7 @@ export function usePageSetup(): Record<string, boolean | undefined> {
   const known = (v: boolean) => (!cfg ? undefined : cfg.failed ? true : v);
   return {
     agents: known(!!cfg?.hermes?.baseUrl),
+    ideas: known(!!cfg?.milaclone?.url),
     wiki: known(!!cfg?.wiki?.mount || (!!cfg?.wiki?.baseUrl && !!cfg?.wiki?.keySet)),
     upkeep: cfg?.upstream?.baseUrl || chores.length ? true : known(false),
     uptime: known(!!cfg?.uptime?.baseUrl),

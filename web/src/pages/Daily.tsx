@@ -1,5 +1,6 @@
+import { useState } from "react";
 import type { PageDef } from "./types";
-import { useColl, useSettings } from "../lib/store";
+import { useColl, useSettings, saveSettings } from "../lib/store";
 import { useUi } from "../lib/ui";
 import { post } from "../lib/api";
 import { useFetch } from "../lib/useFetch";
@@ -8,6 +9,17 @@ import { ago, choreState, fmtDate, sortTasks, todayISO, zoneOpt } from "../lib/u
 import { TaskRows } from "../components/Common";
 import { Spark, pct, money } from "../components/Spark";
 import { useAppPanels } from "../components/AppPanels";
+import { TickerNews, coverageUrl, type Coverage } from "../components/TickerNews";
+
+/** Change part of the Daily page settings. */
+const useDaily = () => { const s = useSettings(), ui = useUi(), d = s.daily || {}; return { d, save: (p: Record<string, unknown>) => saveSettings({ daily: { ...d, ...p } }).catch(ui.error) }; };
+const COVERAGE: Coverage = { on: true, label: "Ground News", template: "https://ground.news/search?query={q}" };
+const useCoverage = (): Coverage => { const c = useSettings().daily?.coverage; return { ...COVERAGE, ...(c || {}) }; };
+/** A one-line form: type, press Enter or Add. */
+function AddInline({ label, placeholder, onAdd }: { label: string; placeholder: string; onAdd: (v: string) => void }) {
+  return <form className="row add-inline" onSubmit={e => { e.preventDefault(); const i = e.currentTarget.elements.namedItem("v") as HTMLInputElement; const v = i.value.trim(); if (v) { onAdd(v); i.value = ""; } }}>
+    <input name="v" type="text" placeholder={placeholder} aria-label={label} /><button className="btn" type="submit">Add</button></form>;
+}
 
 type Ev = { title: string; start: string; end: string; allDay: boolean; location: string; calendar?: string; day: string };
 type Wx = { place: string; units: "F" | "C"; now: { temp: number; feels: number; wind: number; text: string }; days: { date: string; high: number; low: number; rain: number; text: string }[] };
@@ -28,13 +40,23 @@ function Brief() {
 }
 
 function Weather() {
-  const { data, error } = useFetch<Wx>("/api/daily/weather", 20 * 60000);
-  if (error) return <div className="empty">{error} <a href="#config">Settings</a></div>;
-  if (!data) return <div className="hint">Reading the skies…</div>;
-  return <div className="wx">
+  const { d, save } = useDaily(), fav = String(d.location || ""), places: string[] = [fav, ...((d.places || []) as string[]).filter(p => p && p !== fav)].filter(Boolean);
+  const [sel, setSel] = useState(""), [edit, setEdit] = useState(false), place = sel && places.includes(sel) ? sel : fav;
+  const { data, error } = useFetch<Wx>(place ? `/api/daily/weather${place !== fav ? `?place=${encodeURIComponent(place)}` : ""}` : null, 20 * 60000);
+  const chips = <div className="row wx-places" role="group" aria-label="Places">
+    {places.map(p => <button key={p} className={"btn" + (p === place ? " on" : "")} aria-pressed={p === place} onClick={() => setSel(p)}>{p === fav ? "★ " : ""}{p}</button>)}
+    <button className="btn" onClick={() => setEdit(!edit)} aria-expanded={edit}>{edit ? "Done" : "Places…"}</button></div>;
+  const manage = edit && <div className="wx-manage">
+    {place && place !== fav && <div className="row"><button className="btn" onClick={() => { save({ location: place, places: places.filter(p => p !== place) }); setSel(""); }}>★ Make {place} the favourite</button>
+      <button className="btn" onClick={() => { save({ places: ((d.places || []) as string[]).filter(p => p !== place) }); setSel(""); }}>Remove {place}</button></div>}
+    <AddInline label="Add a place" placeholder="City, Country  or  lat,lon" onAdd={v => { if (!fav) save({ location: v }); else if (!places.includes(v)) save({ places: [...((d.places || []) as string[]), v] }); setSel(v); }} />
+    <div className="hint">The favourite (★) shows first and is used in the morning brief.</div></div>;
+  if (!place) return <>{chips}{manage || <div className="empty">Add a place for the weather. <button className="btn" onClick={() => setEdit(true)}>Add a place</button></div>}</>;
+  return <div className="wx">{chips}{manage}
+    {error ? <div className="empty">{error}</div> : !data || data.place === undefined ? <div className="hint">Reading the skies…</div> : <>
     <div className="wx-now"><span className="wx-t">{data.now.temp}°{data.units}</span><div><b>{data.now.text}</b><div className="hint">feels {data.now.feels}° · wind {data.now.wind} {data.units === "F" ? "mph" : "km/h"} · {data.place}</div></div></div>
     <div className="wx-days">{data.days.map(d => <div key={d.date} className="wx-day"><div className="small">{d.date === todayISO() ? "Today" : new Date(d.date + "T12:00:00").toLocaleDateString(undefined, { weekday: "short" })}</div>
-      <div><b>{d.high}°</b> <span className="muted">{d.low}°</span></div><div className="hint">{d.text}{d.rain ? ` · ${d.rain}%` : ""}</div></div>)}</div>
+      <div><b>{d.high}°</b> <span className="muted">{d.low}°</span></div><div className="hint">{d.text}{d.rain ? ` · ${d.rain}%` : ""}</div></div>)}</div></>}
   </div>;
 }
 
@@ -75,23 +97,53 @@ function Tasks() {
   const tasks = sortTasks(useColl("tasks").filter(t => !t.done)).slice(0, 10);
   return tasks.length ? <><TaskRows tasks={tasks} showList /><div className="row"><a className="btn" href="#todo">All tasks</a></div></> : <div className="empty">No open tasks.</div>;
 }
+type FeedInfo = { url: string; title: string; site: string; count: number; error: string };
+/** Your favourite feed by default; pick another or all of them. Every headline links to its story, and to its coverage (Ground News by default). */
 function NewsList() {
-  const { data, error } = useFetch<News[]>("/api/daily/news", 15 * 60000);
-  if (error) return <div className="empty">{error}</div>;
-  if (!data) return <div className="hint">Gathering the news…</div>;
-  return <ul className="list news">{data.slice(0, 15).map((n, k) => <li key={k}><div className="grow"><a href={n.link} target="_blank" rel="noopener noreferrer">{n.title}</a>
-    <div className="hint">{n.source}{n.published ? ` · ${ago(n.published)}` : ""}</div></div></li>)}</ul>;
+  const { d, save } = useDaily(), cov = useCoverage();
+  const info = useFetch<{ favourite: string; feeds: FeedInfo[] }>("/api/daily/feeds", 15 * 60000), feeds = info.data?.feeds || [];
+  const fav = feeds.some(f => f.url === info.data?.favourite) ? info.data!.favourite : "";
+  const [sel, setSel] = useState<string | null>(null), [edit, setEdit] = useState(false);
+  const cur = sel && (sel === "all" || feeds.some(f => f.url === sel)) ? sel : fav || "all", one = feeds.find(f => f.url === cur);
+  const { data, error } = useFetch<News[]>(info.data ? `/api/daily/news${cur === "all" ? "" : `?feed=${encodeURIComponent(cur)}`}` : null, 15 * 60000);
+  const list: string[] = d.feeds || feeds.map(f => f.url);
+  return <div className="nf">
+    <div className="row nf-bar">
+      <select value={cur} onChange={e => setSel(e.target.value)} aria-label="Feed"><option value="all">All feeds</option>{feeds.map(f => <option key={f.url} value={f.url}>{f.url === fav ? "★ " : ""}{f.title}</option>)}</select>
+      {one && one.url !== fav && <button className="btn" onClick={() => save({ favFeed: one.url })} title="Show this feed first">★ Favourite</button>}
+      {one && <a className="btn" href={one.site} target="_blank" rel="noopener noreferrer">Visit {one.title}</a>}
+      <button className="btn" onClick={() => setEdit(!edit)} aria-expanded={edit}>{edit ? "Done" : "Feeds…"}</button>
+    </div>
+    {edit && <div className="nf-manage">
+      <ul className="list">{feeds.map(f => <li key={f.url}><div className="grow"><a href={f.site} target="_blank" rel="noopener noreferrer">{f.title}</a><div className="hint mono">{f.url}{f.error ? ` · ${f.error}` : ` · ${f.count} items`}</div></div>
+        <button className="btn" onClick={() => { save({ feeds: list.filter(u => u !== f.url), ...(f.url === fav ? { favFeed: "" } : {}) }); if (cur === f.url) setSel("all"); }} aria-label={`Remove ${f.title}`}>Remove</button></li>)}</ul>
+      <AddInline label="Add an RSS or Atom feed" placeholder="https://… (any RSS or Atom feed, e.g. weather alerts for your area)" onAdd={v => { if (/^https?:\/\//i.test(v) && !list.includes(v)) save({ feeds: [...list, v] }); }} />
+    </div>}
+    {error ? <div className="empty">{error}</div> : !data ? <div className="hint">Gathering the news…</div> : !data.length ? <div className="empty">Nothing in this feed right now.</div>
+      : <ul className="list news">{data.slice(0, cur === "all" ? 20 : 30).map((n, k) => { const c = coverageUrl(cov, n.title); return <li key={k}><div className="grow"><a href={n.link} target="_blank" rel="noopener noreferrer">{n.title}</a>
+        <div className="hint">{n.source}{n.published ? ` · ${ago(n.published)}` : ""}{c && <> · <a href={c} target="_blank" rel="noopener noreferrer">{cov.label}</a></>}</div></div></li>; })}</ul>}
+  </div>;
 }
+/** Your watchlist: add and remove tickers here; click one for its news, rated for the stock. */
 function Stocks() {
-  const { data, error, at } = useFetch<Q[]>("/api/daily/quotes", 10 * 60000);
-  if (error) return <div className="empty">{error}</div>;
-  if (!data) return <div className="hint">Checking the markets…</div>;
-  if (!data.length) return <div className="empty">Add tickers in Settings → Daily page.</div>;
-  return <><table className="tbl stocks"><tbody>{data.map(q => q.error ? <tr key={q.symbol}><td><b>{q.symbol}</b></td><td colSpan={3} className="small err-inline">{q.error}</td></tr>
-    : <tr key={q.symbol}><td><b>{q.symbol}</b><div className="hint">{q.name}</div></td><td className="num">{money(q.price!)}</td>
-      <td className={"num " + (q.change! >= 0 ? "up" : "down")}>{pct(q.changePct!)}</td><td><Spark data={(q.history || []).map(b => b.close)} /></td></tr>)}</tbody></table>
-    <div className="hint">Prices can be delayed. Updated {ago(at)}.</div></>;
+  const { d, save } = useDaily(), cov = useCoverage(), [open, setOpen] = useState(""), [edit, setEdit] = useState(false);
+  const watch: string[] = d.watchlist || ["SPY", "QQQ", "DIA"];
+  const { data, error, at } = useFetch<Q[]>(`/api/daily/quotes?w=${encodeURIComponent(watch.join(","))}`, 10 * 60000);
+  const add = (v: string) => { const t = v.toUpperCase().replace(/\s+/g, ""); if (/^[A-Z^][A-Z0-9.^=-]{0,14}$/.test(t) && !watch.includes(t)) save({ watchlist: [...watch, t] }); };
+  const rm = (t: string) => save({ watchlist: watch.filter(x => x !== t) });
+  return <>
+    {error ? <div className="empty">{error}</div> : !data ? <div className="hint">Checking the markets…</div> : !data.length ? <div className="empty">Add a ticker to watch.</div>
+      : <table className="tbl stocks"><tbody>{data.map(q => <tr key={q.symbol}>
+        <td><button className="linkish" onClick={() => setOpen(q.symbol)} title={`News about ${q.symbol}, rated`}><b>{q.symbol}</b></button>{!q.error && <div className="hint">{q.name}</div>}</td>
+        {q.error ? <td colSpan={3} className="small err-inline">{q.error}</td> : <><td className="num">{money(q.price!)}</td>
+          <td className={"num " + (q.change! >= 0 ? "up" : "down")}>{pct(q.changePct!)}</td><td><Spark data={(q.history || []).map(b => b.close)} /></td></>}
+        {edit && <td><button className="btn" onClick={() => rm(q.symbol)} aria-label={`Stop watching ${q.symbol}`}>×</button></td>}</tr>)}</tbody></table>}
+    <div className="row small"><span className="hint grow">Click a ticker for its news. Prices can be delayed{at ? `; updated ${ago(at)}` : ""}.</span><button className="btn" onClick={() => setEdit(!edit)} aria-expanded={edit}>{edit ? "Done" : "Edit"}</button></div>
+    {edit && <AddInline label="Add a ticker" placeholder="Ticker, e.g. NVDA" onAdd={add} />}
+    {open && <TickerNews symbol={open} coverage={cov} onClose={() => setOpen("")} />}
+  </>;
 }
+
 function PicksToday() {
   const day = todayISO(), picks = useColl("picks").filter(p => p.date === day), r = useColl("research").find(d => d.id === day);
   if (!picks.length) return <div className="empty">{r?.status && r.status !== "done" && r.status !== "failed" ? "Research is running…" : "No stock picks today."} <a href="#picks">Picks</a></div>;
