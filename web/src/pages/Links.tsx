@@ -5,6 +5,7 @@ import { put, useColl } from "../lib/store";
 import { useUi } from "../lib/ui";
 import { useFetch } from "../lib/useFetch";
 import { parseApps, DEFAULT_APPS } from "../lib/apps";
+import { useDialog } from "../lib/useDialog";
 
 /** Links: a grid of icons for every app with a web page. Containers come from
  *  the Unraid Management Agent (and Docker labels for Unraid's WebUI and
@@ -75,7 +76,8 @@ function Editor({ t, cats, host, onSave, onRemove, onClose }: { t: Tile | null; 
     const base = t!.kind === "container" ? t!.found!.name : t!.key.slice(4); // the name it has without an override
     onSave({ name: name.trim() && name.trim() !== base ? name.trim() : undefined, cat: finalCat, hidden, mode, port: mode === "port" ? Number(port) : undefined, scheme: mode === "port" ? scheme : undefined, url: mode === "url" ? url.trim() : undefined, icon: icon.trim() || undefined });
   };
-  return createPortal(<div className="lk-modal" role="dialog" aria-modal="true" aria-label={isNew ? "Add a link" : `Edit ${t!.name}`} onPointerDown={e => { if (e.target === e.currentTarget) onClose(); }}>
+  const dlg = useDialog<HTMLDivElement>(onClose, ".lk-form input");
+  return createPortal(<div ref={dlg} tabIndex={-1} className="lk-modal" role="dialog" aria-modal="true" aria-label={isNew ? "Add a link" : `Edit ${t!.name}`} onPointerDown={e => { if (e.target === e.currentTarget) onClose(); }}>
     <form className="lk-form panel" onSubmit={submit}>
       <h3>{isNew ? "Add a link" : `Edit ${t!.name}`}</h3>
       <label className="small">Name<input type="text" value={name} onChange={e => setName(e.target.value)} required /></label>

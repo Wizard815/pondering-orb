@@ -185,6 +185,9 @@ export function journalApi(app: FastifyInstance, deps: {
   });
   app.delete("/api/journal/files/:id", { preHandler: guard }, async (req: any, reply) => {
     you(req); const id = String(req.params.id); if (!FILE.test(id)) throw new HttpError(404, "No such file.");
+    // Still on a page (of any day): keep it.
+    const used = (records.list("journal") as any[]).find(j => (j.pages || []).some((p: any) => p?.bg === id));
+    if (used) throw new HttpError(409, `That image is still on a page of ${used.date || used.id}.`);
     await unlink(join(filesDir, id)).catch(() => {}); reply.code(204).send();
   });
 
