@@ -98,7 +98,7 @@ export async function buildApp(o: AppOptions = {}) {
   }
   const glanceTools = () => !cfg().allglance.baseUrl ? [] : [
     { name: "allglance_day", description: "The day's plan from dayGLANCE through the ALLGlance gateway: time blocks with start time and length. date is YYYY-MM-DD (default today).",
-      parameters: { type: "object", properties: { date: { type: "string" } } }, run: ({ date }: any) => glance.day(/^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : today()) },
+      parameters: { type: "object", properties: { date: { type: "string", description: "Day as YYYY-MM-DD. Default today." } } }, run: ({ date }: any) => glance.day(/^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : today()) },
     { name: "allglance_dayglance_tasks", description: "dayGLANCE tasks (the inbox and every scheduled day) with priority 0 none to 5 do now.", parameters: { type: "object", properties: {} }, run: () => glance.dayglanceTasks() },
   ];
   const appsYaml = () => String((store.get("settings", "apps") as any)?.yaml || "");
@@ -113,14 +113,14 @@ export async function buildApp(o: AppOptions = {}) {
           parameters: { type: "object", properties: {} }, run: () => ffOverview(ff) },
         { name: "finance_accounts", description: "Firefly III asset and liability accounts with their current balances. Read only.", parameters: { type: "object", properties: {} }, run: () => ffAccounts(ff) },
         { name: "finance_search_transactions", description: "Search Firefly III transactions with its search syntax, e.g. 'amazon', 'category:Groceries date_after:2026-10-01', 'amount_more:100'. Returns date, description, amount (negative = spent), category, budget, accounts. Read only.",
-          parameters: { type: "object", properties: { query: { type: "string" }, limit: { type: "number" } }, required: ["query"] }, run: ({ query, limit }: any) => ffSearch(ff, String(query || ""), Number(limit) || 25) },
+          parameters: { type: "object", properties: { query: { type: "string", description: "Firefly III search syntax, e.g. amazon or category:Groceries date_after:2026-10-01." }, limit: { type: "integer", minimum: 1, maximum: 100, description: "At most this many. Default 25." } }, required: ["query"] }, run: ({ query, limit }: any) => ffSearch(ff, String(query || ""), Number(limit) || 25) },
       ] : []),
       ...(om ? [
-        { name: "omi_search_memories", description: "Search the user's Omi memories (things Omi learned from their conversations). Read only.", parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
+        { name: "omi_search_memories", description: "Search the user's Omi memories (things Omi learned from their conversations). Read only.", parameters: { type: "object", properties: { query: { type: "string", description: "Words to look for in Omi's memories." } }, required: ["query"] },
           run: ({ query }: any) => omiSearchMemories(om, String(query || ""), 10) },
-        { name: "omi_daily_summary", description: "Omi's recap of a day (headline, overview, decisions, open questions). date is YYYY-MM-DD; empty for the latest. Read only.", parameters: { type: "object", properties: { date: { type: "string" } } },
+        { name: "omi_daily_summary", description: "Omi's recap of a day (headline, overview, decisions, open questions). date is YYYY-MM-DD; empty for the latest. Read only.", parameters: { type: "object", properties: { date: { type: "string", description: "Day as YYYY-MM-DD. Omit for the latest recap." } } },
           run: async ({ date }: any) => (await omiDays(om, 1, String(date || "")))[0] || { none: true } },
-        { name: "omi_recent_conversations", description: "The user's most recent Omi conversations: title and overview. Read only.", parameters: { type: "object", properties: { limit: { type: "number" } } },
+        { name: "omi_recent_conversations", description: "The user's most recent Omi conversations: title and overview. Read only.", parameters: { type: "object", properties: { limit: { type: "integer", minimum: 1, maximum: 50, description: "How many conversations. Default 5." } } },
           run: ({ limit }: any) => omiConversations(om, Number(limit) || 5) },
       ] : []),
     ];
@@ -128,23 +128,23 @@ export async function buildApp(o: AppOptions = {}) {
   // Read-only tools for the wiki (search, read a note) and linked Hermes chats.
   const readTools = (): Tool[] => [
     ...(cfg().wiki.baseUrl ? [
-      { name: "wiki_search", description: "Search the LLMWIKI vault's text. Returns note paths with a snippet.", parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
+      { name: "wiki_search", description: "Search the LLMWIKI vault's text. Returns note paths with a snippet.", parameters: { type: "object", properties: { query: { type: "string", description: "Words to search the vault's notes for." } }, required: ["query"] },
         run: async ({ query }: any) => (await wiki.search(String(query || ""))).slice(0, 10) },
-      { name: "wiki_read", description: "Read one LLMWIKI note (front-matter and body) by its path, e.g. wiki/1-projects/Argos.md. Read only.", parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] },
+      { name: "wiki_read", description: "Read one LLMWIKI note (front-matter and body) by its path, e.g. wiki/1-projects/Argos.md. Read only.", parameters: { type: "object", properties: { path: { type: "string", description: "Vault path from wiki_search, e.g. wiki/1-projects/Argos.md." } }, required: ["path"] },
         run: async ({ path }: any) => { const n = await wiki.note(notePath(path)); return { ...n, body: n.body.slice(0, 12000) }; } },
     ] : []),
     { name: "journal_day", description: "The user's journal for a day: what they typed, how many drawing pages, and the day's log Orb put together (money spent and earned, tasks and chores done, log entries, commits, UpstreamManager requests, Hermes Studio agent work, Omi's recap, calendar, stock-pick calls, alerts). date is YYYY-MM-DD (default today). Read only.",
-      parameters: { type: "object", properties: { date: { type: "string" } } },
+      parameters: { type: "object", properties: { date: { type: "string", description: "Day as YYYY-MM-DD, today or earlier. Default today." } } },
       run: async ({ date }: any) => { const d = isDay(date) && date <= today() ? date : today(); const j: any = records.get("journal", d) || {};
         return { date: d, text: String(j.text || "").slice(0, 8000), drawingPages: (j.pages || []).length, log: await journal.autoFor(d) }; } },
     ...companionTools(),
     ...(cfg().hermes.baseUrl ? [
-      { name: "project_chats", description: "The Hermes chats linked to a project, with their newest messages. Read only.", parameters: { type: "object", properties: { project: { type: "string" } }, required: ["project"] },
+      { name: "project_chats", description: "The Hermes chats linked to a project, with their newest messages. Read only.", parameters: { type: "object", properties: { project: { type: "string", description: "Project name exactly as orb_list_projects shows it." } }, required: ["project"] },
         run: async ({ project }: any) => { const p: any = records.list("projects").find((x: any) => String(x.name).toLowerCase() === String(project).toLowerCase()); if (!p) throw new Error(`No project named ${project}`);
           return Promise.all((p.chats || []).slice(0, 5).map((id: string) => hermes.session(id, 12).catch(e => ({ id, error: e.message })))); } },
     ] : []),
   ];
-  const tools = () => { const all = [...orbTools(records), ...glanceTools(), ...readTools()]; return cfg().golem.canWrite ? all : all.filter(t => !(t as any).write); };
+  const tools = () => { const all = [...orbTools(records, () => sync.lists.map(l => l.name)), ...glanceTools(), ...readTools()]; return cfg().golem.canWrite ? all : all.filter(t => !(t as any).write); };
 
   const app: FastifyInstance = Fastify({ logger: o.logger ?? false, bodyLimit: 2 * 1024 * 1024 });
   await app.register(cookie);

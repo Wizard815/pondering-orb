@@ -465,9 +465,18 @@ task's `caldav` sync fields, and their logs always carry their own name in
 | `orb_list_projects` / `orb_get_project` | projects; one project with its recent logs and tasks |
 | `orb_add_log` / `orb_list_logs` | short log entries (rejects over `log_max`) |
 | `orb_move_project` | change board column (and wiki `project_status`) |
-| `orb_list_tasks` / `orb_add_task` | tasks, from CalDAV lists or Orb-only lists |
-| `orb_set_task_priority` / `orb_complete_task` | change priority; close a task (also logs it) |
+| `orb_list_lists` | task lists, and whether each syncs to CalDAV or only lives in Orb |
+| `orb_list_tasks` / `orb_add_task` | tasks with ids, soonest due first; filter by list and due dates (`due_on_or_before` yesterday = overdue) |
+| `orb_set_task_priority` / `orb_start_task` / `orb_complete_task` | change priority; mark started; close a task (also logs it). Find a task by `id` or exact title |
+| `orb_set_agent_status` | an agent's live state on a task or project (Hermes Studio) |
 | `orb_list_chores` / `orb_chore_done` | chores and when they are due |
+
+Every parameter has a description, read-only tools carry `readOnlyHint`, and
+bad input (a due date that isn't `YYYY-MM-DD`, an unknown list or priority)
+is refused with a message saying what to send instead; nothing is half-saved.
+For household tasks across people (owners, stable ids), agents connected to
+both servers should prefer the ALLGlance gateway's `allglance_list_tasks`;
+the task tool descriptions say so.
 
 Golem has these plus read-only `wiki_search`, `wiki_read` and
 `project_chats` (and the ALLGlance tools when that gateway is set).

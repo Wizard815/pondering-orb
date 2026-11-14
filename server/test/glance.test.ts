@@ -13,10 +13,10 @@ test("TestPriority_ToolsUseVikunjasFiveLevels", async () => {
   assert.equal((records.list("tasks")[0] as any).priority, 3, "high is CalDAV 3, which vikunja reads as High");
   await call("orb_set_task_priority", { title: "ship", priority: "do_now" });
   assert.equal((records.list("tasks")[0] as any).priority, 1);
-  const listed = JSON.parse((await call("orb_list_tasks", {})).content[0].text);
+  const listed = JSON.parse((await call("orb_list_tasks", {})).content[0].text).tasks;
   assert.equal(listed[0].priority, "do_now");
   records.create("tasks", { title: "Other", list: "Homelab", priority: 7 });
-  assert.equal(JSON.parse((await call("orb_list_tasks", {})).content[0].text)[1].priority, "low");
+  assert.equal(JSON.parse((await call("orb_list_tasks", {})).content[0].text).tasks[1].priority, "low");
   assert.equal((await call("orb_set_task_priority", { title: "Ship", priority: "huge" })).isError, true);
 });
 
