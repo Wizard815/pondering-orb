@@ -8,9 +8,8 @@ import { Markdown } from "../lib/markdown";
 import { ago, fmtDate, oneAtATime, todayISO } from "../lib/util";
 import { Spark, pct, money } from "../components/Spark";
 import { useAppPanels } from "../components/AppPanels";
-import { api } from "../lib/api";
 import { useSettings } from "../lib/store";
-import { TickerNews } from "../components/TickerNews";
+import { TickerNews, CoverageSearch } from "../components/TickerNews";
 
 const ACTION_CLS: Record<string, string> = { buy: "ok", hold: "warn", skip: "bad" };
 const H = [1, 5, 20, 60];
@@ -57,7 +56,7 @@ function Decide({ p }: { p: any }) {
 function PickCard({ p }: { p: any }) {
   const v = p.verdict?.answers || {}, a = v.action?.choice || "?", { data } = useFetch<any>(`/api/market/chart/${encodeURIComponent(p.symbol)}`, 0);
   return <div className="pick">
-    <div className="row"><b className="sym">{p.symbol}</b><span className="muted small">{p.name}</span><span className={"chip " + (ACTION_CLS[a] || "")}>{a}</span>
+    <div className="row"><b className="sym">{p.symbol}</b><span className="muted small">{p.name}</span><CoverageSearch q={p.name && p.name !== p.symbol ? p.name : `${p.symbol} stock`} label="Ground News" /><span className={"chip " + (ACTION_CLS[a] || "")}>{a}</span>
       {v.conviction && <span className="tag">{v.conviction.choice} conviction</span>}
       {p.decision !== "pending" && <span className={"pill " + (p.decision === "yes" ? "ok" : "")}><i />{p.decision === "yes" ? "you bought" : "you passed"}{p.amount ? ` · ${money(p.amount)}` : ""}</span>}<span className="grow" /><span className="num">{money(p.priceAtPick)}</span>
       {data?.history && <Spark data={data.history.map((b: any) => b.close)} mark={p.priceAtPick} w={120} />}</div>
@@ -154,42 +153,64 @@ function Scorecard() {
   </>;
 }
 
-// ---------------- your Robinhood history (its activity CSV) ----------------
-type Pos = { symbol: string; shares: number; avgCost: number; cost: number; realized: number; dividends: number; price: number | null; value: number | null; unrealized: number | null; unrealizedPct: number | null };
-type Hist = { date: string; symbol: string; code: string; description: string; quantity: number; price: number; amount: number };
-type Summary = { count: number; from: string; to: string; positions: Pos[]; closed: Pos[]; totals: { cost: number; value: number; unrealized: number; realized: number; dividends: number }; history: Hist[] };
+// ---------------- decision ideas (scheduled reviews) ----------------
+type Ans = { choice: string; confidence: number; probabilities?: Record<string, number> };
+type ReviewItem = { symbol: string; name?: string; held: boolean; shares: number | null; price?: number; changePct?: number; error?: string;
+  verdict?: { answers: Record<string, Ans>; source: string; model: string; error?: string }; news?: { overall: string; summary: string; error: string; top: { title: string; link: string; rating: string }[] } };
+type Review = { id: string; date: string; slot: string; by: string; status: string; items: ReviewItem[]; note?: string; error?: string; finishedAt?: number };
+const ACT: Record<string, string> = { add: "ok", buy: "ok", hold: "", watch: "", trim: "warn", sell: "bad", skip: "bad" };
+const NEWS: Record<string, string> = { good: "ok", bad: "bad", mixed: "warn", neutral: "" };
+function Ideas() {
+  const ui = useUi(), { data, reload } = useFetch<{ running: string; settings: any; reviews: Review[] }>("/api/market/reviews?limit=8", 60000);
+  const [pick, setPick] = useState(""), [open, setOpen] = useState(""), cov = useSettings().daily?.coverage;
+  useEffect(() => { if (!data?.running) return; const t = setInterval(reload, 3000); return () => clearInterval(t); }, [data?.running]);
+  if (!data) return <div className="hint">Loading reviews…</div>;
+  const r = data.reviews.find(x => x.id === pick) || data.reviews[0];
+  const runNow = async (e: React.MouseEvent<HTMLButtonElement>) => { const b = e.currentTarget; b.disabled = true; try { await post("/api/market/review", {}); ui.status("Reviewing your stocks…"); setPick(""); setTimeout(reload, 800); } catch (x) { ui.error(x); } finally { b.disabled = false; } };
+  return <div className="ideas">
+    <div className="row small ideas-bar">
+      {data.reviews.length > 0 && <select value={r?.id || ""} onChange={e => setPick(e.target.value)} aria-label="Review">{data.reviews.map(x => <option key={x.id} value={x.id}>{fmtDate(x.date)} {x.slot}{x.by === "you" ? " (you)" : ""}</option>)}</select>}
+      <button className="btn" onClick={runNow} disabled={!!data.running}>{data.running ? "Reviewing…" : "Review now"}</button>
+      <span className="hint">{data.settings.on ? `Scheduled at ${data.settings.times.join(", ")}${data.settings.weekdaysOnly ? " on weekdays" : ""}.` : "Not scheduled: set times in Settings → Stock picks."}</span>
+    </div>
+    {!r ? <div className="empty">No reviews yet. Press Review now, or schedule them in Settings → Stock picks.</div> : <>
+      {r.note && <div className="hint">{r.note}</div>}{r.error && <div className="err-inline small">{r.error}</div>}
+      <ul className="list">{r.items.map(i => { const a = i.verdict?.answers || {}, act = a.action;
+        return <li key={i.symbol}><div className="ideas-sym"><button className="linkish" onClick={() => setOpen(i.symbol)}><b>{i.symbol}</b></button>{i.held && <div className="hint">you hold {i.shares}</div>}<CoverageSearch q={i.name && i.name !== i.symbol ? i.name : `${i.symbol} stock`} label="Ground News" /></div>
+          <div className="grow">
+            {i.error ? <span className="err-inline small">{i.error}</span> : <>
+              <div className="row small" style={{ gap: 6, flexWrap: "wrap" }}>{act ? <span className={"chip " + (ACT[act.choice] || "")}>{act.choice} · {Math.round((act.confidence || 0) * 100)}%</span> : <span className="chip">no verdict</span>}
+                {a.direction_20d && <span className="tag">20d {a.direction_20d.choice}</span>}{a.conviction && <span className="tag">{a.conviction.choice}</span>}
+                {i.news?.overall && <span className={"chip " + (NEWS[i.news.overall] || "")}>news {i.news.overall}</span>}
+                {i.price != null && <span className="hint">{money(i.price)} {pct(i.changePct || 0)}</span>}</div>
+              {i.news?.summary && <div className="small">{i.news.summary}</div>}
+              {(i.news?.top || []).map((n, k) => <div key={k} className="hint">{n.rating === "good" ? "▲" : "▼"} <a href={n.link} target="_blank" rel="noopener noreferrer">{n.title}</a></div>)}
+              {i.verdict?.error && <div className="err-inline small">Decision model: {i.verdict.error}</div>}</>}
+          </div></li>; })}</ul>
+      <div className="hint">News read by Golem's model; decisions by your decision model{r.items[0]?.verdict?.model ? ` (${r.items[0].verdict.model})` : ""}. Ideas only, not advice: nothing trades.</div>
+    </>}
+    {open && <TickerNews symbol={open} coverage={cov ? { on: cov.on !== false, label: cov.label || "Ground News", template: cov.template || "https://ground.news/search?query={q}" } : undefined} onClose={() => setOpen("")} />}
+  </div>;
+}
+
+// ---------------- what you hold (from Coinpile) ----------------
+type Pos = { symbol: string; shares: number; avgCost: number | null; cost: number | null; price: number | null; value: number | null; unrealized: number | null; unrealizedPct: number | null; account: string };
+type Holdings = { source: string | null; note: string; positions: Pos[]; totals: { value: number; cost: number; unrealized: number } | null };
 const signed = (n: number | null) => (n == null ? "—" : `${n >= 0 ? "+" : "−"}${money(Math.abs(n))}`);
-function Holdings() {
-  const ui = useUi(), { data, error, reload } = useFetch<Summary>("/api/trades/summary", 10 * 60000), [open, setOpen] = useState(""), [all, setAll] = useState(false), [busy, setBusy] = useState(false);
+function HoldingsPanel() {
+  const { data, error } = useFetch<Holdings>("/api/holdings", 10 * 60000), [open, setOpen] = useState("");
   const cov = useSettings().daily?.coverage;
-  const bring = async (f: File | undefined) => {
-    if (!f) return; setBusy(true);
-    try { const r = await fetch("/api/robinhood/csv", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "text/csv" }, body: await f.text() });
-      const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || `Import failed (${r.status}).`);
-      ui.status(`Imported ${d.added} new row${d.added === 1 ? "" : "s"} (${d.from} to ${d.to})${d.skipped ? `; ${d.skipped} were already here` : ""}.`); reload();
-    } catch (e) { ui.error(e); } finally { setBusy(false); }
-  };
-  const input = <label className="btn primary">{busy ? "Importing…" : "Import Robinhood CSV"}<input type="file" accept=".csv,text/csv" hidden disabled={busy} onChange={e => { bring(e.target.files?.[0]); e.currentTarget.value = ""; }} /></label>;
   if (error && !data) return <div className="empty">{error}</div>;
-  if (!data) return <div className="hint">Reading your history…</div>;
-  if (!data.count) return <div className="empty">Bring in your Robinhood history to see what you hold, what you paid and what it's done. In Robinhood: <b>Account → Reports and statements → Reports</b>, create an <b>account activity</b> report, then import the CSV here. Importing a newer report later only adds what's new.
-    <div className="row" style={{ marginTop: 8 }}>{input}</div></div>;
-  const t = data.totals;
+  if (!data) return <div className="hint">Asking Coinpile…</div>;
+  if (!data.source) return <div className="empty">{data.note} Coinpile keeps your Robinhood history (its activity CSV, MCP or connector); Orb shows what you hold from there.</div>;
+  const t = data.totals!;
   return <div className="hold">
-    <div className="row small hold-sum"><span>Value <b>{money(t.value)}</b></span><span>Cost <b>{money(t.cost)}</b></span><span className={t.unrealized >= 0 ? "up" : "down"}>Open {signed(t.unrealized)}</span>
-      <span className={t.realized >= 0 ? "up" : "down"}>Realised {signed(t.realized)}</span><span>Dividends {money(t.dividends)}</span><span className="grow" />{input}</div>
-    <div style={{ overflowX: "auto" }}><table className="tbl"><thead><tr><th>Stock</th><th className="num">Shares</th><th className="num">Avg cost</th><th className="num">Price</th><th className="num">Value</th><th className="num">Gain</th></tr></thead>
-      <tbody>{data.positions.map(p => <tr key={p.symbol}><td><button className="linkish" onClick={() => setOpen(p.symbol)}><b>{p.symbol}</b></button></td><td className="num">{+p.shares.toFixed(4)}</td><td className="num">{money(p.avgCost)}</td>
+    <div className="row small hold-sum"><span>Value <b>{money(t.value)}</b></span><span>Cost <b>{money(t.cost)}</b></span><span className={t.unrealized >= 0 ? "up" : "down"}>Open {signed(t.unrealized)}</span></div>
+    {!data.positions.length ? <div className="empty">Coinpile shows no stocks held.</div> : <div style={{ overflowX: "auto" }}><table className="tbl"><thead><tr><th>Stock</th><th className="num">Shares</th><th className="num">Avg cost</th><th className="num">Price</th><th className="num">Value</th><th className="num">Gain</th></tr></thead>
+      <tbody>{data.positions.map(p => <tr key={p.symbol}><td><button className="linkish" onClick={() => setOpen(p.symbol)}><b>{p.symbol}</b></button></td><td className="num">{+p.shares.toFixed(4)}</td><td className="num">{p.avgCost == null ? "—" : money(p.avgCost)}</td>
         <td className="num">{p.price == null ? "—" : money(p.price)}</td><td className="num">{p.value == null ? "—" : money(p.value)}</td>
-        <td className={"num " + ((p.unrealized ?? 0) >= 0 ? "up" : "down")}>{signed(p.unrealized)}{p.unrealizedPct != null ? ` (${pct(p.unrealizedPct)})` : ""}</td></tr>)}</tbody></table></div>
-    {data.closed.length > 0 && <details><summary className="small">Sold off ({data.closed.length})</summary><ul className="list">{data.closed.map(p => <li key={p.symbol}><button className="linkish" onClick={() => setOpen(p.symbol)}><b>{p.symbol}</b></button><span className="grow" />
-      <span className={"num " + (p.realized >= 0 ? "up" : "down")}>{signed(p.realized)}</span>{p.dividends ? <span className="hint"> + {money(p.dividends)} dividends</span> : null}</li>)}</ul></details>}
-    <details><summary className="small">Activity ({data.count} rows, {fmtDate(data.from)} to {fmtDate(data.to)})</summary>
-      <table className="tbl small"><tbody>{data.history.slice(0, all ? 300 : 40).map((h, k) => <tr key={k}><td className="mono">{h.date}</td><td><b>{h.symbol}</b></td><td>{h.code}</td><td className="grow">{h.description}</td>
-        <td className="num">{h.quantity || ""}</td><td className={"num " + (h.amount >= 0 ? "up" : "down")}>{h.amount ? signed(h.amount) : ""}</td></tr>)}</tbody></table>
-      {!all && data.history.length > 40 && <button className="btn" onClick={() => setAll(true)}>Show more</button>}
-      <div className="row"><button className="btn" onClick={e => ui.confirm(e.currentTarget, "Forget the imported Robinhood history? You can import it again.", "Forget it", () => api("DELETE", "/api/trades").then(reload))}>Forget imported history</button></div></details>
-    <div className="hint">From your Robinhood activity CSV; prices are current quotes. Average-cost basis. Read only: nothing is sent to Robinhood.</div>
+        <td className={"num " + ((p.unrealized ?? 0) >= 0 ? "up" : "down")}>{signed(p.unrealized)}{p.unrealizedPct != null ? ` (${pct(p.unrealizedPct)})` : ""}</td></tr>)}</tbody></table></div>}
+    <div className="hint">From Coinpile; prices are current quotes. Click a stock for its news. Read only.</div>
     {open && <TickerNews symbol={open} coverage={cov ? { on: cov.on !== false, label: cov.label || "Ground News", template: cov.template || "https://ground.news/search?query={q}" } : undefined} onClose={() => setOpen("")} />}
   </div>;
 }
@@ -204,7 +225,8 @@ export const PicksPage: PageDef = {
       { key: "score", title: "Scorecard", node: <Scorecard />, w: 5, h: 10 },
       { key: "history", title: "History", node: <History />, w: 12, h: 10 },
       { key: "account", title: "Robinhood agentic account", node: <Account />, w: 5, h: 7 },
-      { key: "holdings", title: "Your Robinhood history", node: <Holdings />, w: 12, h: 18 },
+      { key: "ideas", title: "Decision ideas", node: <Ideas />, w: 12, h: 18 },
+      { key: "holdings", title: "What you hold", node: <HoldingsPanel />, w: 12, h: 14 },
     ];
     return { panels: [...own, ...apps], defaults: own.map(p => p.key) };
   },

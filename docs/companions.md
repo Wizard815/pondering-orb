@@ -77,6 +77,8 @@ Coinpile is for what Firefly has no place for:
 | CDs maturing / matured and idle | **Maturing today** on Daily's Today (an idle matured CD stays there until handled), This week, the page, the brief |
 | Spending forecast | so far, on track for, % of income, left after: panel, page, brief |
 | Robinhood (main and agentic) | value on the panel and page |
+| Holdings (`holdings`: symbol, quantity, net_cost, equity, account) | Picks → What you hold, the decision model's state, scheduled reviews (when Coinpile shares them) |
+| Daily totals (`daily`: date, spent, income) | the Journal's money for the day, instead of Firefly III's transactions (when Coinpile shares them) |
 | Net worth, subscriptions per month, bill totals and the bill list | the page; Daily's bills and the brief use these only when Firefly III isn't set up (Coinpile's list holds Firefly's bills, so they'd show twice) |
 
 `page: true` gives it a **Coinpile** tab. Golem's read-only tool is

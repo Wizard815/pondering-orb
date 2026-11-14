@@ -42,6 +42,8 @@ export type CpSummary = {
   maturities: CpAlert[];
   /** Spent and income per day, when Coinpile shares a `daily` list (totals only, never transactions). */
   daily: { date: string; spent: number; income: number }[] | null;
+  /** Stocks you hold (Coinpile reads them from Robinhood: its activity CSV, MCP or connector), when Coinpile shares them. */
+  holdings: { symbol: string; quantity: number; netCost: number | null; equity: number | null; account: string }[] | null;
   at: number;
 };
 
@@ -88,6 +90,8 @@ export async function cpSummary(c: Companion): Promise<CpSummary> {
     robinhoodMain: rh(g.robinhood_main), robinhoodAgent: rh(g.robinhood_agent),
     billList: Array.isArray(g.bill_list) ? g.bill_list.slice(0, 200).map((b: any) => ({ date: String(b?.date || ""), name: String(b?.name || ""), amount: Number(b?.amount) || 0, category: String(b?.category || "") })).filter((b: CpBill) => b.name && isDay(b.date)).sort((x: CpBill, y: CpBill) => x.date.localeCompare(y.date)) : null,
     alertList, maturities: (alertList || []).filter(a => (a.kind === "maturing" || a.kind === "matured_idle") && a.date).sort((x, y) => x.date.localeCompare(y.date)),
+    holdings: Array.isArray(g.holdings ?? g.positions) ? (g.holdings ?? g.positions).slice(0, 300).map((h: any) => ({ symbol: String(h?.symbol || "").toUpperCase().slice(0, 12), quantity: Number(h?.quantity ?? h?.shares) || 0,
+      netCost: num(h?.net_cost ?? h?.cost), equity: num(h?.equity ?? h?.value), account: String(h?.account || "") })).filter((h: any) => /^[A-Z0-9.^=-]{1,12}$/.test(h.symbol) && h.quantity > 0) : null,
     daily: Array.isArray(g.daily) ? g.daily.filter((d: any) => isDay(d?.date)).sort((a: any, b: any) => String(b.date).localeCompare(String(a.date))).slice(0, 400).map((d: any) => ({ date: String(d.date), spent: Math.abs(Number(d.spent) || 0), income: Number(d.income) || 0 })) : null,
     at: Date.now(),
   };

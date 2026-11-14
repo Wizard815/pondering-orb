@@ -5,6 +5,7 @@ import type { OrbConfig } from "./config.js";
 import type { Upstream } from "./integrations/upstream.js";
 import type { Hermes } from "./integrations/hermes.js";
 import type { Outbox } from "./outbox.js";
+import type { Wiki } from "./integrations/wiki.js";
 import { uptime } from "./integrations/uptime.js";
 import { companion, omiDays, omiConversations } from "./integrations/companions.js";
 import { ffDay } from "./integrations/firefly.js";
@@ -42,7 +43,7 @@ const clockOf = (ms: number) => localClock(new Date(ms).toISOString());
 
 export function journalApi(app: FastifyInstance, deps: {
   records: Records; cfg: () => OrbConfig; guard: any; who: (req: any) => string; 
-  upstream: Upstream; hermes: Hermes; outbox: Outbox; appsYaml: () => string;
+  upstream: Upstream; hermes: Hermes; outbox: Outbox; appsYaml: () => string; wiki: Wiki;
   events: (from: string, days: number) => Promise<{ title: string; start: string; allDay: boolean; calendar?: string; day: string }[]>;
 }) {
   const { records, cfg, guard } = deps;
@@ -147,7 +148,34 @@ export function journalApi(app: FastifyInstance, deps: {
   // Reading never writes. Refresh saves a past day's log again, and only you can ask for that.
   app.get("/api/journal/:day/auto", { preHandler: guard }, async (req: any) => { const refresh = req.query.refresh === "1"; if (refresh) you(req); return autoFor(dayParam(req.params.day), refresh); });
 
+  /** The day as a wiki note: what you wrote (typed and handwritten), then Orb's log in short. */
+  function wikiBody(day: string, j: any, a: AutoLog) {
+    const L: string[] = [];
+    if (String(j?.text || "").trim()) L.push("## Notes", "", String(j.text).trim(), "");
+    const sec = (t: string, rows: string[]) => { if (rows.length) L.push(`## ${t}`, "", ...rows, ""); };
+    if (a.money) sec("Money", [`- Spent ${a.money.spent.toFixed(2)}, income ${a.money.income.toFixed(2)}${a.money.currency ? ` ${a.money.currency}` : ""}`]);
+    sec("Done", [...a.tasksDone.map(t => `- [x] ${t.title}${t.list ? ` (${t.list})` : ""}`), ...a.choresDone.map(c => `- [x] ${c.name} (chore)`)]);
+    sec("Log", a.logs.map(l => `- ${l.time ? `${l.time} ` : ""}[[${l.project}]]: ${l.text}`));
+    sec("Code", [...a.commits.map(c => `- ${c.repo}: ${c.subject}`), ...a.requests.map(r => `- ${r.repo}: ${r.type} request ${r.what}${r.what === "decided" ? `, ${r.status}` : ""}`)]);
+    sec("Agents", a.agents.map(g => `- ${g.title} (${g.agent}, ${String(g.status).replace(/_/g, " ")})${g.last ? `: ${g.last.replace(/\s+/g, " ").slice(0, 200)}` : ""}`));
+    if (a.omi) sec("Omi", [`- ${a.omi.headline}`, ...a.omi.decisions.map(d => `- Decided: ${d}`), ...a.omi.questions.map(q => `- Open: ${q}`)]);
+    sec("Calendar", a.events.map(e => `- ${e.time} ${e.title}`));
+    return L.join("\n") || "_Nothing written or logged this day._";
+  }
+  /** Write a day's journal to LLMWIKI (wiki/journal/Journal - YYYY-MM-DD.md). */
+  async function toWiki(day: string) {
+    if (!cfg().wiki.baseUrl) throw new HttpError(503, "The wiki isn't set up (Settings → Connections → LLMWIKI).");
+    return deps.wiki.writeJournal(day, wikiBody(day, records.get("journal", day), await autoFor(day)));
+  }
+  app.post("/api/journal/:day/wiki", { preHandler: guard }, async (req: any) => { you(req); return toWiki(dayParam(req.params.day)); });
+
   /** After midnight, yesterday's log is saved for good. */
-  async function tick() { const y = localDay(Date.now() - 864e5); const cur: any = records.get("journal", y); if (!cur?.auto?.final) await snapshot(y, true); }
-  return { build, autoFor, snapshot, tick };
+  async function tick() {
+    const y = localDay(Date.now() - 864e5); let cur: any = records.get("journal", y);
+    if (!cur?.auto?.final) { await snapshot(y, true); cur = records.get("journal", y); }
+    // With "send each day to the wiki" on, a finished day goes to the wiki once.
+    const on = ((records.get("settings", "app") as any)?.journal || {}).wiki === true;
+    if (on && cur?.auto?.final && !cur.wikiAt && cfg().wiki.baseUrl) { await toWiki(y); records.patch("journal", y, { wikiAt: Date.now() }, undefined, "orb"); }
+  }
+  return { build, autoFor, snapshot, tick, toWiki, wikiBody };
 }

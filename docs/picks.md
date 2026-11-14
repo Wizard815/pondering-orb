@@ -68,19 +68,39 @@ Each run (by hand, or on market days after the hour you set):
 6. **The order** (optional): with Robinhood connected and orders turned on,
    a pick you're buying gets *Place a $N order on Robinhood…*.
 
-## Your Robinhood history (CSV)
+## What you hold (from Coinpile)
 
-Picks → **Your Robinhood history** imports Robinhood's account activity
-report (Robinhood → Account → Reports and statements → Reports → account
-activity, CSV). Orb works out what you hold (shares, average cost, current
-value, open gain), what you sold (realised gain) and dividends, and lists the
-activity. Import a newer report whenever you like: rows already here are
-skipped. **Forget imported history** removes it.
+Coinpile keeps your Robinhood history (its activity CSV, Robinhood MCP or a
+connector), and Orb reads what you hold from Coinpile's summary when you
+share **holdings** there (Coinpile → Settings → Home Assistant & API). Picks →
+**What you hold** shows shares, average cost, value and gain, summed across
+accounts. Holdings go into the decision model's state (`you_own`) and into
+reviews. Orb has no import of its own. Later,
+[Foliofox](https://github.com/unav4ila8le/foliofox) can feed Coinpile as
+another source.
 
-What you hold goes into the decision model's state for that stock
-(`you_own`), and shows in a ticker's news. Nothing is sent to Robinhood.
-Later, [Foliofox](https://github.com/unav4ila8le/foliofox) could be the
-source instead, once it has an API Orb can read.
+## Decision ideas (scheduled reviews)
+
+At the times you set (Settings → Stock picks → Stock reviews, e.g.
+`08:45, 12:30, 15:45` on weekdays), or with **Review now**, Orb goes through
+what you hold and your watchlist:
+
+1. **Golem's model** (a chat model) reads each stock's recent news and rates
+   every headline good, bad or neutral for it, with an overall read.
+2. **Your decision model** (Jev-format or OpenAI-compatible, self-hosted)
+   decides from the price history, the index, the rated news and your
+   position: **add, hold, trim or sell** for what you hold; **buy, watch or
+   skip** for the rest; plus a 20-day direction and how strong the case is.
+
+Picks → **Decision ideas** shows the latest review (and earlier ones), each
+with its news and links. Ideas only: nothing trades; orders still need you.
+
+## Ground News
+
+Every headline links to its coverage on Ground News, and each stock (ticker
+news, picks, ideas) has a **Ground News** search link for the company. Ground
+News has no public API, so Orb links to it rather than reading it. The site
+and link are in Settings → Daily page.
 
 ## Robinhood
 
