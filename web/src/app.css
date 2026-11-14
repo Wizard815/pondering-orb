@@ -102,3 +102,4 @@ div:not(.editing) > .react-grid-layout .react-resizable-handle { display: none; 
 .lk-modal { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,.45); display: grid; place-items: center; padding: 16px; }
 .lk-form { width: min(460px, 100%); max-height: 90vh; overflow: auto; display: flex; flex-direction: column; gap: 10px; padding: 18px; }
 .lk-form h3 { margin: 0; } .lk-mode { border: 1px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; }
+.ink-full:focus, .lk-modal:focus { outline: none; }

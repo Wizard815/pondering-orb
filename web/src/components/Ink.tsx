@@ -10,7 +10,7 @@ import { useUi } from "../lib/ui";
 
 export type InkPage = { id: string; w: number; h: number; bg?: string };
 /** A stroke: tool, colour, base width and points as flat [x, y, pressure 0–255, ...] in page units. */
-export type Stroke = { t: "pen" | "hl"; c: string; w: number; p: number[] };
+export type Stroke = { t: "pen" | "hl"; c: string; w: number; p: number[]; i?: string };
 
 export const PAGE_W = 1404, PAGE_H = 1872; // a BOOX Note Air page at 3:4
 export const COLORS: [string, string][] = [["#1b1b1b", "Black"], ["#1f4fa8", "Blue"], ["#b0281c", "Red"], ["#2e7a4c", "Green"], ["#b8860b", "Gold"]];
@@ -55,19 +55,72 @@ export type Tool = { kind: "pen" | "hl" | "erase"; color: string; width: number 
 
 /** One copy of each page's strokes, shared by every view of it (the page in
  *  the list and its full-screen view), so neither overwrites the other. */
-type Shared = { strokes: Stroke[]; loaded: boolean; failed: string; undo: Stroke[][]; redo: Stroke[][]; views: Set<() => void> };
+type Shared = { strokes: Stroke[]; loaded: boolean; failed: string; undo: Stroke[][]; redo: Stroke[][]; views: Set<() => void>;
+  /** The record's version and the strokes it held when this tab last read or saved it. */
+  version: number; base: Set<string>; day: string; pending: number; chain: Promise<unknown> };
 const pagesInk = new Map<string, Shared>();
+const inkUrl = (id: string) => `/api/c/ink/${encodeURIComponent(id)}`;
+
+/** Every stroke has an id, so two devices' changes to one page can be merged.
+ *  Strokes saved before ids existed get one from their content (the same on every device). */
+const sid = (s: Stroke) => s.i || (s.i = "h" + [...JSON.stringify([s.t, s.c, s.w, s.p])].reduce((a, c) => (Math.imul(a, 31) + c.charCodeAt(0)) >>> 0, 7).toString(36));
+export const newStrokeId = () => Math.random().toString(36).slice(2, 12);
+const idsOf = (l: Stroke[]) => new Set(l.map(sid));
+const notify = (v: Shared) => v.views.forEach(f => f());
+
+/** What this tab drew and erased since it last synced, applied on top of the server's strokes. */
+function merge(v: Shared, server: Stroke[]) {
+  const mine = idsOf(v.strokes), theirs = idsOf(server);
+  const erased = new Set([...v.base].filter(x => !mine.has(x)));
+  const merged = [...server.filter(s => !erased.has(sid(s))), ...v.strokes.filter(s => !v.base.has(sid(s)) && !theirs.has(sid(s)))];
+  // Undo steps were taken before the other device's strokes arrived: replaying them would remove those.
+  if ([...theirs].some(x => !v.base.has(x))) { v.undo.length = 0; v.redo.length = 0; }
+  v.strokes = merged; v.base = theirs;
+}
+/** Save this tab's strokes. If another device saved the page meanwhile, merge and try again. */
+async function push(id: string, v: Shared) {
+  for (let tries = 0; tries < 4; tries++) {
+    try {
+      if (!v.version) {
+        // A page this tab saw as new: it may have been saved elsewhere since.
+        const d = await api<any>("GET", inkUrl(id)).catch(e => { if (e instanceof ApiError && e.status === 404) return null; throw e; });
+        if (d) { merge(v, Array.isArray(d.strokes) ? d.strokes : []); v.version = d.version; notify(v); continue; }
+        const r = await api<any>("PUT", inkUrl(id), { day: v.day, strokes: v.strokes });
+        v.version = r.version; v.base = idsOf(v.strokes); return;
+      }
+      const r = await api<any>("PATCH", inkUrl(id), { day: v.day, strokes: v.strokes }, { "If-Match": String(v.version) });
+      v.version = r.version; v.base = idsOf(v.strokes); return;
+    } catch (e) {
+      if (!(e instanceof ApiError && e.status === 409)) throw e;
+      const d = await api<any>("GET", inkUrl(id)); merge(v, Array.isArray(d.strokes) ? d.strokes : []); v.version = d.version; notify(v);
+    }
+  }
+  throw new Error("This page keeps changing on another device. Try again in a moment.");
+}
+/** Saves of one page run one after another. */
+const queueSave = (id: string, v: Shared) => { v.pending++; const p = v.chain.then(() => push(id, v)).finally(() => { v.pending--; }); v.chain = p.catch(() => {}); return p; };
+
 /** Load (or load again) a page's strokes. Only "not found" means a blank page:
  *  any other failure keeps the page closed, so a stroke can't overwrite what's saved. */
 function load(id: string, v: Shared) {
-  v.failed = ""; v.loaded = false; v.views.forEach(f => f());
-  api<any>("GET", `/api/c/ink/${encodeURIComponent(id)}`).then(d => { v.strokes = Array.isArray(d?.strokes) ? d.strokes : []; v.loaded = true; },
-    e => { if (e instanceof ApiError && e.status === 404) { v.strokes = []; v.loaded = true; } else v.failed = e?.message || "Couldn't open this page."; })
-    .finally(() => v.views.forEach(f => f()));
+  v.failed = ""; v.loaded = false; notify(v);
+  api<any>("GET", inkUrl(id)).then(d => { v.strokes = Array.isArray(d?.strokes) ? d.strokes : []; v.version = d?.version || 0; v.base = idsOf(v.strokes); v.loaded = true; },
+    e => { if (e instanceof ApiError && e.status === 404) { v.strokes = []; v.version = 0; v.base = new Set(); v.loaded = true; } else v.failed = e?.message || "Couldn't open this page."; })
+    .finally(() => notify(v));
 }
-function shared(id: string): Shared {
+/** Pick up strokes saved on another device (when you come back to the tab, and every half minute). */
+async function refresh(id: string, v: Shared) {
+  if (!v.loaded || v.pending) return;
+  const d = await api<any>("GET", inkUrl(id)).catch(() => null);
+  if (!d || !d.version || d.version === v.version || v.pending) return;
+  merge(v, Array.isArray(d.strokes) ? d.strokes : []); v.version = d.version; notify(v);
+}
+const refreshOpen = () => { if (document.visibilityState !== "visible") return; for (const [id, v] of pagesInk) if (v.views.size) refresh(id, v); };
+if (typeof window !== "undefined") { addEventListener("focus", refreshOpen); document.addEventListener("visibilitychange", refreshOpen); setInterval(refreshOpen, 30000); }
+
+function shared(id: string, day: string): Shared {
   let s = pagesInk.get(id);
-  if (!s) { s = { strokes: [], loaded: false, failed: "", undo: [], redo: [], views: new Set() }; pagesInk.set(id, s); load(id, s); }
+  if (!s) { s = { strokes: [], loaded: false, failed: "", undo: [], redo: [], views: new Set(), version: 0, base: new Set(), day, pending: 0, chain: Promise.resolve() }; pagesInk.set(id, s); load(id, s); }
   return s;
 }
 /** The strokes as drawn here (including any not saved yet), or null if the page isn't open. */
@@ -82,7 +135,7 @@ export type ActiveInk = { current: InkActions | null };
 export function InkCanvas({ page, day, tool, penOnly, onPen, onActive, onGone, big }: { page: InkPage; day: string; tool: Tool; penOnly: boolean; onPen: () => void; onActive: (a: ActiveInk) => void; onGone: (a: ActiveInk) => void; big?: boolean }) {
   const ui = useUi(), wrap = useRef<HTMLDivElement>(null), cv = useRef<HTMLCanvasElement>(null);
   // Undo and Redo live with the page, so the page and its full-screen view share them.
-  const ink = shared(page.id), undo = { get current() { return ink.undo; } }, redo = { get current() { return ink.redo; }, set current(v: Stroke[][]) { ink.redo = v; } };
+  const ink = shared(page.id, day), undo = { get current() { return ink.undo; } }, redo = { get current() { return ink.redo; }, set current(v: Stroke[][]) { ink.redo = v; } };
   const strokes = { get current() { return ink.strokes; }, set current(v: Stroke[]) { ink.strokes = v; } };
   const cur = useRef<{ s: Stroke; id: number; erased?: boolean } | null>(null), scale = useRef(1), dirty = useRef(false), timer = useRef<number>(0);
   const [, force] = useState(0), loaded = ink.loaded;
@@ -111,7 +164,7 @@ export function InkCanvas({ page, day, tool, penOnly, onPen, onActive, onGone, b
   const save = useCallback((now = false) => {
     dirty.current = true; clearTimeout(timer.current);
     const go = () => { if (!dirty.current) return; dirty.current = false;
-      api("PUT", `/api/c/ink/${encodeURIComponent(page.id)}`, { day, strokes: strokes.current }).catch(e => { dirty.current = true; ui.error(e); }); };
+      queueSave(page.id, ink).catch(e => { dirty.current = true; ui.error(e); }); };
     if (now) go(); else timer.current = window.setTimeout(go, 1200);
   }, [page.id, day]);
   useEffect(() => () => { if (dirty.current) save(true); }, [save]);
@@ -143,7 +196,7 @@ export function InkCanvas({ page, day, tool, penOnly, onPen, onActive, onGone, b
   const up = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const c = cur.current; if (!c || c.id !== e.pointerId) return; cur.current = null;
     if (tool.kind === "erase") { force(x => x + 1); return; }
-    commit([...strokes.current, { ...c.s, p: simplify(c.s.p) }]);
+    commit([...strokes.current, { ...c.s, p: simplify(c.s.p), i: newStrokeId() }]);
   };
 
   const doUndo = () => { const prev = undo.current.pop(); if (!prev) return; redo.current.push(strokes.current); strokes.current = prev; changed(); save(); };

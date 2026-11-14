@@ -6,6 +6,7 @@ import { useUi } from "../lib/ui";
 import { useFetch } from "../lib/useFetch";
 import { Markdown } from "../lib/markdown";
 import { ago, todayISO } from "../lib/util";
+import { useDialog } from "../lib/useDialog";
 import { InkCanvas, InkTools, PAGE_W, PAGE_H, paint, strokesOf, forgetInk, type InkPage, type InkActions, type ActiveInk, type Tool } from "../components/Ink";
 
 /** The Journal: one page per day. Orb's log of the day (money, what got done,
@@ -157,7 +158,6 @@ function Drawing({ day, j }: { day: string; j: ReturnType<typeof useJournal> }) 
   const pen = (v: boolean) => { setPenOnly(v); try { localStorage.setItem("orb.penonly", v ? "1" : "0"); } catch { /* storage blocked */ } };
   const onPen = () => { if (!penOnly && localStorage.getItem("orb.penonly") === null) pen(true); }; // first pen seen: ignore palms from now on
   useEffect(() => { setFull(null); active.current = null; }, [day]);
-  useEffect(() => { if (full === null) return; const k = (e: KeyboardEvent) => { if (e.key === "Escape") setFull(null); }; addEventListener("keydown", k); return () => removeEventListener("keydown", k); }, [full]);
   if (!j.doc) return <div className="hint">Opening the day…</div>;
   const pages = j.doc.pages;
   /** Pages are added to the day they were started on, even if you moved on meanwhile. */
@@ -208,14 +208,20 @@ function Drawing({ day, j }: { day: string; j: ReturnType<typeof useJournal> }) 
       <figcaption className="row small"><span className="hint">Page {k + 1}{p.bg ? " · on an imported image" : ""}</span>
         <button className="btn" onClick={() => setFull(k)}>Full screen</button><button className="btn" onClick={() => save(p, k).catch(ui.error)}>Save as PNG</button><button className="btn" onClick={e => del(e.currentTarget, p)}>Delete</button></figcaption>
     </figure>)}
-    {full !== null && pages[full] && createPortal(<div className="ink-full" role="dialog" aria-modal="true" aria-label={`Page ${full + 1}, full screen`}>
+    {full !== null && pages[full] && createPortal(<FullScreen onClose={() => setFull(null)} label={`Page ${full + 1}, full screen`}>
       <div className="ink-full-bar">{tools}<span className="ink-sep" />
         <button className="btn" disabled={full === 0} onClick={() => setFull(full - 1)}>‹ Page</button><span className="small">{full + 1} / {pages.length}</span>
         <button className="btn" onClick={() => (full === pages.length - 1 ? blank().then(ok => { if (ok) setFull(full + 1); }) : setFull(full + 1))}>{full === pages.length - 1 ? "New page ›" : "Page ›"}</button>
         <button className="btn primary" onClick={() => setFull(null)}>Done</button></div>
       <InkCanvas key={pages[full].id + "-big"} page={pages[full]} day={day} tool={tool} penOnly={penOnly} onPen={onPen} onActive={onActive} onGone={onGone} big />
-    </div>, document.body)}
+    </FullScreen>, document.body)}
   </div>;
+}
+
+/** One page filling the screen, with its tools: a dialog (Escape closes it). */
+function FullScreen({ onClose, label, children }: { onClose: () => void; label: string; children: React.ReactNode }) {
+  const ref = useDialog<HTMLDivElement>(onClose, ".ink-full-bar .btn.primary");
+  return <div ref={ref} className="ink-full" role="dialog" aria-modal="true" aria-label={label} tabIndex={-1}>{children}</div>;
 }
 
 // ---------------- the page ----------------

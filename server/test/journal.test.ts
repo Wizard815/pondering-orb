@@ -95,6 +95,12 @@ test("TestJournal_DayLogMoneyWorkOmiAndSnapshots", async () => {
     assert.equal((await app.inject({ method: "POST", url: "/api/journal/files", cookies: cookie, headers: { "content-type": "image/png" }, payload: Buffer.from("<svg onload=alert(1)>") })).statusCode, 415);
     assert.equal((await app.inject({ method: "POST", url: "/api/journal/files", headers: { ...bot, "content-type": "image/png" }, payload: PNG })).statusCode, 403);
     assert.equal((await app.inject({ method: "GET", url: "/api/journal/files/..%2Forb.db", cookies: cookie })).statusCode, 404);
+    // An image still on a page can't be deleted; once no page uses it, it can.
+    records.create("journal", { date: day(-3), text: "", pages: [{ id: "pg1", w: 10, h: 10, bg: id }] }, day(-3));
+    assert.equal((await app.inject({ method: "DELETE", url: `/api/journal/files/${id}`, cookies: cookie })).statusCode, 409);
+    records.patch("journal", day(-3), { pages: [] });
+    assert.equal((await app.inject({ method: "DELETE", url: `/api/journal/files/${id}`, cookies: cookie })).statusCode, 204);
+    assert.equal((await app.inject({ method: "GET", url: `/api/journal/files/${id}`, cookies: cookie })).statusCode, 404);
     // The big image body is only for the upload route, and only after sign-in.
     const big = Buffer.alloc(5 * 1024 * 1024, 1);
     assert.equal((await app.inject({ method: "POST", url: "/api/journal/files", headers: { "content-type": "image/png" }, payload: big })).statusCode, 401);
