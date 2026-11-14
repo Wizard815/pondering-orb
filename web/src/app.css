@@ -94,7 +94,8 @@ div:not(.editing) > .react-grid-layout .react-resizable-handle { display: none; 
 .lk-modal:focus { outline: none; }
 
 /* Ideas: Milaclone in place */
-.mila { height: 100%; min-height: 70vh; display: flex; } .mila-frame { flex: 1; width: 100%; min-height: 70vh; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.mila { height: 100%; min-height: 70vh; display: flex; flex-direction: column; gap: 6px; background: var(--panel); } .mila-bar { gap: 6px; flex-wrap: wrap; } .mila-frame { flex: 1; width: 100%; min-height: 70vh; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.mila:fullscreen { padding: 6px; } .mila:fullscreen .mila-frame { min-height: 0; }
 
 /* Daily: places, feeds, watchlist, ticker news */
 .wx-places, .nf-bar { flex-wrap: wrap; gap: 6px; margin-bottom: 8px; } .wx-places .btn, .nf-bar .btn { min-height: 34px; padding: 4px 10px; font-size: .85rem; }
@@ -106,3 +107,10 @@ div:not(.editing) > .react-grid-layout .react-resizable-handle { display: none; 
 .tn-head { gap: 10px; align-items: baseline; } .tn-head h3 { margin: 0; } .tn-overall { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
 .tn-pos { background: var(--inset); border-radius: 6px; padding: 6px 10px; }
 .hold { display: flex; flex-direction: column; gap: 10px; } .hold-sum { flex-wrap: wrap; gap: 14px; align-items: center; }
+.ideas { display: flex; flex-direction: column; gap: 8px; } .ideas-bar { flex-wrap: wrap; gap: 8px; } .ideas-bar select { width: auto; } .ideas-sym { min-width: 5em; }
+.cov-search { white-space: nowrap; }
+.hw { display: flex; flex-direction: column; gap: 10px; } .hw-bar { flex-wrap: wrap; gap: 8px; align-items: center; }
+.hw-page { display: grid; grid-template-columns: minmax(0, 240px) minmax(0, 1fr); gap: 12px; border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+.hw-page img { width: 100%; border-radius: 4px; border: 1px solid var(--line); background: #fff; } .hw-txt { padding: 8px; background: var(--inset); border-radius: 4px; }
+.hw-edit { display: flex; flex-direction: column; gap: 8px; } .hw-edit textarea { width: 100%; font: inherit; line-height: 1.5; }
+@media (max-width: 640px) { .hw-page { grid-template-columns: 1fr; } }

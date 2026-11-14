@@ -5,6 +5,8 @@ import { useUi } from "../lib/ui";
 import { useFetch } from "../lib/useFetch";
 import { Markdown } from "../lib/markdown";
 import { ago, todayISO } from "../lib/util";
+import { useSettings, saveSettings, getDoc } from "../lib/store";
+const journalSettings = () => (getDoc("settings", "app") as any)?.journal;
 
 /** The Journal: one page per day. Orb's log of the day (money, what got done,
  *  commits, agents, Omi, alerts) and your typed notes. Days load one at a time. */
@@ -102,6 +104,8 @@ function Notes({ day, j }: { day: string; j: ReturnType<typeof useJournal> }) {
   const flush = () => { clearTimeout(t.current); const p = pending.current; pending.current = null; if (p) j.save(p.day, { text: p.text }).then(() => setSaved(Date.now()), ui.error); };
   // Moving to another day (or leaving the page) saves what was typed, on the day it was typed on.
   useEffect(() => { setText(null); setPreview(false); return flush; }, [day]);
+  // Text added from elsewhere (a handwritten page) shows once nothing typed is waiting to save.
+  useEffect(() => { if (!pending.current) setText(null); }, [j.doc?.text]);
   if (!j.doc) return <div className="hint">Opening the day…</div>;
   const val = text ?? j.doc.text;
   const change = (v: string) => { setText(v); pending.current = { day, text: v }; clearTimeout(t.current); t.current = window.setTimeout(flush, 800); };
@@ -110,6 +114,82 @@ function Notes({ day, j }: { day: string; j: ReturnType<typeof useJournal> }) {
       <span className="hint">{saved ? `Saved ${ago(saved)}` : "Saves as you type. Markdown works."}</span></div>
     {preview ? (val.trim() ? <Markdown text={val} /> : <div className="empty">Nothing written yet.</div>)
       : <textarea className="jn-text" value={val} onChange={e => change(e.target.value)} placeholder={`What happened on ${longDay(day)}?`} aria-label="Your notes for the day" />}
+  </div>;
+}
+
+// ---------------- handwritten notes ----------------
+type Page = { key: string; name: string; url: string; id: string; text: string; status: "reading" | "ready" | "error" | "added"; error: string; kind: "image" | "text" };
+const toBlob = (c: HTMLCanvasElement, type = "image/jpeg", q = 0.9) => new Promise<Blob>((ok, no) => c.toBlob(b => (b ? ok(b) : no(new Error("Couldn't make the image."))), type, q));
+/** Big photos are scaled down (a long side of 2000 px reads well and uploads fast). */
+async function shrink(file: Blob): Promise<Blob> {
+  const bmp = await createImageBitmap(file), k = Math.min(1, 2000 / Math.max(bmp.width, bmp.height));
+  if (k === 1 && /^image\/(png|jpeg|webp)$/.test(file.type)) return file;
+  const c = document.createElement("canvas"); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k); c.getContext("2d")!.drawImage(bmp, 0, 0, c.width, c.height); return toBlob(c);
+}
+/** Each PDF page (a BOOX export) as an image, rendered here in the browser. */
+async function pdfImages(file: File): Promise<Blob[]> {
+  const pdfjs = await import("pdfjs-dist");
+  pdfjs.GlobalWorkerOptions.workerSrc = (await import("pdfjs-dist/build/pdf.worker.min.mjs?url")).default;
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise, out: Blob[] = [];
+  for (let i = 1; i <= Math.min(doc.numPages, 20); i++) {
+    const page = await doc.getPage(i), vp = page.getViewport({ scale: 1600 / page.getViewport({ scale: 1 }).width }), c = document.createElement("canvas");
+    c.width = Math.round(vp.width); c.height = Math.round(vp.height); const ctx = c.getContext("2d")!; ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+    await page.render({ canvasContext: ctx, viewport: vp }).promise; out.push(await toBlob(c));
+  }
+  return out;
+}
+function Handwritten({ day, j }: { day: string; j: ReturnType<typeof useJournal> }) {
+  const ui = useUi(), [pages, setPages] = useState<Page[]>([]), file = useRef<HTMLInputElement>(null), [busy, setBusy] = useState("");
+  const stats = useFetch<{ samples: number; corrected: number; hints: string[]; model: string }>("/api/handwriting/stats", 0), wikiOn = useSettings().journal?.wiki === true;
+  const set = (key: string, p: Partial<Page>) => setPages(list => list.map(x => (x.key === key ? { ...x, ...p } : x)));
+  const read = async (name: string, blob: Blob) => {
+    const key = Math.random().toString(36).slice(2), url = URL.createObjectURL(blob);
+    setPages(l => [...l, { key, name, url, id: "", text: "", status: "reading", error: "", kind: "image" }]);
+    try { const img = await shrink(blob), r = await fetch("/api/handwriting", { method: "POST", credentials: "same-origin", headers: { "Content-Type": img.type }, body: img });
+      const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || `Couldn't send the page (${r.status}).`);
+      set(key, { id: d.id, text: d.text, status: d.error ? "error" : "ready", error: d.error ? `${d.error} Type it below instead; it still counts for training.` : "" });
+    } catch (e: any) { set(key, { status: "error", error: e.message }); }
+  };
+  const bring = async (files: FileList | null) => {
+    for (const f of Array.from(files || [])) {
+      try {
+        if (/\.txt$/i.test(f.name) || f.type === "text/plain") setPages(l => [...l, { key: Math.random().toString(36).slice(2), name: f.name, url: "", id: "", text: "", status: "ready", error: "", kind: "text" }]),
+          f.text().then(t => setPages(l => l.map(x => (x.name === f.name && x.kind === "text" && !x.text ? { ...x, text: t.trim() } : x))));
+        else if (f.type === "application/pdf" || /\.pdf$/i.test(f.name)) { setBusy(`Reading ${f.name}…`); const imgs = await pdfImages(f); setBusy(""); imgs.forEach((b, k) => read(`${f.name} · page ${k + 1}`, b)); }
+        else if (f.type.startsWith("image/")) read(f.name, f);
+        else ui.error(new Error(`${f.name} isn't a photo, a PDF or a text file.`));
+      } catch (e) { setBusy(""); ui.error(e); }
+    }
+    if (file.current) file.current.value = "";
+  };
+  const add = async (p: Page) => {
+    const text = p.text.trim(); if (!text) return;
+    try {
+      if (p.id) await api("POST", `/api/handwriting/${p.id}/text`, { text, day }); // kept for training on your handwriting
+      const at = new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+      await j.save(day, cur => ({ text: `${(cur.text || "").trimEnd()}${cur.text?.trim() ? "\n\n" : ""}### Handwritten (${at})\n${text}\n` }));
+      set(p.key, { status: "added" }); stats.reload(); ui.status("Added to the day's notes.");
+    } catch (e) { ui.error(e); }
+  };
+  const toWiki = async () => { try { const r = await api<any>("POST", `/api/journal/${day}/wiki`); ui.status(`Written to the wiki: ${r.path}`); } catch (e) { ui.error(e); } };
+  return <div className="hw">
+    <div className="row hw-bar">
+      <button className="btn primary" onClick={() => file.current?.click()}>Photo, scan or BOOX export</button>
+      <input ref={file} type="file" accept="image/*,application/pdf,.pdf,.txt,text/plain" multiple hidden onChange={e => bring(e.target.files)} />
+      <button className="btn" onClick={toWiki}>Send this day to the wiki</button>
+      <label className="small row" style={{ gap: 4 }}><input type="checkbox" checked={wikiOn} onChange={e => saveSettings({ journal: { ...(journalSettings() || {}), wiki: e.target.checked } }).catch(ui.error)} /> every day</label>
+      {busy && <span className="hint">{busy}</span>}
+    </div>
+    <div className="hint">From the BOOX: export the note as PDF or PNG (or as TXT, if the BOOX already recognised it). From paper: take a photo. Pages are read by your vision model{stats.data?.model ? ` (${stats.data.model})` : ""}; check the text, then add it.</div>
+    {pages.filter(p => p.status !== "added").map(p => <div key={p.key} className="hw-page">
+      {p.url ? <a href={p.url} target="_blank" rel="noopener noreferrer"><img src={p.url} alt={`Page ${p.name}`} /></a> : <div className="hw-txt small">{p.name}</div>}
+      <div className="hw-edit">
+        {p.status === "reading" ? <div className="hint">Reading the handwriting…</div> : <>
+          {p.error && <div className="err-inline small">{p.error}</div>}
+          <textarea value={p.text} onChange={e => set(p.key, { text: e.target.value })} rows={Math.min(14, Math.max(4, p.text.split("\n").length + 1))} aria-label={`Text of ${p.name}`} placeholder="The page's text" />
+          <div className="row"><button className="btn primary" onClick={() => add(p)} disabled={!p.text.trim()}>Add to notes</button><button className="btn" onClick={() => setPages(l => l.filter(x => x.key !== p.key))}>Discard</button></div></>}
+      </div></div>)}
+    {stats.data && stats.data.samples > 0 && <div className="hint">{stats.data.samples} page{stats.data.samples === 1 ? "" : "s"} kept for training on your handwriting ({stats.data.corrected} corrected){stats.data.hints.length ? `. Words it has learned to watch for: ${stats.data.hints.slice(0, 8).join(", ")}` : ""}.</div>}
   </div>;
 }
 
@@ -133,6 +213,7 @@ export const JournalPage: PageDef = {
         { key: "log", title: "The day's log", node: <DayLog day={day} log={log} />, w: 7, h: 22 },
         { key: "money", title: "Money", node: <Money day={day} log={log} />, w: 5, h: 9 },
         { key: "notes", title: "Notes", node: <Notes day={day} j={j} />, w: 5, h: 13 },
+        { key: "handwritten", title: "Handwritten notes", node: <Handwritten day={day} j={j} />, w: 12, h: 14 },
       ],
     };
   },

@@ -17,14 +17,14 @@ layout**. Drag a tab onto another to show two pages side by side.
 | **Links** | A grid of icons for every app with a web page: the Unraid server's containers (with Unraid's WebUI address and icon), the apps list, and links you add. Hide, rename, give another address (a container port or any URL), sort into categories and drag into place |
 | **Main** | The Golem, favorite projects, open and top-priority tasks, today's family calendar, the log, chores, uptime, UpstreamManager, system, and a panel per app (with live views for Plex, SABnzbd, Firefly III and Omi) |
 | **Daily** | The morning brief, written by the Golem from the weather, news, your watchlist, tasks, chores, bills and every calendar; weather for your places, news from your feeds (with Ground News coverage links), markets you can edit and click for rated news; plus Today and This week |
-| **Journal** | One page per day: Orb's log of the day (money spent and earned, tasks and chores done, commits, UpstreamManager requests, Hermes Studio agent work, Omi's recap, alerts) and your typed notes |
+| **Journal** | One page per day: Orb's log of the day (money spent and earned, tasks and chores done, commits, UpstreamManager requests, Hermes Studio agent work, Omi's recap, alerts), your notes, and handwritten pages (BOOX exports or photos of paper) read by your vision model; each day can go to the wiki |
 | **Projects** | Kanban board (next, active, blocked, paused, shipped) and the log; each project has a page with its tasks, log, wiki note, repository and linked chats |
 | **Agents** | Hermes Studio chats working on your plans: watch them, or send a project or task to a new one (Ekko, Hermes or a coding agent) |
 | **Ideas** | Milaclone (Miladash) in place: boards, mind maps and drawings (`MILACLONE_URL`) |
 | **To-do** | CalDAV task lists with priorities, plus dayGLANCE's tasks |
 | **Wiki** | The LLMWIKI vault: tree, notes, search, section edits, related links |
 | **Calendar** | Month and next two weeks: your events, the family calendar, CalDAV calendars, task due dates and chores |
-| **Picks** | Daily stock research, a verdict per stock from your self-hosted decision model, your call with an amount, an order on Robinhood when you confirm it, and what every pick did afterwards, and your Robinhood history from its activity CSV (holdings, gains, dividends) |
+| **Picks** | Daily stock research, a verdict per stock from your self-hosted decision model, your call with an amount, an order on Robinhood when you confirm it, and what every pick did afterwards, decision ideas for what you hold (from Coinpile) and your watchlist at times you set |
 | **Money**, **Coinpile**, **Omi** | Optional full pages for Firefly III (this month, bills, budgets, accounts, piggy banks, transactions), Coinpile (savings, goals, alerts, maturities, forecast) and Omi (`page: true` in the apps YAML) |
 | **Upkeep** | UpstreamManager's repos, approval requests and daily check, and your chores |
 | **Uptime** | Monitors from an Uptime Kuma status page |

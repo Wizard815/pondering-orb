@@ -114,6 +114,18 @@ export class Wiki {
     if (/^##\s+Pondering Orb\s*$/m.test(text)) { const h1 = /^#\s+(.+)$/m.exec(text)?.[1]?.trim() || `Log - ${d}`; await this.patch(path, { Operation: "append", "Target-Type": "heading", Target: encodeURIComponent(`${h1}::Pondering Orb`) }, bullet); }
     else { const w = await call(this.url(path, true), { method: "POST", headers: this.h({ "Content-Type": "text/markdown" }), body: `\n## Pondering Orb\n${bullet}` }); if (!w.ok) throw new HttpError(502, `The wiki refused the log (${w.status}).`); }
   }
+  /** A day's journal as its own note, wiki/journal/Journal - YYYY-MM-DD.md.
+   *  Orb writes the whole note each time (it is Orb's), keeps `created`, and logs the write. */
+  async writeJournal(day: string, body: string) {
+    const path = `wiki/journal/Journal - ${day}.md`, title = `Journal - ${day}`;
+    const old = await call(this.url(path), { headers: this.h({ Accept: "text/markdown" }) });
+    const created = old.ok ? (/^created:\s*(\d{4}-\d{2}-\d{2})/m.exec(String(old.body))?.[1] || day) : today();
+    const text = `---\ntitle: "${title}"\ntype: log\ntags: [wiki, log]\ncreated: ${created}\nupdated: ${today()}\nsource: manual\nstatus: draft\n---\n# ${title}\n\n${body.trim()}\n`;
+    const w = await call(this.url(path, true), { method: "PUT", headers: this.h({ "Content-Type": "text/markdown" }), body: text });
+    if (!w.ok) throw new HttpError(502, `The wiki refused the journal note (${w.status}).`);
+    await this.log(`[[${title}]]: ${old.ok ? "updated" : "written"} from the journal`);
+    return { path, created: !old.ok };
+  }
   /** New project note from the PROJECT template, linked from its area hub. */
   async createProject(name: string, area: string, status: string, next: string, hub: string) {
     if (!isNoteName(name)) throw new HttpError(422, "That project name can't be a note name (no / \\ [ ] | # ^ : or line breaks).");

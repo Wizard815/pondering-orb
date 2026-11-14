@@ -38,6 +38,39 @@ next to `spending` under Settings → Home Assistant & API).
 Type with a keyboard. Markdown works; **Read** shows it formatted. It saves
 as you type.
 
+## Handwritten notes (BOOX or paper)
+
+Journal → **Handwritten notes** → **Photo, scan or BOOX export**:
+
+- **From the BOOX:** export the note as **PDF** or **PNG** (each PDF page
+  becomes one page here), or as **TXT** if the BOOX already recognised the
+  handwriting (that text goes straight in, no reading needed).
+- **From paper:** take a photo (on a phone the button offers the camera).
+
+A vision model on your own endpoint reads each page (Settings → Journal; empty
+means Golem's endpoint and model, which then must accept images, e.g.
+Qwen2.5-VL, Llama 3.2 Vision or MiniCPM-V). You check the text, fix what it
+got wrong, and **Add to notes** puts it in the day's notes under "Handwritten
+(time)".
+
+**Learning your handwriting.** Every page you add is kept with its text in
+`data/handwriting/`: the image, what the model read (`<id>.ocr.txt`), what you
+corrected it to (`<id>.txt`), and one line per page in `manifest.jsonl`
+(`{"image", "text", "ocr", "day", "model"}`), the usual shape for training a
+handwriting model (for example fine-tuning TrOCR or a small vision model).
+Until then, the words you correct most often are passed to the model as hints
+on every new page. Back the folder up with the rest of `data/`.
+
+## In the wiki
+
+**Send this day to the wiki** writes the day to LLMWIKI as
+`wiki/journal/Journal - YYYY-MM-DD.md`: your notes (typed and handwritten),
+then the day's log in short (money, done, log, code, agents, Omi, calendar).
+It follows the vault's rules: `type: log`, tags `[wiki, log]`,
+`source: manual`, `status: draft`, `updated` today, and a bullet in the day's
+wiki log. Orb owns these notes and rewrites them whole. Tick **every day**
+(or Settings → Journal) to send each finished day once, after midnight.
+
 ## Who can change it
 
 Only you, signed in. Agents can't write the journal, and the saved day log

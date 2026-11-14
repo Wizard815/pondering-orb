@@ -2,7 +2,9 @@ import Fastify, { FastifyInstance } from "fastify";
 import cookie from "@fastify/cookie";
 import fstatic from "@fastify/static";
 import { existsSync } from "node:fs";
-import { hostname } from "node:os";
+import { hostname, tmpdir } from "node:os";
+import { mkdtempSync } from "node:fs";
+import { dirname, join as pjoin } from "node:path";
 import { Store } from "./db.js";
 import { Records, HttpError, isColl, Change } from "./records.js";
 import { Auth } from "./auth.js";
@@ -30,11 +32,16 @@ import { marketApi } from "./market.js";
 import { robinhoodApi } from "./robinhood.js";
 import { journalApi } from "./journal.js";
 import { stocksApi } from "./stocks.js";
+import { reviewsApi } from "./reviews.js";
+import { handwritingApi } from "./handwriting.js";
 import { serverApps, linkHost, appUrl, suggestions, unraidSystem, unraidContainers } from "./integrations/unraid.js";
 import { today, localDay, isDay, timeZone } from "./dates.js";
 
 export const VERSION = "0.1.0";
 
+/** Without a data file (tests), handwriting pages go to one temporary folder per process. */
+let tmpData = "";
+const tempData = () => (tmpData ||= mkdtempSync(pjoin(tmpdir(), "orb-data-")));
 export interface AppOptions { dataFile?: string; config?: OrbConfig; webDir?: string; password?: string; tokens?: string; logger?: boolean }
 
 export async function buildApp(o: AppOptions = {}) {
@@ -190,7 +197,7 @@ export async function buildApp(o: AppOptions = {}) {
     if (c === "settings" && who(req) !== "you") throw new HttpError(403, "Only a signed-in person can change settings.");
     // The brief, research and stock picks are written by Orb; only you decide on a pick.
     if (c === "orders") throw new HttpError(403, "Orders are written by Orb when you place one.");
-    if ((c === "daily" || c === "picks" || c === "research" || c === "journal" || c === "trades") && who(req) !== "you") throw new HttpError(403, "Only a signed-in person can change these.");
+    if ((c === "daily" || c === "picks" || c === "research" || c === "journal" || c === "reviews") && who(req) !== "you") throw new HttpError(403, "Only a signed-in person can change these.");
     const raw = req.body ?? {};
     if (typeof raw !== "object" || Array.isArray(raw)) throw new HttpError(400, "Send a JSON object.");
     const body: Record<string, any> = { ...raw };
@@ -221,7 +228,7 @@ export async function buildApp(o: AppOptions = {}) {
     const c = coll(req.params.coll);
     // Deletes follow the same rules as writes (an agent can't remove settings, picks or orders).
     if (c === "orders") throw new HttpError(403, "Orders are kept as a record.");
-    if (["settings", "daily", "picks", "research", "journal", "trades"].includes(c) && who(req) !== "you") throw new HttpError(403, "Only a signed-in person can delete these.");
+    if (["settings", "daily", "picks", "research", "journal", "reviews"].includes(c) && who(req) !== "you") throw new HttpError(403, "Only a signed-in person can delete these.");
     if (c === "tasks" && isOmiTask((records.get("tasks", req.params.id) as any)?.caldav?.uid)) throw new HttpError(403, "This task comes from Omi. Change it in Omi; Orb only reads it.");
     records.remove(c, req.params.id); reply.code(204).send();
   });
@@ -244,7 +251,10 @@ export async function buildApp(o: AppOptions = {}) {
   const market = marketApi(app, { records, cfg, guard, who });
   robinhoodApi(app, { records, store, guard, who });
   stocksApi(app, { records, cfg, guard, who });
-  const journal = journalApi(app, { records, cfg, guard, who, upstream, hermes, outbox, appsYaml, events: daily.events });
+  const reviews = reviewsApi(app, { records, cfg, guard, who });
+  const dataDir = o.dataFile && o.dataFile !== ":memory:" ? dirname(o.dataFile) : tempData();
+  const journal = journalApi(app, { records, cfg, guard, who, upstream, hermes, outbox, appsYaml, events: daily.events, wiki });
+  handwritingApi(app, { records, cfg, guard, who, dir: pjoin(dataDir, "handwriting") });
 
   // ---- live updates (Server-Sent Events) ----
   app.get("/api/stream", { preHandler: guard }, (req, reply) => {
@@ -512,5 +522,5 @@ export async function buildApp(o: AppOptions = {}) {
     app.setNotFoundHandler((req, reply) => req.url.startsWith("/api/") || req.url.startsWith("/mcp") ? reply.code(404).send({ error: "Not found." }) : reply.sendFile("index.html"));
   }
 
-  return { app, records, store, auth, upstream, cfg, sync, outbox, writeDigest, daily, market, journal };
+  return { app, records, store, auth, upstream, cfg, sync, outbox, writeDigest, daily, market, journal, reviews };
 }

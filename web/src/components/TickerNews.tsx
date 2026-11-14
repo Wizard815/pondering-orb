@@ -7,6 +7,12 @@ import { money, pct } from "./Spark";
 export type Coverage = { on: boolean; label: string; template: string };
 /** A link to the story's coverage elsewhere (Ground News by default), built from its headline. */
 export const coverageUrl = (c: Coverage | undefined, title: string) => (c?.on && /^https:\/\//.test(c.template) ? c.template.replace("{q}", encodeURIComponent(title.slice(0, 160))) : "");
+const DEFAULT_COV: Coverage = { on: true, label: "Ground News", template: "https://ground.news/search?query={q}" };
+/** "Search Ground News for …" for a stock or a news event (any words). */
+export function CoverageSearch({ q, coverage, label }: { q: string; coverage?: Coverage; label?: string }) {
+  const c = coverage || DEFAULT_COV, url = coverageUrl(c, q);
+  return url ? <a className="cov-search small" href={url} target="_blank" rel="noopener noreferrer" title={`Search ${c.label} for ${q}`}>{label || `${c.label}: ${q}`}</a> : null;
+}
 
 type Item = { title: string; link: string; source: string; published: number; rating: string; why: string };
 type Data = { symbol: string; name: string; price: number | null; changePct: number | null; position: any; items: Item[]; overall: string; summary: string; error: string };
@@ -21,6 +27,7 @@ export function TickerNews({ symbol, coverage, onClose }: { symbol: string; cove
       <div className="row tn-head"><h3>{symbol}{d && d.name !== symbol ? <span className="hint"> {d.name}</span> : null}</h3>
         {d?.price != null && <span className="num">{money(d.price)} <span className={d.changePct! >= 0 ? "up" : "down"}>{pct(d.changePct!)}</span></span>}
         <span className="grow" /><button className="btn" onClick={onClose}>Close</button></div>
+      <div className="row small" style={{ gap: 10, flexWrap: "wrap" }}><CoverageSearch q={d && d.name !== symbol ? d.name : `${symbol} stock`} coverage={coverage} label={`Search ${(coverage || DEFAULT_COV).label} for ${d && d.name !== symbol ? d.name : symbol}`} /></div>
       {p && <div className="small tn-pos">You hold <b>{p.shares}</b> shares at {money(p.avgCost)} average{p.realized ? ` · realised ${money(p.realized)}` : ""}{p.dividends ? ` · dividends ${money(p.dividends)}` : ""}.</div>}
       {error && !d && <div className="empty">{error}</div>}
       {!d && !error && <div className="hint">Reading the news and rating it…</div>}
