@@ -66,10 +66,18 @@ test("TestJournal_DayLogMoneyWorkOmiAndSnapshots", async () => {
     assert.equal(a.omi.headline, "Fixed the NAS"); assert.deepEqual(a.omiConversations.map((c: any) => c.title), ["NAS talk"]);
     assert.deepEqual(a.alerts.map((x: any) => x.title), ["Sign in again"]);
 
-    // A finished day is saved once and then read back, even if the apps change.
-    const y = (await app.inject({ method: "GET", url: `/api/journal/${day(-1)}/auto`, cookies: cookie })).json();
-    assert.equal(y.final, true); assert.equal(y.money.spent, 50); assert.deepEqual(y.alerts, [], "alerts are only gathered live for today");
-    assert.equal((records.get("journal", day(-1)) as any).auto.money.spent, 50);
+    // Reading a past day never writes it (not even for an agent); the tick saves it, keeping text saved meanwhile.
+    const y0 = (await app.inject({ method: "GET", url: `/api/journal/${day(-1)}/auto`, headers: bot })).json();
+    assert.equal(y0.final, false); assert.equal(y0.money.spent, 50); assert.deepEqual(y0.alerts, [], "alerts are only gathered live for today");
+    assert.equal(records.get("journal", day(-1)), null, "a GET doesn't create the record");
+    assert.equal((await app.inject({ method: "GET", url: `/api/journal/${day(-1)}/auto?refresh=1`, headers: bot })).statusCode, 403, "only you can save it again");
+    records.create("journal", { date: day(-1), text: "old", pages: [] }, day(-1));
+    const saving = journal.tick();
+    records.patch("journal", day(-1), { text: "typed while it was saving" });
+    await saving;
+    const y: any = records.get("journal", day(-1));
+    assert.equal(y.text, "typed while it was saving", "the save writes only the log"); assert.equal(y.auto.final, true); assert.equal(y.auto.money.spent, 50);
+    assert.equal((await app.inject({ method: "GET", url: `/api/journal/${day(-1)}/auto`, cookies: cookie })).json().final, true);
     // Coinpile's own daily totals count when it shares them.
     clearCoinpileCache(); assert.equal((await journal.build(day(-2))).money?.spent, 77.7);
 
@@ -87,6 +95,20 @@ test("TestJournal_DayLogMoneyWorkOmiAndSnapshots", async () => {
     assert.equal((await app.inject({ method: "POST", url: "/api/journal/files", cookies: cookie, headers: { "content-type": "image/png" }, payload: Buffer.from("<svg onload=alert(1)>") })).statusCode, 415);
     assert.equal((await app.inject({ method: "POST", url: "/api/journal/files", headers: { ...bot, "content-type": "image/png" }, payload: PNG })).statusCode, 403);
     assert.equal((await app.inject({ method: "GET", url: "/api/journal/files/..%2Forb.db", cookies: cookie })).statusCode, 404);
+    // The big image body is only for the upload route, and only after sign-in.
+    const big = Buffer.alloc(5 * 1024 * 1024, 1);
+    assert.equal((await app.inject({ method: "POST", url: "/api/journal/files", headers: { "content-type": "image/png" }, payload: big })).statusCode, 401);
+    assert.notEqual((await app.inject({ method: "POST", url: "/api/c/tasks", cookies: cookie, headers: { "content-type": "image/png" }, payload: PNG })).statusCode, 201, "other routes don't take images");
     await app.close();
   } finally { ff.close(); omi.close(); cp.close(); um.close(); hs.close(); clearCoinpileCache(); delete process.env.JF_TOKEN; delete process.env.JO_KEY; delete process.env.JC_TOKEN; }
+});
+
+test("TestJournal_FailedSourceIsRetried", async () => {
+  const um = await serve((_req, res) => J(res, { error: "down" }, 500));
+  try {
+    const { journal, records } = await buildApp({ config: loadConfig("/nonexistent.yaml", { UPSTREAM_URL: um.url }) });
+    await journal.tick();
+    const y: any = records.get("journal", day(-1));
+    assert.equal(y.auto.final, false, "a source that failed leaves the day open"); assert.match(y.auto.notes.join(" "), /UpstreamManager/);
+  } finally { um.close(); }
 });

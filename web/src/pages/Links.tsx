@@ -28,7 +28,10 @@ function useLinks() {
   const doc = useColl("settings").find(d => d.id === "links"), host = typeof location !== "undefined" ? location.hostname : "";
   const found = useFetch<{ host: string; apps: Found[]; notes: string[]; sources: { unraid: boolean; docker: boolean } }>(`/api/links?host=${encodeURIComponent(host)}`, 60000);
   const yaml = useColl("settings").find(d => d.id === "apps")?.yaml as string | undefined;
-  const cfg: Cfg = { ...EMPTY, ...(doc || {}) } as Cfg;
+  // Changes show at once and build on each other, so two quick edits can't undo one another.
+  const [local, setLocal] = useState<Cfg | null>(null), inflight = useRef(0);
+  const cfg: Cfg = local ?? ({ ...EMPTY, ...(doc || {}) } as Cfg);
+  const latest = useRef(cfg); latest.current = cfg;
   const tiles = useMemo(() => {
     const out: Tile[] = [];
     const add = (t: Omit<Tile, "url" | "hidden" | "name" | "cat" | "icon" | "over"> & { name: string; cat: string; icon: string }) => {
@@ -36,14 +39,18 @@ function useLinks() {
       const url = o.mode === "url" ? safeUrl(o.url || "") : o.mode === "port" && o.port ? `${o.scheme || "http"}://${found.data?.host || host}:${o.port}` : t.detected;
       out.push({ ...t, name: o.name || t.name, cat: o.cat || t.cat, icon: safeUrl(o.icon || "") || t.icon, url, hidden: !!o.hidden, over: o, update: !!f?.updateAvailable });
     };
-    for (const f of found.data?.apps || []) add({ key: f.key, kind: "container", name: f.name, cat: "Server", icon: f.icon, rune: runeOf(f.name), state: f.state, update: f.updateAvailable, found: f, detected: f.url });
+    for (const f of found.data?.apps || []) add({ key: f.key, kind: "container", name: f.name, cat: "Server", icon: safeUrl(f.icon), rune: runeOf(f.name), state: f.state, update: f.updateAvailable, found: f, detected: safeUrl(f.url) });
     for (const g of parseApps(yaml ?? DEFAULT_APPS).groups) for (const a of g.apps) if (safeUrl(a.url)) add({ key: `app:${a.name}`, kind: "app", name: a.name, cat: g.name, icon: "", rune: a.rune || runeOf(a.name), state: "", update: false, detected: a.url });
     for (const e of cfg.extra) add({ key: e.key, kind: "link", name: e.name, cat: e.cat || "Links", icon: safeUrl(e.icon || ""), rune: runeOf(e.name), state: "", update: false, detected: safeUrl(e.url), extra: e });
     const pos = new Map(cfg.order.map((k, i) => [k, i]));
     return out.sort((a, b) => (pos.get(a.key) ?? 1e6) - (pos.get(b.key) ?? 1e6) || a.name.localeCompare(b.name));
   }, [JSON.stringify(cfg), found.data, yaml]);
   const cats = useMemo(() => [...new Set([...cfg.cats, ...tiles.map(t => t.cat)])], [tiles, cfg.cats.join("|")]);
-  const save = (p: Partial<Cfg>) => { const { id: _i, version: _v, ...cur } = (doc || EMPTY) as any; return put("settings", "links", { ...EMPTY, ...cur, ...p }); };
+  const save = (p: Partial<Cfg> | ((c: Cfg) => Partial<Cfg>)) => {
+    const { id: _i, version: _v, ...cur } = latest.current as any, next: Cfg = { ...EMPTY, ...cur, ...(typeof p === "function" ? p(latest.current) : p) };
+    latest.current = next; setLocal(next); inflight.current++;
+    return put("settings", "links", next).finally(() => { if (--inflight.current === 0) setLocal(null); });
+  };
   return { cfg, tiles, cats, found, save };
 }
 
@@ -99,7 +106,7 @@ function Portals() {
   const [drag, setDrag] = useState<{ key: string; x: number; y: number } | null>(null), [drop, setDrop] = useState<{ key?: string; cat: string; after: boolean } | null>(null);
   const moved = useRef(false);
   const show = tiles.filter(t => (arrange || !t.hidden) && (!q || t.name.toLowerCase().includes(q.toLowerCase())));
-  const setOver = (key: string, o: Over) => save({ items: { ...cfg.items, [key]: Object.fromEntries(Object.entries({ ...cfg.items[key], ...o }).filter(([, v]) => v !== undefined && v !== "")) } }).catch(ui.error);
+  const setOver = (key: string, o: Over) => save(c => ({ items: { ...c.items, [key]: Object.fromEntries(Object.entries({ ...c.items[key], ...o }).filter(([, v]) => v !== undefined && v !== "")) } })).catch(ui.error);
 
   // Dragging works with a mouse, a finger or a pen: pointer events on the window, so it doesn't depend on HTML drag and drop.
   const latest = useRef({ tiles, cfg, cats, save }); latest.current = { tiles, cfg, cats, save };
@@ -127,7 +134,9 @@ function Portals() {
         keys.splice(at, 0, t.key);
         const extra = t.kind === "link" ? cfg.extra.map(x => (x.key === t.key ? { ...x, cat: d.cat } : x)) : cfg.extra;
         const items = t.kind === "link" ? cfg.items : { ...cfg.items, [t.key]: { ...cfg.items[t.key], cat: d.cat } };
-        save({ order: keys, items, extra, cats }).catch(ui.error);
+        // Keep the places of apps not listed right now (a container whose server didn't answer).
+        const listed = new Set(keys), order = [...keys, ...cfg.order.filter(k => !listed.has(k))];
+        save({ order, items, extra, cats }).catch(ui.error);
       }
       dropRef.current = null; setDrag(null); setDrop(null);
     };
@@ -143,7 +152,7 @@ function Portals() {
   return <div className={"lk" + (arrange ? " arranging" : "")}>
     <div className="row lk-bar">
       <input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder="Find an app" aria-label="Find an app" />
-      <button className={"btn" + (arrange ? " on" : "")} aria-pressed={arrange} onClick={() => setArrange(!arrange)}>{arrange ? "Done arranging" : "Arrange"}</button>
+      <button className={"btn" + (arrange ? " on" : "")} aria-pressed={arrange} disabled={!arrange && !found.data && !found.error} title={!found.data && !found.error ? "Waiting for the server's apps" : undefined} onClick={() => setArrange(!arrange)}>{arrange ? "Done arranging" : "Arrange"}</button>
       {arrange && <><button className="btn" onClick={() => setEdit("new")}>Add link</button><button className="btn" onClick={addCat}>New category</button></>}
       <span className="hint">{arrange ? "Drag icons to move them. ✎ edits, the eye shows or hides." : found.data ? `${tiles.filter(t => !t.hidden).length} links${found.data.sources.unraid ? " · from Unraid" : found.data.sources.docker ? " · from Docker" : ""}` : "Looking for apps…"}</span>
     </div>

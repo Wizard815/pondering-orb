@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api } from "../lib/api";
+import { api, ApiError } from "../lib/api";
 import { useUi } from "../lib/ui";
 
 /** Handwriting and drawing for the Journal. Works with a mouse, a finger, a
@@ -55,25 +55,36 @@ export type Tool = { kind: "pen" | "hl" | "erase"; color: string; width: number 
 
 /** One copy of each page's strokes, shared by every view of it (the page in
  *  the list and its full-screen view), so neither overwrites the other. */
-type Shared = { strokes: Stroke[]; loaded: boolean; views: Set<() => void> };
+type Shared = { strokes: Stroke[]; loaded: boolean; failed: string; undo: Stroke[][]; redo: Stroke[][]; views: Set<() => void> };
 const pagesInk = new Map<string, Shared>();
+/** Load (or load again) a page's strokes. Only "not found" means a blank page:
+ *  any other failure keeps the page closed, so a stroke can't overwrite what's saved. */
+function load(id: string, v: Shared) {
+  v.failed = ""; v.loaded = false; v.views.forEach(f => f());
+  api<any>("GET", `/api/c/ink/${encodeURIComponent(id)}`).then(d => { v.strokes = Array.isArray(d?.strokes) ? d.strokes : []; v.loaded = true; },
+    e => { if (e instanceof ApiError && e.status === 404) { v.strokes = []; v.loaded = true; } else v.failed = e?.message || "Couldn't open this page."; })
+    .finally(() => v.views.forEach(f => f()));
+}
 function shared(id: string): Shared {
   let s = pagesInk.get(id);
-  if (!s) {
-    const v: Shared = { strokes: [], loaded: false, views: new Set() }; s = v; pagesInk.set(id, v);
-    api<any>("GET", `/api/c/ink/${encodeURIComponent(id)}`).then(d => { if (Array.isArray(d?.strokes)) v.strokes = d.strokes; }, () => {})
-      .finally(() => { v.loaded = true; v.views.forEach(f => f()); });
-  }
+  if (!s) { s = { strokes: [], loaded: false, failed: "", undo: [], redo: [], views: new Set() }; pagesInk.set(id, s); load(id, s); }
   return s;
 }
+/** The strokes as drawn here (including any not saved yet), or null if the page isn't open. */
+export const strokesOf = (id: string) => { const s = pagesInk.get(id); return s?.loaded ? s.strokes : null; };
+/** Forget a deleted page. */
+export const forgetInk = (id: string) => { pagesInk.delete(id); };
 
 /** One drawing page. Loads and saves its own strokes (record "ink/<page id>"). */
 export type InkActions = { undo: () => void; redo: () => void; clear: () => void };
-export function InkCanvas({ page, day, tool, penOnly, onPen, onActive, big }: { page: InkPage; day: string; tool: Tool; penOnly: boolean; onPen: () => void; onActive: (a: InkActions) => void; big?: boolean }) {
+/** The page the toolbar acts on: a ref each canvas hands over when touched and takes back when it goes. */
+export type ActiveInk = { current: InkActions | null };
+export function InkCanvas({ page, day, tool, penOnly, onPen, onActive, onGone, big }: { page: InkPage; day: string; tool: Tool; penOnly: boolean; onPen: () => void; onActive: (a: ActiveInk) => void; onGone: (a: ActiveInk) => void; big?: boolean }) {
   const ui = useUi(), wrap = useRef<HTMLDivElement>(null), cv = useRef<HTMLCanvasElement>(null);
-  const ink = shared(page.id), undo = useRef<Stroke[][]>([]), redo = useRef<Stroke[][]>([]);
+  // Undo and Redo live with the page, so the page and its full-screen view share them.
+  const ink = shared(page.id), undo = { get current() { return ink.undo; } }, redo = { get current() { return ink.redo; }, set current(v: Stroke[][]) { ink.redo = v; } };
   const strokes = { get current() { return ink.strokes; }, set current(v: Stroke[]) { ink.strokes = v; } };
-  const cur = useRef<{ s: Stroke; id: number } | null>(null), scale = useRef(1), dirty = useRef(false), timer = useRef<number>(0);
+  const cur = useRef<{ s: Stroke; id: number; erased?: boolean } | null>(null), scale = useRef(1), dirty = useRef(false), timer = useRef<number>(0);
   const [, force] = useState(0), loaded = ink.loaded;
 
   const redraw = useCallback(() => {
@@ -113,11 +124,14 @@ export function InkCanvas({ page, day, tool, penOnly, onPen, onActive, big }: { 
     if (!loaded || (penOnly && e.pointerType === "touch") || e.button > 0) return;
     e.preventDefault(); cv.current!.setPointerCapture(e.pointerId);
     const p = at(e);
-    if (tool.kind === "erase") { undo.current.push(strokes.current); redo.current = []; eraseAt(p[0], p[1]); cur.current = { s: { t: "pen", c: "", w: 0, p: [] }, id: e.pointerId }; return; }
+    if (tool.kind === "erase") { cur.current = { s: { t: "pen", c: "", w: 0, p: [] }, id: e.pointerId }; eraseAt(p[0], p[1]); return; }
     cur.current = { s: { t: tool.kind, c: tool.color, w: tool.width, p }, id: e.pointerId };
     const ctx = cv.current!.getContext("2d")!; ctx.setTransform(scale.current, 0, 0, scale.current, 0, 0); drawStroke(ctx, cur.current.s);
   };
-  const eraseAt = (x: number, y: number) => { const r = 14 + tool.width, keep = strokes.current.filter(s => !hits(s, x, y, r)); if (keep.length !== strokes.current.length) { strokes.current = keep; changed(); save(); } };
+  const eraseAt = (x: number, y: number) => { const r = 14 + tool.width, keep = strokes.current.filter(s => !hits(s, x, y, r)); if (keep.length === strokes.current.length) return;
+    // One undo step per eraser stroke, and only once it has erased something.
+    if (cur.current && !cur.current.erased) { cur.current.erased = true; undo.current.push(strokes.current); if (undo.current.length > 60) undo.current.shift(); redo.current = []; }
+    strokes.current = keep; changed(); save(); };
   const move = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const c = cur.current; if (!c || c.id !== e.pointerId) return;
     const evs = (e.nativeEvent as any).getCoalescedEvents?.() || [e.nativeEvent];
@@ -135,14 +149,16 @@ export function InkCanvas({ page, day, tool, penOnly, onPen, onActive, big }: { 
   const doUndo = () => { const prev = undo.current.pop(); if (!prev) return; redo.current.push(strokes.current); strokes.current = prev; changed(); save(); };
   const doRedo = () => { const next = redo.current.pop(); if (!next) return; undo.current.push(strokes.current); strokes.current = next; changed(); save(); };
   const clear = () => { if (strokes.current.length) commit([]); };
-  // The toolbar's Undo, Redo and Clear act on the page you last touched.
-  const actions = { undo: doUndo, redo: doRedo, clear };
-  useEffect(() => { if (big) onActive(actions); });
+  // The toolbar's Undo, Redo and Clear act on the page you last touched (or the one full screen).
+  const mine = useRef<InkActions | null>(null); mine.current = { undo: doUndo, redo: doRedo, clear };
+  useEffect(() => { if (big) onActive(mine); }, [big]);
+  useEffect(() => () => { mine.current = null; onGone(mine); }, []);
 
-  return <div ref={wrap} className={"ink-wrap" + (big ? " big" : "")} onPointerDownCapture={() => onActive(actions)}>
+  return <div ref={wrap} className={"ink-wrap" + (big ? " big" : "")} onPointerDownCapture={() => onActive(mine)}>
     <canvas ref={cv} className={"ink-canvas" + (tool.kind === "erase" ? " erasing" : "")} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
       role="img" aria-label={`Drawing page${page.bg ? " on an imported image" : ""}`} />
-    {!loaded && <div className="ink-loading hint">Opening the page…</div>}
+    {!loaded && !ink.failed && <div className="ink-loading hint">Opening the page…</div>}
+    {ink.failed && <div className="ink-loading err-inline small">{ink.failed} <button className="btn" onClick={() => load(page.id, ink)}>Try again</button></div>}
   </div>;
 }
 

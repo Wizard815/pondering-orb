@@ -73,7 +73,7 @@ export async function cpSummary(c: Companion): Promise<CpSummary> {
     robinhoodMain: rh(g.robinhood_main), robinhoodAgent: rh(g.robinhood_agent),
     billList: Array.isArray(g.bill_list) ? g.bill_list.slice(0, 200).map((b: any) => ({ date: String(b?.date || ""), name: String(b?.name || ""), amount: Number(b?.amount) || 0, category: String(b?.category || "") })).filter((b: CpBill) => b.name && isDay(b.date)).sort((x: CpBill, y: CpBill) => x.date.localeCompare(y.date)) : null,
     alertList, maturities: (alertList || []).filter(a => (a.kind === "maturing" || a.kind === "matured_idle") && a.date).sort((x, y) => x.date.localeCompare(y.date)),
-    daily: Array.isArray(g.daily) ? g.daily.slice(0, 400).filter((d: any) => isDay(d?.date)).map((d: any) => ({ date: String(d.date), spent: Math.abs(Number(d.spent) || 0), income: Number(d.income) || 0 })) : null,
+    daily: Array.isArray(g.daily) ? g.daily.filter((d: any) => isDay(d?.date)).sort((a: any, b: any) => String(b.date).localeCompare(String(a.date))).slice(0, 400).map((d: any) => ({ date: String(d.date), spent: Math.abs(Number(d.spent) || 0), income: Number(d.income) || 0 })) : null,
     at: Date.now(),
   };
   cache.set(c.url, { at: Date.now(), v }); return v;

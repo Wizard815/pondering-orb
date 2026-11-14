@@ -97,7 +97,7 @@ function PagesSetting() {
   const rows = all.filter(p => p.id !== "main" && p.id !== "config");
   const set = (id: string, v: string) => { const next = { ...(s.pages || {}) }; if (v === "auto") delete next[id]; else next[id] = v; saveSettings({ pages: next }).catch(ui.error); };
   return <><p className="hint" style={{ margin: 0 }}>Auto shows a page when what it needs is set up: Agents (Hermes Studio), Wiki (the vault or its REST key), Upkeep (UpstreamManager or chores), Uptime (Uptime Kuma), Picks (stock picks turned on).</p>
-    <ul className="list">{rows.map(p => { const st = setup[p.id], shown = pageMode(s, p.id) === "show" || (pageMode(s, p.id) === "auto" && st !== false);
+    <ul className="list">{rows.map(p => { const st = setup[p.id], shown = pageMode(s, p.id) === "show" || (pageMode(s, p.id) === "auto" && (!(p.id in setup) || st === true));
       return <li key={p.id}><div className="grow"><label htmlFor={"pg-" + p.id}>{p.label}</label><div className="hint">{p.id in setup ? (st === undefined ? "checking…" : st ? "set up" : "not set up") : "always available"} · {shown ? "shown" : "hidden"}</div></div>
         <select id={"pg-" + p.id} value={pageMode(s, p.id)} onChange={e => set(p.id, e.target.value)}><option value="auto">Auto</option><option value="show">Always show</option><option value="hide">Hide</option></select></li>; })}</ul></>;
 }

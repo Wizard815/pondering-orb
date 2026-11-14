@@ -70,3 +70,11 @@ test("TestUnraid_WebuiTemplates", () => {
   assert.equal(resolveWebui("https://[IP]:[PORT:443]", "tower", ports), "https://tower:443", "unmapped: the container port");
   assert.equal(resolveWebui("http://[IP]:[PORT:8080]/", "", ports), "", "no host, no link");
 });
+
+test("TestUnraid_LinkHostAndUnsafeWebui", async () => {
+  const { linkHost, appUrl } = await import("../src/integrations/unraid.js");
+  assert.equal(linkHost("nas:8080", ""), "nas", "a port in the link address is dropped");
+  assert.equal(linkHost("https://tower.lan/", ""), "tower.lan");
+  const a: any = { webui: "javascript:alert(1)//[IP]", ports: [{ private: 80, public: 8088, type: "tcp" }], networkMode: "bridge" };
+  assert.equal(appUrl(a, "tower"), "http://tower:8088", "a WebUI label that isn't http(s) is ignored");
+});

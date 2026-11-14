@@ -49,7 +49,10 @@ export function App() {
   useEffect(() => applyAppearance(settings), [JSON.stringify(settings)]);
   useEffect(() => setEditing(false), [hash]);
 
-  const links: [string, string][] = (settings.links || []).filter((l: any) => Array.isArray(l) && l.length === 2 && l.every((x: string) => pageById(x)) && l[0] !== l[1]);
+  // Every saved pair; only pairs whose pages both show are used. Saves keep the others,
+  // so a page that's hidden for now (or still being checked) doesn't lose its pairing.
+  const stored: [string, string][] = (settings.links || []).filter((l: any) => Array.isArray(l) && l.length === 2 && l.every((x: unknown) => typeof x === "string") && l[0] !== l[1]);
+  const links = stored.filter(l => l.every(x => pageById(x)));
   const projectId = /^p-/.test(hash) ? hash.slice(2) : null;
   const first = hash.split("--")[0];
   let tab = projectId ? "projects" : pageById(first) ? first : "main"; // an unknown hash shows Main, never a blank page
@@ -70,13 +73,13 @@ export function App() {
     if (!id.includes("--")) return ui.menu(e.clientX, e.clientY, [{ label: "Drag this tab onto another tab to show both side by side.", heading: true }]);
     const [a, b] = id.split("--");
     ui.menu(e.clientX, e.clientY, [
-      { label: `Unlink ${pageById(a)!.label} and ${pageById(b)!.label}`, run: () => { const before = links; saveSettings({ links: links.filter(l => l.join("--") !== id) }).then(() => ui.undo("Tabs unlinked.", () => saveSettings({ links: before }))).catch(ui.error); location.hash = a; } },
-      { label: "Swap sides", run: () => { saveSettings({ links: links.map(l => (l.join("--") === id ? [l[1], l[0]] : l)) }).catch(ui.error); location.hash = `${b}--${a}`; } },
+      { label: `Unlink ${pageById(a)!.label} and ${pageById(b)!.label}`, run: () => { const before = stored; saveSettings({ links: stored.filter(l => l.join("--") !== id) }).then(() => ui.undo("Tabs unlinked.", () => saveSettings({ links: before }))).catch(ui.error); location.hash = a; } },
+      { label: "Swap sides", run: () => { saveSettings({ links: stored.map(l => (l.join("--") === id ? [l[1], l[0]] : l)) }).catch(ui.error); location.hash = `${b}--${a}`; } },
     ]);
   };
   const dropTab = (target: string) => {
     if (!dragTab || dragTab === target || target.includes("--")) return;
-    saveSettings({ links: [...links.filter(l => !l.includes(dragTab) && !l.includes(target)), [target, dragTab]] }).catch(ui.error);
+    saveSettings({ links: [...stored.filter(l => !l.includes(dragTab) && !l.includes(target)), [target, dragTab]] }).catch(ui.error);
     location.hash = `${target}--${dragTab}`; setDragTab(null);
   };
   const startSlide = (e: React.PointerEvent) => {

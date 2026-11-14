@@ -35,6 +35,9 @@ import { serverApps, linkHost, appUrl, suggestions, unraidSystem, unraidContaine
 import { today, localDay, isDay, timeZone } from "./dates.js";
 
 export const VERSION = "0.1.0";
+/** Without a data file (tests), journal images go to one temporary folder per process. */
+let tmpFiles = "";
+const tempFiles = () => (tmpFiles ||= mkdtempSync(pjoin(tmpdir(), "orb-journal-")));
 
 export interface AppOptions { filesDir?: string; dataFile?: string; config?: OrbConfig; webDir?: string; password?: string; tokens?: string; logger?: boolean }
 
@@ -242,7 +245,7 @@ export async function buildApp(o: AppOptions = {}) {
   const market = marketApi(app, { records, cfg, guard, who });
   robinhoodApi(app, { records, store, guard, who });
   const journal = journalApi(app, { records, cfg, guard, who, upstream, hermes, outbox, appsYaml, events: daily.events,
-    filesDir: o.filesDir ?? (o.dataFile && o.dataFile !== ":memory:" ? pjoin(dirname(o.dataFile), "journal") : mkdtempSync(pjoin(tmpdir(), "orb-journal-"))) });
+    filesDir: o.filesDir ?? (o.dataFile && o.dataFile !== ":memory:" ? pjoin(dirname(o.dataFile), "journal") : tempFiles()) });
 
   // ---- live updates (Server-Sent Events) ----
   app.get("/api/stream", { preHandler: guard }, (req, reply) => {
