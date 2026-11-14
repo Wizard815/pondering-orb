@@ -32,7 +32,8 @@ const ALWAYS = new Set(["main", "config"]); // can't be hidden: Settings is how 
 /** Whether each page has what it needs: true, false, or undefined while unknown. */
 export function usePageSetup(): Record<string, boolean | undefined> {
   const cfg = useOrbConfig(), s = useSettings(), chores = useColl("chores"), picks = useColl("picks"), research = useColl("research");
-  const known = (v: boolean) => (cfg ? v : undefined);
+  // Unknown while loading; if the server's settings can't be read, show the pages rather than hide them.
+  const known = (v: boolean) => (!cfg ? undefined : cfg.failed ? true : v);
   return {
     agents: known(!!cfg?.hermes?.baseUrl),
     wiki: known(!!cfg?.wiki?.mount || (!!cfg?.wiki?.baseUrl && !!cfg?.wiki?.keySet)),

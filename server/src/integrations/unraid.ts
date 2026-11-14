@@ -64,7 +64,7 @@ export async function serverApps(o: { base: string; token: string; dockerHost: s
 
 /** The address links use: set in Settings, else the agent's host. Empty means "the host this page was opened from". */
 export function linkHost(linkHostSetting: string, base: string) {
-  if (linkHostSetting) return linkHostSetting.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  if (linkHostSetting) { const v = linkHostSetting.trim(); try { return new URL(/^https?:\/\//i.test(v) ? v : `http://${v}`).hostname; } catch { return ""; } }
   try { return base ? new URL(base).hostname : ""; } catch { return ""; }
 }
 
@@ -75,7 +75,8 @@ export function resolveWebui(t: string, host: string, ports: Port[]) {
 }
 /** Where an app answers on the LAN: its WebUI, else its first TCP host port (or, on the host network, its first port). */
 export function appUrl(a: AppSource, host: string) {
-  const w = resolveWebui(a.webui, host, a.ports); if (w) return w;
+  const w = resolveWebui(a.webui, host, a.ports); if (/^https?:\/\//i.test(w)) return w; // a label could say javascript:
+
   if (!host) return "";
   const p = a.ports.find(x => x.type === "tcp" && x.public) || (a.networkMode === "host" ? a.ports.find(x => x.type === "tcp") : undefined);
   return p ? `http://${host}:${p.public || p.private}` : "";

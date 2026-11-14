@@ -6,7 +6,7 @@ import { useUi } from "../lib/ui";
 import { useFetch } from "../lib/useFetch";
 import { Markdown } from "../lib/markdown";
 import { ago, todayISO } from "../lib/util";
-import { InkCanvas, InkTools, PAGE_W, PAGE_H, paint, type InkPage, type InkActions, type Tool } from "../components/Ink";
+import { InkCanvas, InkTools, PAGE_W, PAGE_H, paint, strokesOf, forgetInk, type InkPage, type InkActions, type ActiveInk, type Tool } from "../components/Ink";
 
 /** The Journal: one page per day. Orb's log of the day (money, what got done,
  *  commits, agents, Omi, alerts), your typed notes, and pages to write or
@@ -19,21 +19,30 @@ const longDay = (iso: string) => new Date(iso + "T12:00:00").toLocaleDateString(
 const usd = (n: number, cur = "") => n.toLocaleString(undefined, { style: "currency", currency: cur || "USD" });
 const newId = (day: string) => `${day}-${Math.random().toString(36).slice(2, 10)}`;
 
-/** One day's journal record: loaded on its own, saved in small pieces. */
+/** Journal records by day: loaded one day at a time, saved in small pieces.
+ *  Every save names its day, so a save that finishes after you moved to
+ *  another day still lands on (and only changes) the day it was made on. */
+type Patch = Partial<Doc> | ((cur: Doc) => Partial<Doc>);
 function useJournal(day: string) {
-  const ui = useUi(), [doc, setDoc] = useState<Doc | null>(null), docRef = useRef<Doc | null>(null);
-  useEffect(() => { let live = true; setDoc(null); docRef.current = null;
+  const ui = useUi(), docs = useRef(new Map<string, Doc>()), seq = useRef(new Map<string, number>()), shown = useRef(day);
+  const [, bump] = useState(0); shown.current = day;
+  const set = (d: string, v: Doc) => { docs.current.set(d, v); if (d === shown.current) bump(x => x + 1); };
+  useEffect(() => { let live = true;
+    if (docs.current.has(day)) return;
     api<Doc>("GET", `/api/c/journal/${day}`).catch(e => { if (e instanceof ApiError && e.status === 404) return { date: day, text: "", pages: [] }; throw e; })
-      .then(d => { if (live) { const v = { ...d, text: d.text || "", pages: d.pages || [] }; docRef.current = v; setDoc(v); } }, ui.error);
+      .then(d => { if (live && !docs.current.has(day)) set(day, { ...d, text: d.text || "", pages: d.pages || [] }); }, ui.error);
     return () => { live = false; }; }, [day]);
-  const save = useCallback(async (p: Partial<Doc>) => {
-    const cur = docRef.current || { date: day, text: "", pages: [] }, next = { ...cur, ...p };
-    docRef.current = next; setDoc(next);
-    const { id: _i, version: _v, auto: _a, ...body } = next;
-    const d = await api<Doc>(cur.version ? "PATCH" : "PUT", `/api/c/journal/${day}`, cur.version ? p : body);
-    docRef.current = { ...next, version: d.version, id: d.id }; setDoc(docRef.current);
-  }, [day]);
-  return { doc, save };
+  const save = useCallback(async (forDay: string, p: Patch) => {
+    const cur = docs.current.get(forDay) || { date: forDay, text: "", pages: [] }, part = typeof p === "function" ? p(cur) : p;
+    set(forDay, { ...cur, ...part });
+    const n = (seq.current.get(forDay) || 0) + 1; seq.current.set(forDay, n);
+    // PATCH changes only what was sent; a day with no record yet is created.
+    const url = `/api/c/journal/${forDay}`;
+    const d = await api<Doc>("PATCH", url, part).catch(e => { if (e instanceof ApiError && e.status === 404) return api<Doc>("PUT", url, { date: forDay, text: "", pages: [], ...part }); throw e; });
+    // Only the latest save's answer counts (an older one may arrive last).
+    if (seq.current.get(forDay) === n) set(forDay, { ...(docs.current.get(forDay) as Doc), version: d.version, id: d.id });
+  }, []);
+  return { doc: docs.current.get(day) || null, save };
 }
 
 // ---------------- the day's log ----------------
@@ -93,10 +102,13 @@ function Money({ day, log }: { day: string; log: ReturnType<typeof useFetch<any>
 // ---------------- typed notes ----------------
 function Notes({ day, j }: { day: string; j: ReturnType<typeof useJournal> }) {
   const ui = useUi(), [text, setText] = useState<string | null>(null), [preview, setPreview] = useState(false), t = useRef(0), [saved, setSaved] = useState(0);
-  useEffect(() => { setText(null); setPreview(false); }, [day]);
+  const pending = useRef<{ day: string; text: string } | null>(null);
+  const flush = () => { clearTimeout(t.current); const p = pending.current; pending.current = null; if (p) j.save(p.day, { text: p.text }).then(() => setSaved(Date.now()), ui.error); };
+  // Moving to another day (or leaving the page) saves what was typed, on the day it was typed on.
+  useEffect(() => { setText(null); setPreview(false); return flush; }, [day]);
   if (!j.doc) return <div className="hint">Opening the day…</div>;
   const val = text ?? j.doc.text;
-  const change = (v: string) => { setText(v); clearTimeout(t.current); t.current = window.setTimeout(() => j.save({ text: v }).then(() => setSaved(Date.now()), ui.error), 800); };
+  const change = (v: string) => { setText(v); pending.current = { day, text: v }; clearTimeout(t.current); t.current = window.setTimeout(flush, 800); };
   return <div className="jn">
     <div className="row small"><button className={"btn" + (!preview ? " on" : "")} onClick={() => setPreview(false)}>Write</button><button className={"btn" + (preview ? " on" : "")} onClick={() => setPreview(true)}>Read</button>
       <span className="hint">{saved ? `Saved ${ago(saved)}` : "Saves as you type. Markdown works."}</span></div>
@@ -139,18 +151,21 @@ function loadTool(): Tool { try { return { kind: "pen", color: "#1b1b1b", width:
 
 function Drawing({ day, j }: { day: string; j: ReturnType<typeof useJournal> }) {
   const ui = useUi(), [tool, setToolS] = useState<Tool>(loadTool), [penOnly, setPenOnly] = useState(() => localStorage.getItem("orb.penonly") === "1");
-  const [full, setFull] = useState<number | null>(null), [busy, setBusy] = useState(""), file = useRef<HTMLInputElement>(null), active = useRef<InkActions | null>(null);
+  const [full, setFull] = useState<number | null>(null), [busy, setBusy] = useState(""), file = useRef<HTMLInputElement>(null), active = useRef<ActiveInk | null>(null);
+  const onActive = (a: ActiveInk) => { active.current = a; }, onGone = (a: ActiveInk) => { if (active.current === a) active.current = null; };
   const setTool = (t: Tool) => { setToolS(t); try { localStorage.setItem(TOOL_KEY, JSON.stringify(t)); } catch { /* storage blocked */ } };
   const pen = (v: boolean) => { setPenOnly(v); try { localStorage.setItem("orb.penonly", v ? "1" : "0"); } catch { /* storage blocked */ } };
   const onPen = () => { if (!penOnly && localStorage.getItem("orb.penonly") === null) pen(true); }; // first pen seen: ignore palms from now on
-  useEffect(() => { setFull(null); }, [day]);
+  useEffect(() => { setFull(null); active.current = null; }, [day]);
   useEffect(() => { if (full === null) return; const k = (e: KeyboardEvent) => { if (e.key === "Escape") setFull(null); }; addEventListener("keydown", k); return () => removeEventListener("keydown", k); }, [full]);
   if (!j.doc) return <div className="hint">Opening the day…</div>;
   const pages = j.doc.pages;
-  const addPages = async (more: InkPage[]) => { await j.save({ pages: [...(j.doc?.pages || []), ...more] }); };
-  const blank = () => addPages([{ id: newId(day), w: PAGE_W, h: PAGE_H }]).catch(ui.error);
+  /** Pages are added to the day they were started on, even if you moved on meanwhile. */
+  const addPages = (forDay: string, more: InkPage[]) => j.save(forDay, cur => ({ pages: [...cur.pages, ...more] }));
+  const blank = () => addPages(day, [{ id: newId(day), w: PAGE_W, h: PAGE_H }]).then(() => true, e => { ui.error(e); return false; });
   const bring = async (files: FileList | null) => {
     if (!files?.length) return;
+    const day0 = day;
     try {
       const made: InkPage[] = [];
       for (const f of Array.from(files)) {
@@ -158,22 +173,24 @@ function Drawing({ day, j }: { day: string; j: ReturnType<typeof useJournal> }) 
         else if (f.type.startsWith("image/")) { setBusy(`Bringing in ${f.name}…`); made.push(await imagePage(f, day)); }
         else throw new Error(`${f.name} isn't an image or a PDF.`);
       }
-      await addPages(made); ui.status(`Added ${made.length} page${made.length === 1 ? "" : "s"}.`);
+      await addPages(day0, made); ui.status(`Added ${made.length} page${made.length === 1 ? "" : "s"}${day0 !== day ? ` to ${longDay(day0)}` : ""}.`);
     } catch (e) { ui.error(e); } finally { setBusy(""); if (file.current) file.current.value = ""; }
   };
   const del = (anchor: Element, p: InkPage) => ui.confirm(anchor, "Delete this page and everything drawn on it?", "Delete page", async () => {
-    await j.save({ pages: pages.filter(x => x.id !== p.id) });
+    await j.save(day, cur => ({ pages: cur.pages.filter(x => x.id !== p.id) }));
+    forgetInk(p.id);
     await api("DELETE", `/api/c/ink/${encodeURIComponent(p.id)}`).catch(() => {});
     if (p.bg) await api("DELETE", `/api/journal/files/${encodeURIComponent(p.bg)}`).catch(() => {});
   });
   const save = async (p: InkPage, k: number) => {
-    const d = await api<any>("GET", `/api/c/ink/${encodeURIComponent(p.id)}`).catch(() => ({ strokes: [] })), c = document.createElement("canvas"); c.width = p.w; c.height = p.h;
+    // What's on screen, including strokes not saved yet.
+    const strokes = strokesOf(p.id) ?? (await api<any>("GET", `/api/c/ink/${encodeURIComponent(p.id)}`)).strokes ?? [], c = document.createElement("canvas"); c.width = p.w; c.height = p.h;
     let bg: HTMLImageElement | null = null;
     if (p.bg) { bg = new Image(); bg.src = `/api/journal/files/${encodeURIComponent(p.bg)}`; await bg.decode().catch(() => {}); }
-    paint(c.getContext("2d")!, p, d.strokes || [], 1, bg);
+    paint(c.getContext("2d")!, p, strokes, 1, bg);
     const a = document.createElement("a"); a.href = URL.createObjectURL(await toBlob(c)); a.download = `journal-${day}-${k + 1}.png`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
   };
-  const act = (k: keyof InkActions) => active.current?.[k]();
+  const act = (k: keyof InkActions) => active.current?.current?.[k]();
   const tools = <InkTools tool={tool} setTool={setTool} penOnly={penOnly} setPenOnly={pen} act={act} />;
   const drop = (e: React.DragEvent) => { e.preventDefault(); bring(e.dataTransfer.files); };
 
@@ -187,16 +204,16 @@ function Drawing({ day, j }: { day: string; j: ReturnType<typeof useJournal> }) 
     {pages.length > 0 && tools}
     {!pages.length && <div className="empty">No pages yet. Start a blank page to write or draw on, or bring in a photo, a scan or a PDF (from your BOOX, say) and keep writing on it. You can also drop files here.</div>}
     {pages.map((p, k) => <figure key={p.id} className="ink-page">
-      <InkCanvas page={p} day={day} tool={tool} penOnly={penOnly} onPen={onPen} onActive={a => { active.current = a; }} />
+      <InkCanvas page={p} day={day} tool={tool} penOnly={penOnly} onPen={onPen} onActive={onActive} onGone={onGone} />
       <figcaption className="row small"><span className="hint">Page {k + 1}{p.bg ? " · on an imported image" : ""}</span>
         <button className="btn" onClick={() => setFull(k)}>Full screen</button><button className="btn" onClick={() => save(p, k).catch(ui.error)}>Save as PNG</button><button className="btn" onClick={e => del(e.currentTarget, p)}>Delete</button></figcaption>
     </figure>)}
     {full !== null && pages[full] && createPortal(<div className="ink-full" role="dialog" aria-modal="true" aria-label={`Page ${full + 1}, full screen`}>
       <div className="ink-full-bar">{tools}<span className="ink-sep" />
         <button className="btn" disabled={full === 0} onClick={() => setFull(full - 1)}>‹ Page</button><span className="small">{full + 1} / {pages.length}</span>
-        <button className="btn" onClick={() => (full === pages.length - 1 ? blank().then(() => setFull(full + 1)) : setFull(full + 1))}>{full === pages.length - 1 ? "New page ›" : "Page ›"}</button>
+        <button className="btn" onClick={() => (full === pages.length - 1 ? blank().then(ok => { if (ok) setFull(full + 1); }) : setFull(full + 1))}>{full === pages.length - 1 ? "New page ›" : "Page ›"}</button>
         <button className="btn primary" onClick={() => setFull(null)}>Done</button></div>
-      <InkCanvas key={pages[full].id + "-big"} page={pages[full]} day={day} tool={tool} penOnly={penOnly} onPen={onPen} onActive={a => { active.current = a; }} big />
+      <InkCanvas key={pages[full].id + "-big"} page={pages[full]} day={day} tool={tool} penOnly={penOnly} onPen={onPen} onActive={onActive} onGone={onGone} big />
     </div>, document.body)}
   </div>;
 }

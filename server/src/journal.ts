@@ -53,7 +53,7 @@ export function sniff(b: Buffer): keyof typeof TYPES | null {
   return null;
 }
 
-const dayOfIso = (s: string) => { const t = Date.parse(s); return Number.isNaN(t) ? "" : localDay(t); };
+const dayOfIso = (s: string) => { if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; const t = Date.parse(s); return Number.isNaN(t) ? "" : localDay(t); };
 const clockOf = (ms: number) => localClock(new Date(ms).toISOString());
 
 export function journalApi(app: FastifyInstance, deps: {
@@ -139,36 +139,44 @@ export function journalApi(app: FastifyInstance, deps: {
 
   /** Save a finished day's log into its journal record (once). */
   async function snapshot(day: string, force = false) {
-    const cur: any = records.get("journal", day);
-    if (cur?.auto?.final && !force) return cur.auto as AutoLog;
-    const auto = { ...(await build(day)), final: true };
-    const { id: _i, version: _v, ...rest } = cur || { date: day, text: "", pages: [] };
-    records.put("journal", day, { ...rest, auto }, "orb");
+    const before: any = records.get("journal", day);
+    if (before?.auto?.final && !force) return before.auto as AutoLog;
+    const built = await build(day);
+    // Final only when every source answered; otherwise the tick tries again.
+    const auto = { ...built, final: built.notes.length === 0 };
+    // The build takes a while: write only `auto`, onto the record as it is now, so text saved meanwhile stays.
+    if (records.get("journal", day)) records.patch("journal", day, { auto }, undefined, "orb");
+    else records.create("journal", { date: day, text: "", pages: [], auto }, day, "orb");
     return auto;
   }
 
   /** The day's log: saved for a finished day, worked out now for today (or a past day never saved). */
   async function autoFor(day: string, refresh = false): Promise<AutoLog> {
     const cur: any = records.get("journal", day);
-    if (day < today()) return refresh || !cur?.auto?.final ? snapshot(day, refresh) : cur.auto;
+    if (day < today()) { if (refresh) return snapshot(day, true); if (cur?.auto) return cur.auto; }
     return build(day);
   }
 
   const dayParam = (v: unknown) => { const d = String(v || ""); if (!isDay(d)) throw new HttpError(400, "The day is YYYY-MM-DD."); if (d > today()) throw new HttpError(400, "That day hasn't happened yet."); return d; };
   const you = (req: any) => { if (deps.who(req) !== "you") throw new HttpError(403, "Only a signed-in person can change the journal."); };
 
-  app.get("/api/journal/:day/auto", { preHandler: guard }, async (req: any) => autoFor(dayParam(req.params.day), req.query.refresh === "1"));
+  // Reading never writes. Refresh saves a past day's log again, and only you can ask for that.
+  app.get("/api/journal/:day/auto", { preHandler: guard }, async (req: any) => { const refresh = req.query.refresh === "1"; if (refresh) you(req); return autoFor(dayParam(req.params.day), refresh); });
 
   // Images (and PDF pages, which the browser turns into images) for drawing pages.
-  app.addContentTypeParser(/^image\/(png|jpeg|webp|gif)$/, { parseAs: "buffer", bodyLimit: 25 * 1024 * 1024 }, (_req, body, done) => done(null, body));
-  app.post("/api/journal/files", { preHandler: guard, bodyLimit: 25 * 1024 * 1024 }, async (req: any) => {
-    you(req);
+  // The image body parser lives in its own scope, so no other route accepts a 25 MB image body,
+  // and sign-in is checked before the body is read.
+  app.register(async scope => {
+    scope.addContentTypeParser(/^image\/(png|jpeg|webp|gif)$/, { parseAs: "buffer", bodyLimit: 25 * 1024 * 1024 }, (_req, body, done) => done(null, body));
+    scope.post("/api/journal/files", { onRequest: [guard, async (req: any) => you(req)], bodyLimit: 25 * 1024 * 1024 }, upload);
+  });
+  async function upload(req: any) {
     const b = req.body; if (!Buffer.isBuffer(b) || !b.length) throw new HttpError(400, "Send the image itself (PNG, JPEG, WebP or GIF) as the request body.");
     const ext = sniff(b); if (!ext) throw new HttpError(415, "That isn't a PNG, JPEG, WebP or GIF image.");
     await mkdir(filesDir, { recursive: true });
     const id = `${randomUUID().replace(/-/g, "")}.${ext}`; await writeFile(join(filesDir, id), b);
     return { id, type: TYPES[ext], bytes: b.length };
-  });
+  }
   app.get("/api/journal/files/:id", { preHandler: guard }, async (req: any, reply) => {
     const id = String(req.params.id); if (!FILE.test(id)) throw new HttpError(404, "No such file.");
     const data = await readFile(join(filesDir, id)).catch(() => { throw new HttpError(404, "No such file."); });
@@ -181,6 +189,6 @@ export function journalApi(app: FastifyInstance, deps: {
   });
 
   /** After midnight, yesterday's log is saved for good. */
-  async function tick() { const y = localDay(Date.now() - 864e5); const cur: any = records.get("journal", y); if (!cur?.auto?.final) await snapshot(y); }
+  async function tick() { const y = localDay(Date.now() - 864e5); const cur: any = records.get("journal", y); if (!cur?.auto?.final) await snapshot(y, true); }
   return { build, autoFor, snapshot, tick };
 }
