@@ -20,9 +20,10 @@ import { DailyPage } from "./Daily";
 import { PicksPage } from "./Picks";
 import { AgentsPage } from "./Agents";
 import { JournalPage } from "./Journal";
+import { LinksPage } from "./Links";
 
 /** Tabs, in order. */
-export const PAGES: PageDef[] = [MainPage, DailyPage, JournalPage, ProjectsPage, AgentsPage, IdeasPage, TodoPage, WikiPage, CalendarPage, PicksPage, UpkeepPage, UptimePage, SystemPage, SettingsPage];
+export const PAGES: PageDef[] = [MainPage, LinksPage, DailyPage, JournalPage, ProjectsPage, AgentsPage, IdeasPage, TodoPage, WikiPage, CalendarPage, PicksPage, UpkeepPage, UptimePage, SystemPage, SettingsPage];
 
 /** Pages that only make sense with an app behind them. A page whose app
  *  isn't set up stays out of the tabs unless Settings → Pages says "Show". */

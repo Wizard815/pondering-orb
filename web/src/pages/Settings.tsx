@@ -16,6 +16,7 @@ const CONNS: { id: string; name: string; fields: [string, string][]; note?: stri
   { id: "caldav", name: "CalDAV tasks", fields: [["url", "CalDAV URL (empty: the ALLGlance gateway's /dav/)"], ["userEnv", "User variable"], ["passwordEnv", "Password variable"], ["choresList", "List that holds chores"]] },
   { id: "wiki", name: "LLMWIKI", fields: [["baseUrl", "REST API URL"], ["tokenEnv", "API key variable"], ["vault", "Vault folder in the container (read only)"]] },
   { id: "allglance", name: "ALLGlance gateway", fields: [["baseUrl", "Base URL (e.g. http://allglance-gateway:8090)"], ["tokenEnv", "Token variable (same value as GATEWAY_TOKEN)"]], note: "Brings in dayGLANCE's day plan and inbox, lastGLANCE chores and lifeGLANCE milestones. vikunja tasks still come over CalDAV." },
+  { id: "unraid", name: "Unraid Management Agent", fields: [["baseUrl", "Agent address (e.g. http://tower:8043)"], ["tokenEnv", "Token variable (the agent's API token)"], ["linkHost", "Address for app links (empty: the agent's host)"]], note: "Lists every container with its ports for the Links page. Unraid's WebUI and icon for each container come from Docker labels, through the socket proxy." },
   { id: "hermes", name: "Hermes Studio", fields: [["baseUrl", "Base URL"], ["userEnv", "User variable"], ["passwordEnv", "Password variable"]] },
 ];
 
@@ -32,6 +33,19 @@ function Connections() {
       <div className="row"><button className="btn primary" type="submit">Save</button><button className="btn" type="button" onClick={async () => { setRes({ ...res, [c.id]: { ok: true, detail: "Testing…" } }); try { setRes({ ...res, [c.id]: await post(`/api/connections/test/${c.id}`) }); } catch (x: any) { setRes({ ...res, [c.id]: { ok: false, detail: x.message } }); } }}>Test</button></div>
       {res[c.id] && <div className={res[c.id].ok ? "okmsg" : "err-inline"}>{res[c.id].detail}</div>}
     </form>)}</div></>;
+}
+
+/** Containers on the server that look like apps Orb connects to, for connections that are still empty. */
+function Suggested() {
+  const ui = useUi(), s = useSettings(), { data, error, reload } = useFetch<{ conn: string; field: string; label: string; container: string; url: string; running: boolean }[]>(`/api/links/suggest?host=${encodeURIComponent(location.hostname)}`);
+  if (error) return <div className="empty small">{error}</div>;
+  if (!data) return <div className="hint">Looking at the server's containers…</div>;
+  if (!data.length) return <div className="empty small">Nothing to suggest: every connection Orb could match to a container is set, or the server's containers aren't listed yet (connect the Unraid Management Agent or the Docker socket proxy).</div>;
+  const use = async (x: (typeof data)[number]) => {
+    try { await (x.conn === "golem" ? saveSettings({ golem: { ...(s.golem || {}), baseUrl: x.url } }) : saveSettings({ connections: { ...(s.connections || {}), [x.conn]: { ...(s.connections?.[x.conn] || {}), [x.field]: x.url } } }));
+      ui.status(`${x.label} now uses ${x.url}. Press Test under Connections to check it.`); reload(); } catch (e) { ui.error(e); }
+  };
+  return <ul className="list">{data.map(x => <li key={x.conn}><div className="grow"><b>{x.label}</b> <span className="hint">from {x.container}{x.running ? "" : " (stopped)"}</span><div className="mono small">{x.url}</div></div><button className="btn" onClick={() => use(x)}>Use</button></li>)}</ul>;
 }
 
 function GolemSettings() {
@@ -103,6 +117,7 @@ export const SettingsPage: PageDef = {
       { key: "appearance", title: "Appearance", node: <Appearance />, w: 6, h: 11 },
       { key: "pages", title: "Pages", node: <PagesSetting />, w: 6, h: 17 },
       { key: "connections", title: "Connections", node: <Connections />, w: 12, h: 12 },
+      { key: "suggested", title: "Found on your server", node: <Suggested />, w: 6, h: 8 },
       { key: "logs", title: "Logs", node: <form className="setting" onSubmit={e => { e.preventDefault(); const v = Number(new FormData(e.currentTarget).get("logmax")); saveSettings({ logMax: Math.max(20, Math.min(200, v || 50)) }).then(() => ui.status("Log length saved.")).catch(ui.error); }}>
           <div><label htmlFor="logmax">Log entry length</label><div className="d">Most characters in one entry, for you, Golem and agents. 20 to 200.</div></div>
           <div className="row"><input type="number" id="logmax" name="logmax" min={20} max={200} defaultValue={s.logMax || 50} key={s.logMax} /><button className="btn" type="submit">Save</button></div>

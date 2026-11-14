@@ -31,6 +31,7 @@ import { dailyApi } from "./daily.js";
 import { marketApi } from "./market.js";
 import { robinhoodApi } from "./robinhood.js";
 import { journalApi } from "./journal.js";
+import { serverApps, linkHost, appUrl, suggestions, unraidSystem, unraidContainers } from "./integrations/unraid.js";
 import { today, localDay, isDay, timeZone } from "./dates.js";
 
 export const VERSION = "0.1.0";
@@ -54,6 +55,7 @@ export async function buildApp(o: AppOptions = {}) {
       wiki: { ...base.wiki, ...envSafe(c.wiki), vault: base.wiki.vault },
       hermes: { ...base.hermes, ...envSafe(c.hermes) },
       allglance: { ...base.allglance, ...envSafe(c.allglance) },
+      unraid: { ...base.unraid, ...envSafe(c.unraid) },
     };
     // The ALLGlance stack serves Vikunja's CalDAV at the gateway's /dav: with
     // no CalDAV URL of its own, Orb uses that one address for tasks too.
@@ -282,6 +284,24 @@ export async function buildApp(o: AppOptions = {}) {
   app.post("/api/upstream/poll", { preHandler: guard }, async () => ({ logged: await logCommits(records, upstream, cfg().logMax) }));
 
   // ---- Uptime Kuma, host stats ----
+  // ---- Links: the server's containers (Unraid Management Agent and/or Docker), with where each answers ----
+  let appsCache: { at: number; key: string; v: Awaited<ReturnType<typeof serverApps>> } | null = null;
+  const linkApps = async () => {
+    const c = cfg(), key = `${c.unraid.baseUrl}|${c.system.docker}|${c.unraid.tokenEnv}|${secret(c.unraid.tokenEnv)}`;
+    if (!appsCache || appsCache.key !== key || Date.now() - appsCache.at > 30000) appsCache = { at: Date.now(), key, v: await serverApps({ base: c.unraid.baseUrl, token: secret(c.unraid.tokenEnv), dockerHost: c.system.docker }) };
+    return appsCache.v;
+  };
+  /** The page passes its own host name, used when neither a link address nor the agent's is known. */
+  const hostFor = (q: unknown) => { const c = cfg(), h = linkHost(c.unraid.linkHost, c.unraid.baseUrl); if (h) return h; const v = String(q || ""); return /^[A-Za-z0-9.-]{1,253}$|^\[[0-9a-fA-F:]+\]$/.test(v) ? v : ""; };
+  app.get("/api/links", { preHandler: guard }, async (req: any) => {
+    const { apps, notes, sources } = await linkApps(), host = hostFor(req.query.host);
+    return { host, sources, notes, apps: apps.map(a => ({ ...a, url: appUrl(a, host) })) };
+  });
+  app.get("/api/links/suggest", { preHandler: guard }, async (req: any) => {
+    const c: any = cfg(), host = hostFor(req.query.host);
+    return suggestions((await linkApps()).apps, host, (conn, field) => String(c[conn]?.[field] || ""));
+  });
+
   app.get("/api/uptime", { preHandler: guard }, async () => uptime(cfg().uptime.baseUrl, cfg().uptime.statusPage));
   app.get("/api/system", { preHandler: guard }, async () => {
     const c = cfg().system;
@@ -331,11 +351,14 @@ export async function buildApp(o: AppOptions = {}) {
       caldav: { url: c.caldav.url, choresList: c.caldav.choresList, userEnv: c.caldav.userEnv, passwordEnv: c.caldav.passwordEnv, userSet: !!secret(c.caldav.userEnv) },
       wiki: { baseUrl: c.wiki.baseUrl, tokenEnv: c.wiki.tokenEnv, keySet: !!secret(c.wiki.tokenEnv), vault: c.wiki.vault, mount: await wiki.hasMount() },
       hermes: { baseUrl: c.hermes.baseUrl, userEnv: c.hermes.userEnv, passwordEnv: c.hermes.passwordEnv, userSet: !!secret(c.hermes.userEnv) },
-      allglance: { baseUrl: c.allglance.baseUrl, tokenEnv: c.allglance.tokenEnv, tokenSet: !!secret(c.allglance.tokenEnv) } };
+      allglance: { baseUrl: c.allglance.baseUrl, tokenEnv: c.allglance.tokenEnv, tokenSet: !!secret(c.allglance.tokenEnv) },
+      unraid: { baseUrl: c.unraid.baseUrl, tokenEnv: c.unraid.tokenEnv, tokenSet: !!secret(c.unraid.tokenEnv), linkHost: c.unraid.linkHost } };
   });
   app.post("/api/connections/test/:id", { preHandler: guard }, async (req: any) => {
     const c = cfg(), id = req.params.id;
     try {
+      if (id === "unraid") { const s = await unraidSystem(c.unraid.baseUrl, secret(c.unraid.tokenEnv)); const a = await unraidContainers(c.unraid.baseUrl, secret(c.unraid.tokenEnv));
+        return { ok: true, detail: `Reached the Unraid Management Agent on ${s.hostname || "the server"}${s.version ? ` (Unraid ${s.version})` : ""}: ${a.length} container${a.length === 1 ? "" : "s"}.` }; }
       if (id === "upstream") { const r = await upstream.repos(); return { ok: true, detail: `Reached UpstreamManager: ${r.length} repo${r.length === 1 ? "" : "s"}.` }; }
       if (id === "uptime") { const r = await uptime(c.uptime.baseUrl, c.uptime.statusPage); return { ok: true, detail: `Reached Uptime Kuma: ${r.monitors.length} monitors on "${c.uptime.statusPage}".` }; }
       if (id === "golem") { const r = await call(`${trimSlash(c.golem.baseUrl)}/models`, { headers: secret(c.golem.keyEnv) ? { Authorization: `Bearer ${secret(c.golem.keyEnv)}` } : {} });

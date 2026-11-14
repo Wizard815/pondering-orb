@@ -34,6 +34,8 @@ services:
       # Addresses of apps you already run. Empty = not used. A container name
       # works on a shared network; a LAN address (http://<host>:port) for
       # another machine or compose project. orb.yaml wins when it sets one.
+      UNRAID_URL: ${UNRAID_URL:-}                    # Unraid Management Agent (port 8043): containers for the Links page
+      UNRAID_LINK_HOST: ${UNRAID_LINK_HOST:-}
       ALLGLANCE_URL: ${ALLGLANCE_URL:-}              # the gateway; also serves vikunja's CalDAV at /dav
       UPSTREAM_URL: ${UPSTREAM_URL:-}
       UPTIME_URL: ${UPTIME_URL:-}
@@ -44,6 +46,7 @@ services:
       ORB_PROC: /host/proc
       DOCKER_HOST: tcp://docker-proxy:2375
       # Logins and keys (the names are what orb.yaml and Settings point at):
+      UNRAID_TOKEN: ${UNRAID_TOKEN:-}
       ALLGLANCE_TOKEN: ${ALLGLANCE_TOKEN:-}
       CALDAV_USER: ${CALDAV_USER:-}
       CALDAV_PASSWORD: ${CALDAV_PASSWORD:-}
