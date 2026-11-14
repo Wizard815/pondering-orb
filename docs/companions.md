@@ -69,7 +69,10 @@ Coinpile is for what Firefly has no place for:
 | Coinpile shares | Orb shows |
 | --- | --- |
 | Savings: total, free, set aside | the Coinpile panel and page, the brief |
-| Goals and their progress (0–1) | bars on the panel and page |
+| Goals (your Firefly III piggy banks) and their progress (0–1), with the target date | bars on the panel and page |
+| Firefly III budgets this month (limit, spent, left) | a line on the panel; budgets at 90% or more in the brief (when Firefly III isn't set up in Orb itself) |
+| Next paycheck (date, amount, bills before the next one, piggy banks' share, what is left) | a line on the panel; the brief when it lands this week |
+| This week (in and out against last week, the 3 biggest payments, net worth change) | a line on the panel; one line in the brief |
 | Alert list (and counts) | the panel and page (critical first): a bank to sign in again at the Plaid connector, an account running short, missed payments, money earmarked twice, CDs maturing |
 | CDs maturing / matured and idle | **Maturing today** on Daily's Today (an idle matured CD stays there until handled), This week, the page, the brief |
 | Spending forecast | so far, on track for, % of income, left after: panel, page, brief |
@@ -78,6 +81,24 @@ Coinpile is for what Firefly has no place for:
 
 `page: true` gives it a **Coinpile** tab. Golem's read-only tool is
 `coinpile_summary`.
+
+### Golem with Coinpile's own tools (MCP)
+
+Coinpile is also an MCP server (`POST /api/v1/mcp`). Make a second Coinpile
+token with the **mcp** scope, put it in `.env` (say `COINPILE_MCP_TOKEN`) and
+name it in the widget:
+
+```yaml
+        widget: { type: coinpile, key_env: COINPILE_TOKEN, mcp_key_env: COINPILE_MCP_TOKEN }
+```
+
+Golem then gets every tool of Coinpile's agent as `coinpile_...`: accounts,
+transactions (with Firefly III tags, budgets and payees), cash flow, budgets,
+piggy banks, the paycheck plan, the tax year, loan payoff and savings plans,
+and Coinpile's calculator (Golem is told to use it for every sum). Tools that
+would change something only **ask**: the request waits on Coinpile's Agent
+page for your Yes, so nothing changes from Orb. Without `mcp_key_env`, or if
+Coinpile is down, Golem works as before.
 
 ## Panel, or a full page
 
