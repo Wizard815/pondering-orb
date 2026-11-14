@@ -14,6 +14,7 @@ layout**. Drag a tab onto another to show two pages side by side.
 
 | Tab | What it shows |
 | --- | --- |
+| **Links** | A grid of icons for every app with a web page: the Unraid server's containers (with Unraid's WebUI address and icon), the apps list, and links you add. Hide, rename, give another address (a container port or any URL), sort into categories and drag into place |
 | **Main** | The Golem, favorite projects, open and top-priority tasks, today's family calendar, the log, chores, uptime, UpstreamManager, system, and a panel per app (with live views for Plex, SABnzbd, Firefly III and Omi) |
 | **Daily** | The morning brief, written by the Golem from the weather, news, your watchlist, tasks, chores, bills and every calendar; plus Today and This week |
 | **Journal** | One page per day: Orb's log of the day (money spent and earned, tasks and chores done, commits, UpstreamManager requests, Hermes Studio agent work, Omi's recap, alerts), your typed notes, and pages to write or draw on with a pen or tablet, blank or over an image or PDF you bring in |
@@ -55,6 +56,7 @@ Each one is optional; leave its address empty and its panels say so.
 | **LLMWIKI** (Obsidian Local REST API) | Reads the vault (mounted read only); writes only through the REST API, following the vault's rules; a daily digest line if you want one | [docs/backend.md](docs/backend.md) |
 | **UpstreamManager** | Repos, approval requests (approve part of one), daily check, fetch, new commits logged per project | [docs/backend.md](docs/backend.md) |
 | **Hermes Studio** | Chats linked to projects; work sent to Studio on the Agents tab, with its status reported back | |
+| **Unraid Management Agent** | Read only: every container, its state, port mappings and updates, for the Links page; suggests addresses for Orb's other connections from what's running | [docs/links.md](docs/links.md) |
 | **Uptime Kuma** | Monitors from a public status page | |
 | **Firefly III** | Read only: this month (net worth, spent, earned, left to spend), bills due and paid, budgets, piggy banks, accounts, transactions and search; bills also show in Today and This week, and in the brief. Bank data reaches Firefly through [plaid-firefly-connector](https://github.com/Wizard815/plaid-firefly-connector) | [docs/companions.md](docs/companions.md) |
 | **Coinpile** | Read only: what you share with the Orb: savings (free vs set aside), goals, alerts (a bank to sign in again, CDs maturing), the spending forecast, Robinhood value | [docs/companions.md](docs/companions.md) |
@@ -108,6 +110,7 @@ Start from [`.env.example`](.env.example). Values here never reach the browser.
 | `ORB_PASSWORD` | Sign-in for the web app (required) |
 | `ORB_API_TOKENS` | `name:token` pairs for agents and `/mcp`, e.g. `hermes:abc,claude:def`; the name is recorded on what each one writes |
 | `ORB_PORT`, `ORB_HOSTNAME` | The host port (default 8095) and the name the System tab shows |
+| `UNRAID_URL`, `UNRAID_TOKEN`, `UNRAID_LINK_HOST` | The Unraid Management Agent (`http://tower:8043`), its API token, and optionally the address app links use |
 | `ALLGLANCE_URL`, `UPSTREAM_URL`, `UPTIME_URL`, `HERMES_URL`, `HERMES_PUBLIC_URL`, `ARGOS_URL`, `WIKI_URL` | Addresses of your apps. Empty means not used. Use a container name if Orb shares the app's network, else `http://<host>:<port>`. |
 | `LLMWIKI_VAULT` | The vault folder on this host, mounted read only |
 | `CALDAV_USER`, `CALDAV_PASSWORD` | Your CalDAV login; with ALLGlance, your vikunja login |
@@ -192,6 +195,8 @@ npm run build   # server/dist and web/dist
 - [docs/allglance.md](docs/allglance.md): the ALLGlance stack, priorities,
   the family calendar
 - [docs/companions.md](docs/companions.md): Firefly III, Coinpile and Omi
+- [docs/links.md](docs/links.md): the Links page and the Unraid Management
+  Agent
 - [docs/journal.md](docs/journal.md): the Journal, its day log, notes and
   drawing pages
 - [docs/picks.md](docs/picks.md): the Daily page, stock picks, the decision

@@ -27,7 +27,7 @@ export async function hostStats(proc: string, disks: string[]) {
 
 /** GET a Docker API path over tcp://host:port (the socket proxy) or a
  *  unix:// socket. */
-function docker(host: string, path: string): Promise<any> {
+export function docker(host: string, path: string): Promise<any> {
   const where = host.startsWith("unix://") ? { socketPath: host.slice(7) } : (() => { const u = new URL(host.replace(/^tcp:/, "http:")); return { host: u.hostname, port: u.port || 2375 }; })();
   return new Promise((resolve, reject) => {
     const r = request({ ...where, path, timeout: 5000 }, res => {

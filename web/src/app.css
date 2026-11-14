@@ -81,3 +81,24 @@ div:not(.editing) > .react-grid-layout .react-resizable-handle { display: none; 
 .ink-canvas.erasing { cursor: cell; } .ink-loading { position: absolute; top: 12px; left: 12px; }
 .ink-full { position: fixed; inset: 0; z-index: 1000; background: var(--bg); display: flex; flex-direction: column; gap: 8px; padding: 8px; }
 .ink-full-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; } .ink-full-bar .ink-tools { position: static; padding: 0; background: none; }
+
+/* Links */
+.lk { display: flex; flex-direction: column; gap: 10px; } .lk-bar { flex-wrap: wrap; gap: 8px; } .lk-bar input[type=search] { width: min(260px, 100%); }
+.lk-cat { border-radius: 8px; padding: 2px 4px 8px; } .lk-cat.drop { outline: 2px dashed var(--gold); }
+.lk-catbtns { display: inline-flex; gap: 4px; margin-left: 10px; text-transform: none; letter-spacing: 0; } .lk-catbtns .btn { padding: 2px 8px; min-height: 28px; font-size: .8rem; }
+.lk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; }
+.lk-tile { position: relative; } .lk-tile.hid { opacity: .4; } .lk-tile.dragging { opacity: .35; }
+.lk-tile.drop-before::before, .lk-tile.drop-after::after { content: ""; position: absolute; top: 4px; bottom: 4px; width: 3px; background: var(--gold); border-radius: 2px; z-index: 1; }
+.lk-tile.drop-before::before { left: -7px; } .lk-tile.drop-after::after { right: -7px; }
+.lk-face { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; min-height: 108px; padding: 14px 6px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--inset); color: var(--ink); text-decoration: none; font: inherit; cursor: pointer; }
+.lk-face:hover { border-color: var(--gold); background: var(--gold-soft); } .arranging .lk-face { cursor: grab; touch-action: none; user-select: none; } .arranging .lk-upd { display: none; }
+.lk-img, .lk-rune { width: 48px; height: 48px; border-radius: 10px; object-fit: contain; flex: none; }
+.lk-rune { display: grid; place-items: center; color: #fff; font-family: var(--f-display); font-weight: 700; font-size: 1.15rem; }
+.lk-name { font-size: .85rem; text-align: center; line-height: 1.2; overflow-wrap: anywhere; }
+.lk-dot { position: absolute; top: 8px; right: 8px; width: 9px; height: 9px; border-radius: 50%; } .lk-dot.up { background: var(--ok); } .lk-dot.down { background: var(--muted); }
+.lk-upd { position: absolute; top: 4px; left: 8px; font-style: normal; font-size: .8rem; color: var(--warn); font-weight: 700; }
+.lk-acts { position: absolute; top: -8px; left: -6px; display: flex; gap: 2px; } .lk-acts .btn { padding: 0 7px; min-height: 30px; min-width: 30px; font-size: .9rem; background: var(--panel); }
+.lk-emptycat { padding: 18px 4px; }
+.lk-modal { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,.45); display: grid; place-items: center; padding: 16px; }
+.lk-form { width: min(460px, 100%); max-height: 90vh; overflow: auto; display: flex; flex-direction: column; gap: 10px; padding: 18px; }
+.lk-form h3 { margin: 0; } .lk-mode { border: 1px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; }

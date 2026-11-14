@@ -39,6 +39,11 @@ allglance:           # the ALLGlance gateway: family calendar, lastGLANCE, lifeG
   base_url: ""       # e.g. http://<host>:8090
   token_env: ALLGLANCE_TOKEN   # same value as GATEWAY_TOKEN on the gateway
 
+unraid:              # the Unraid Management Agent plugin: containers and ports for the Links page; "" = UNRAID_URL
+  base_url: ""       # e.g. http://tower:8043
+  token_env: UNRAID_TOKEN
+  link_host: ""      # the address app links use; "" = the agent's host
+
 hermes:              # Hermes Studio; "" = HERMES_URL
   base_url: ""       # e.g. http://hermes-studio:6060
   # public_url: https://studio.example.com   # Studio in your browser (Agents tab links); or HERMES_PUBLIC_URL
