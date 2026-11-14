@@ -16,15 +16,15 @@ layout**. Drag a tab onto another to show two pages side by side.
 | --- | --- |
 | **Links** | A grid of icons for every app with a web page: the Unraid server's containers (with Unraid's WebUI address and icon), the apps list, and links you add. Hide, rename, give another address (a container port or any URL), sort into categories and drag into place |
 | **Main** | The Golem, favorite projects, open and top-priority tasks, today's family calendar, the log, chores, uptime, UpstreamManager, system, and a panel per app (with live views for Plex, SABnzbd, Firefly III and Omi) |
-| **Daily** | The morning brief, written by the Golem from the weather, news, your watchlist, tasks, chores, bills and every calendar; plus Today and This week |
-| **Journal** | One page per day: Orb's log of the day (money spent and earned, tasks and chores done, commits, UpstreamManager requests, Hermes Studio agent work, Omi's recap, alerts), your typed notes, and pages to write or draw on with a pen or tablet, blank or over an image or PDF you bring in |
+| **Daily** | The morning brief, written by the Golem from the weather, news, your watchlist, tasks, chores, bills and every calendar; weather for your places, news from your feeds (with Ground News coverage links), markets you can edit and click for rated news; plus Today and This week |
+| **Journal** | One page per day: Orb's log of the day (money spent and earned, tasks and chores done, commits, UpstreamManager requests, Hermes Studio agent work, Omi's recap, alerts) and your typed notes |
 | **Projects** | Kanban board (next, active, blocked, paused, shipped) and the log; each project has a page with its tasks, log, wiki note, repository and linked chats |
 | **Agents** | Hermes Studio chats working on your plans: watch them, or send a project or task to a new one (Ekko, Hermes or a coding agent) |
-| **Ideas** | A board in Milaclone's style: cards, columns, nested boards, arrows, to-do cards |
+| **Ideas** | Milaclone (Miladash) in place: boards, mind maps and drawings (`MILACLONE_URL`) |
 | **To-do** | CalDAV task lists with priorities, plus dayGLANCE's tasks |
 | **Wiki** | The LLMWIKI vault: tree, notes, search, section edits, related links |
 | **Calendar** | Month and next two weeks: your events, the family calendar, CalDAV calendars, task due dates and chores |
-| **Picks** | Daily stock research, a verdict per stock from your self-hosted decision model, your call with an amount, an order on Robinhood when you confirm it, and what every pick did afterwards |
+| **Picks** | Daily stock research, a verdict per stock from your self-hosted decision model, your call with an amount, an order on Robinhood when you confirm it, and what every pick did afterwards, and your Robinhood history from its activity CSV (holdings, gains, dividends) |
 | **Money**, **Coinpile**, **Omi** | Optional full pages for Firefly III (this month, bills, budgets, accounts, piggy banks, transactions), Coinpile (savings, goals, alerts, maturities, forecast) and Omi (`page: true` in the apps YAML) |
 | **Upkeep** | UpstreamManager's repos, approval requests and daily check, and your chores |
 | **Uptime** | Monitors from an Uptime Kuma status page |
@@ -33,7 +33,7 @@ layout**. Drag a tab onto another to show two pages side by side.
 
 Pages that need an app you haven't set up stay out of the tabs: Agents (Hermes
 Studio), Wiki (the vault mount or its REST key), Upkeep (UpstreamManager, or
-any chores), Uptime (Uptime Kuma) and Picks (stock picks turned on). Settings →
+any chores), Uptime (Uptime Kuma), Picks (stock picks turned on) and Ideas (Milaclone). Settings →
 Pages can always show or hide any page except Main and Settings.
 
 ### The Golem
@@ -110,6 +110,7 @@ Start from [`.env.example`](.env.example). Values here never reach the browser.
 | `ORB_PASSWORD` | Sign-in for the web app (required) |
 | `ORB_API_TOKENS` | `name:token` pairs for agents and `/mcp`, e.g. `hermes:abc,claude:def`; the name is recorded on what each one writes |
 | `ORB_PORT`, `ORB_HOSTNAME` | The host port (default 8095) and the name the System tab shows |
+| `MILACLONE_URL` | Milaclone's address as your browser reaches it, for the Ideas tab |
 | `UNRAID_URL`, `UNRAID_TOKEN`, `UNRAID_LINK_HOST` | The Unraid Management Agent (`http://tower:8043`), its API token, and optionally the address app links use |
 | `ALLGLANCE_URL`, `UPSTREAM_URL`, `UPTIME_URL`, `HERMES_URL`, `HERMES_PUBLIC_URL`, `ARGOS_URL`, `WIKI_URL` | Addresses of your apps. Empty means not used. Use a container name if Orb shares the app's network, else `http://<host>:<port>`. |
 | `LLMWIKI_VAULT` | The vault folder on this host, mounted read only |
@@ -143,8 +144,7 @@ another compose project or on another machine just need
 docker compose pull && docker compose up -d   # or: git pull && docker compose up -d --build
 ```
 
-Everything Orb keeps is in `data/orb.db` (SQLite), plus images brought into
-the Journal in `data/journal/`. Back up the `data` folder
+Everything Orb keeps is in `data/orb.db` (SQLite). Back up the `data` folder
 and `.env`. Stopping the container cleanly is enough for a consistent copy.
 
 ### If something's wrong
@@ -197,8 +197,7 @@ npm run build   # server/dist and web/dist
 - [docs/companions.md](docs/companions.md): Firefly III, Coinpile and Omi
 - [docs/links.md](docs/links.md): the Links page and the Unraid Management
   Agent
-- [docs/journal.md](docs/journal.md): the Journal, its day log, notes and
-  drawing pages
+- [docs/journal.md](docs/journal.md): the Journal, its day log and notes
 - [docs/picks.md](docs/picks.md): the Daily page, stock picks, the decision
   model and Robinhood
 - [docs/miladash.md](docs/miladash.md): the ideas board and Miladash

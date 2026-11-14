@@ -5,7 +5,7 @@ import type { OrbConfig } from "./config.js";
 import { secret } from "./config.js";
 import type { CalDav } from "./integrations/caldav.js";
 import { parseEvents, type CalEvent } from "./integrations/ical.js";
-import { weather, news, quotes, type NewsItem } from "./integrations/daily.js";
+import { weather, news, quotes, feed, okFeeds, type NewsItem } from "./integrations/daily.js";
 import { chat } from "./integrations/llm.js";
 import { companion, omiDays, isOmiEvent } from "./integrations/companions.js";
 import { ffBills, ffOverview } from "./integrations/firefly.js";
@@ -14,16 +14,23 @@ import type { AllGlance } from "./integrations/allglance.js";
 import { today, localDay, localClock, isDay, timeZone } from "./dates.js";
 
 /** Settings → Daily page. */
-export type DailySettings = { location: string; units: "F" | "C"; feeds: string[]; watchlist: string[]; briefOn: boolean; briefHour: number };
+/** location is the favourite place (shown first, used by the brief); places are the others.
+ *  coverage links each headline to its coverage on another site (Ground News by default). */
+export type DailySettings = { location: string; places: string[]; units: "F" | "C"; feeds: string[]; favFeed: string; watchlist: string[]; briefOn: boolean; briefHour: number;
+  coverage: { on: boolean; label: string; template: string } };
+export const COVERAGE_DEFAULT = { on: true, label: "Ground News", template: "https://ground.news/search?query={q}" };
 export const DAILY_DEFAULTS: DailySettings = {
-  location: "", units: "F", watchlist: ["SPY", "QQQ", "DIA"], briefOn: true, briefHour: 7,
+  location: "", places: [], units: "F", watchlist: ["SPY", "QQQ", "DIA"], briefOn: true, briefHour: 7, favFeed: "", coverage: COVERAGE_DEFAULT,
   feeds: ["https://feeds.npr.org/1001/rss.xml", "https://feeds.bbci.co.uk/news/world/rss.xml", "https://www.cnbc.com/id/100003114/device/rss/rss.html"],
 };
 export const dailySettings = (records: Records): DailySettings => {
   const s: any = (records.get("settings", "app") as any)?.daily || {};
   const list = (v: unknown, d: string[]) => (Array.isArray(v) ? v.map(String).map(x => x.trim()).filter(Boolean) : d);
   return { ...DAILY_DEFAULTS, ...s, units: s.units === "C" ? "C" : "F", feeds: list(s.feeds, DAILY_DEFAULTS.feeds), watchlist: list(s.watchlist, DAILY_DEFAULTS.watchlist),
-    briefOn: s.briefOn !== false, briefHour: Math.max(0, Math.min(23, Number.isFinite(+s.briefHour) ? Math.round(+s.briefHour) : 7)) };
+    briefOn: s.briefOn !== false, briefHour: Math.max(0, Math.min(23, Number.isFinite(+s.briefHour) ? Math.round(+s.briefHour) : 7)),
+    places: list(s.places, []).filter(p => p !== s.location).slice(0, 20), favFeed: typeof s.favFeed === "string" ? s.favFeed : "",
+    coverage: { on: s.coverage?.on !== false, label: String(s.coverage?.label || COVERAGE_DEFAULT.label).slice(0, 40),
+      template: /^https:\/\/[^\s]*\{q\}/.test(String(s.coverage?.template || "")) ? String(s.coverage.template) : COVERAGE_DEFAULT.template } };
 };
 
 /** Start of a local day (in TZ) as a Date. */
@@ -136,9 +143,27 @@ export function dailyApi(app: FastifyInstance, deps: { records: Records; dav: Ca
     // A matured CD still sitting there stays on Today until it is handled.
     return (await cpSummary(cp)).maturities.filter(m => (m.kind === "matured_idle" ? m.date <= to : m.date >= from && m.date <= to)).map(m => ({ ...m, date: m.kind === "matured_idle" && m.date < from ? from : m.date }));
   });
-  app.get("/api/daily/weather", { preHandler: guard }, async () => { const s = dailySettings(records); return weather(s.location, s.units); });
-  app.get("/api/daily/news", { preHandler: guard }, async () => news(dailySettings(records).feeds, 25));
-  app.get("/api/daily/quotes", { preHandler: guard }, async () => quotes(dailySettings(records).watchlist));
+  // Weather for the favourite place, or another of your places.
+  app.get("/api/daily/weather", { preHandler: guard }, async (req: any) => {
+    const s = dailySettings(records), want = String(req.query.place || "").trim();
+    if (want && want !== s.location && !s.places.includes(want)) throw new HttpError(400, "That place isn't in your list (Settings → Daily page).");
+    return weather(want || s.location, s.units);
+  });
+  /** Your feeds with their names and sites (and how many items each has now). */
+  app.get("/api/daily/feeds", { preHandler: guard }, async () => {
+    const s = dailySettings(records);
+    return { favourite: s.favFeed, coverage: s.coverage, feeds: (await Promise.all(okFeeds(s.feeds).map(f => feed(f)))).map(f => ({ url: f.url, title: f.title, site: f.site, count: f.items.length, error: f.error })) };
+  });
+  /** News from one of your feeds (?feed=<its address>), or all of them. */
+  app.get("/api/daily/news", { preHandler: guard }, async (req: any) => {
+    const s = dailySettings(records), one = String(req.query.feed || "");
+    if (!one) return news(s.feeds, 25);
+    if (!okFeeds(s.feeds).includes(one)) throw new HttpError(400, "That feed isn't in your list.");
+    const f = await feed(one); if (f.error && !f.items.length) throw new HttpError(502, `${f.title}: ${f.error}`);
+    return f.items.slice(0, 40);
+  });
+  // ?w=A,B: the list the page shows right now (it may be saving a change); else the saved watchlist.
+  app.get("/api/daily/quotes", { preHandler: guard }, async (req: any) => { const w = String(req.query.w || "").split(",").map(x => x.trim()).filter(Boolean).slice(0, 40); return quotes(w.length ? w : dailySettings(records).watchlist); });
   app.get("/api/daily/events", { preHandler: guard }, async (req: any) => {
     const from = req.query.from ? String(req.query.from) : today(); if (!isDay(from)) throw new HttpError(400, "from must be YYYY-MM-DD.");
     return events(from, Math.max(1, Math.min(42, Number(req.query.days) || 7)));

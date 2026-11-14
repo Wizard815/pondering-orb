@@ -39,6 +39,9 @@ allglance:           # the ALLGlance gateway: family calendar, lastGLANCE, lifeG
   base_url: ""       # e.g. http://<host>:8090
   token_env: ALLGLANCE_TOKEN   # same value as GATEWAY_TOKEN on the gateway
 
+milaclone:           # the Ideas tab shows Milaclone; "" = MILACLONE_URL
+  url: ""           # as your browser reaches it, e.g. http://tower:4321
+
 unraid:              # the Unraid Management Agent plugin: containers and ports for the Links page; "" = UNRAID_URL
   base_url: ""       # e.g. http://tower:8043
   token_env: UNRAID_TOKEN

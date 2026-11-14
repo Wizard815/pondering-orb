@@ -8,6 +8,9 @@ import { Markdown } from "../lib/markdown";
 import { ago, fmtDate, oneAtATime, todayISO } from "../lib/util";
 import { Spark, pct, money } from "../components/Spark";
 import { useAppPanels } from "../components/AppPanels";
+import { api } from "../lib/api";
+import { useSettings } from "../lib/store";
+import { TickerNews } from "../components/TickerNews";
 
 const ACTION_CLS: Record<string, string> = { buy: "ok", hold: "warn", skip: "bad" };
 const H = [1, 5, 20, 60];
@@ -151,6 +154,46 @@ function Scorecard() {
   </>;
 }
 
+// ---------------- your Robinhood history (its activity CSV) ----------------
+type Pos = { symbol: string; shares: number; avgCost: number; cost: number; realized: number; dividends: number; price: number | null; value: number | null; unrealized: number | null; unrealizedPct: number | null };
+type Hist = { date: string; symbol: string; code: string; description: string; quantity: number; price: number; amount: number };
+type Summary = { count: number; from: string; to: string; positions: Pos[]; closed: Pos[]; totals: { cost: number; value: number; unrealized: number; realized: number; dividends: number }; history: Hist[] };
+const signed = (n: number | null) => (n == null ? "—" : `${n >= 0 ? "+" : "−"}${money(Math.abs(n))}`);
+function Holdings() {
+  const ui = useUi(), { data, error, reload } = useFetch<Summary>("/api/trades/summary", 10 * 60000), [open, setOpen] = useState(""), [all, setAll] = useState(false), [busy, setBusy] = useState(false);
+  const cov = useSettings().daily?.coverage;
+  const bring = async (f: File | undefined) => {
+    if (!f) return; setBusy(true);
+    try { const r = await fetch("/api/robinhood/csv", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "text/csv" }, body: await f.text() });
+      const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || `Import failed (${r.status}).`);
+      ui.status(`Imported ${d.added} new row${d.added === 1 ? "" : "s"} (${d.from} to ${d.to})${d.skipped ? `; ${d.skipped} were already here` : ""}.`); reload();
+    } catch (e) { ui.error(e); } finally { setBusy(false); }
+  };
+  const input = <label className="btn primary">{busy ? "Importing…" : "Import Robinhood CSV"}<input type="file" accept=".csv,text/csv" hidden disabled={busy} onChange={e => { bring(e.target.files?.[0]); e.currentTarget.value = ""; }} /></label>;
+  if (error && !data) return <div className="empty">{error}</div>;
+  if (!data) return <div className="hint">Reading your history…</div>;
+  if (!data.count) return <div className="empty">Bring in your Robinhood history to see what you hold, what you paid and what it's done. In Robinhood: <b>Account → Reports and statements → Reports</b>, create an <b>account activity</b> report, then import the CSV here. Importing a newer report later only adds what's new.
+    <div className="row" style={{ marginTop: 8 }}>{input}</div></div>;
+  const t = data.totals;
+  return <div className="hold">
+    <div className="row small hold-sum"><span>Value <b>{money(t.value)}</b></span><span>Cost <b>{money(t.cost)}</b></span><span className={t.unrealized >= 0 ? "up" : "down"}>Open {signed(t.unrealized)}</span>
+      <span className={t.realized >= 0 ? "up" : "down"}>Realised {signed(t.realized)}</span><span>Dividends {money(t.dividends)}</span><span className="grow" />{input}</div>
+    <div style={{ overflowX: "auto" }}><table className="tbl"><thead><tr><th>Stock</th><th className="num">Shares</th><th className="num">Avg cost</th><th className="num">Price</th><th className="num">Value</th><th className="num">Gain</th></tr></thead>
+      <tbody>{data.positions.map(p => <tr key={p.symbol}><td><button className="linkish" onClick={() => setOpen(p.symbol)}><b>{p.symbol}</b></button></td><td className="num">{+p.shares.toFixed(4)}</td><td className="num">{money(p.avgCost)}</td>
+        <td className="num">{p.price == null ? "—" : money(p.price)}</td><td className="num">{p.value == null ? "—" : money(p.value)}</td>
+        <td className={"num " + ((p.unrealized ?? 0) >= 0 ? "up" : "down")}>{signed(p.unrealized)}{p.unrealizedPct != null ? ` (${pct(p.unrealizedPct)})` : ""}</td></tr>)}</tbody></table></div>
+    {data.closed.length > 0 && <details><summary className="small">Sold off ({data.closed.length})</summary><ul className="list">{data.closed.map(p => <li key={p.symbol}><button className="linkish" onClick={() => setOpen(p.symbol)}><b>{p.symbol}</b></button><span className="grow" />
+      <span className={"num " + (p.realized >= 0 ? "up" : "down")}>{signed(p.realized)}</span>{p.dividends ? <span className="hint"> + {money(p.dividends)} dividends</span> : null}</li>)}</ul></details>}
+    <details><summary className="small">Activity ({data.count} rows, {fmtDate(data.from)} to {fmtDate(data.to)})</summary>
+      <table className="tbl small"><tbody>{data.history.slice(0, all ? 300 : 40).map((h, k) => <tr key={k}><td className="mono">{h.date}</td><td><b>{h.symbol}</b></td><td>{h.code}</td><td className="grow">{h.description}</td>
+        <td className="num">{h.quantity || ""}</td><td className={"num " + (h.amount >= 0 ? "up" : "down")}>{h.amount ? signed(h.amount) : ""}</td></tr>)}</tbody></table>
+      {!all && data.history.length > 40 && <button className="btn" onClick={() => setAll(true)}>Show more</button>}
+      <div className="row"><button className="btn" onClick={e => ui.confirm(e.currentTarget, "Forget the imported Robinhood history? You can import it again.", "Forget it", () => api("DELETE", "/api/trades").then(reload))}>Forget imported history</button></div></details>
+    <div className="hint">From your Robinhood activity CSV; prices are current quotes. Average-cost basis. Read only: nothing is sent to Robinhood.</div>
+    {open && <TickerNews symbol={open} coverage={cov ? { on: cov.on !== false, label: cov.label || "Ground News", template: cov.template || "https://ground.news/search?query={q}" } : undefined} onClose={() => setOpen("")} />}
+  </div>;
+}
+
 export const PicksPage: PageDef = {
   id: "picks", label: "Picks", title: "Augury", flavor: "Daily research, a verdict per stock, your call, and what came of it.",
   usePanels: () => {
@@ -161,6 +204,7 @@ export const PicksPage: PageDef = {
       { key: "score", title: "Scorecard", node: <Scorecard />, w: 5, h: 10 },
       { key: "history", title: "History", node: <History />, w: 12, h: 10 },
       { key: "account", title: "Robinhood agentic account", node: <Account />, w: 5, h: 7 },
+      { key: "holdings", title: "Your Robinhood history", node: <Holdings />, w: 12, h: 18 },
     ];
     return { panels: [...own, ...apps], defaults: own.map(p => p.key) };
   },

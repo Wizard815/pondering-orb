@@ -2,9 +2,7 @@ import Fastify, { FastifyInstance } from "fastify";
 import cookie from "@fastify/cookie";
 import fstatic from "@fastify/static";
 import { existsSync } from "node:fs";
-import { hostname, tmpdir } from "node:os";
-import { mkdtempSync } from "node:fs";
-import { dirname, join as pjoin } from "node:path";
+import { hostname } from "node:os";
 import { Store } from "./db.js";
 import { Records, HttpError, isColl, Change } from "./records.js";
 import { Auth } from "./auth.js";
@@ -31,15 +29,13 @@ import { dailyApi } from "./daily.js";
 import { marketApi } from "./market.js";
 import { robinhoodApi } from "./robinhood.js";
 import { journalApi } from "./journal.js";
+import { stocksApi } from "./stocks.js";
 import { serverApps, linkHost, appUrl, suggestions, unraidSystem, unraidContainers } from "./integrations/unraid.js";
 import { today, localDay, isDay, timeZone } from "./dates.js";
 
 export const VERSION = "0.1.0";
-/** Without a data file (tests), journal images go to one temporary folder per process. */
-let tmpFiles = "";
-const tempFiles = () => (tmpFiles ||= mkdtempSync(pjoin(tmpdir(), "orb-journal-")));
 
-export interface AppOptions { filesDir?: string; dataFile?: string; config?: OrbConfig; webDir?: string; password?: string; tokens?: string; logger?: boolean }
+export interface AppOptions { dataFile?: string; config?: OrbConfig; webDir?: string; password?: string; tokens?: string; logger?: boolean }
 
 export async function buildApp(o: AppOptions = {}) {
   const store = new Store(o.dataFile ?? ":memory:");
@@ -59,6 +55,7 @@ export async function buildApp(o: AppOptions = {}) {
       hermes: { ...base.hermes, ...envSafe(c.hermes) },
       allglance: { ...base.allglance, ...envSafe(c.allglance) },
       unraid: { ...base.unraid, ...envSafe(c.unraid) },
+      milaclone: { ...base.milaclone, ...envSafe(c.milaclone) },
     };
     // The ALLGlance stack serves Vikunja's CalDAV at the gateway's /dav: with
     // no CalDAV URL of its own, Orb uses that one address for tasks too.
@@ -193,7 +190,7 @@ export async function buildApp(o: AppOptions = {}) {
     if (c === "settings" && who(req) !== "you") throw new HttpError(403, "Only a signed-in person can change settings.");
     // The brief, research and stock picks are written by Orb; only you decide on a pick.
     if (c === "orders") throw new HttpError(403, "Orders are written by Orb when you place one.");
-    if ((c === "daily" || c === "picks" || c === "research" || c === "journal" || c === "ink") && who(req) !== "you") throw new HttpError(403, "Only a signed-in person can change these.");
+    if ((c === "daily" || c === "picks" || c === "research" || c === "journal" || c === "trades") && who(req) !== "you") throw new HttpError(403, "Only a signed-in person can change these.");
     const raw = req.body ?? {};
     if (typeof raw !== "object" || Array.isArray(raw)) throw new HttpError(400, "Send a JSON object.");
     const body: Record<string, any> = { ...raw };
@@ -224,7 +221,7 @@ export async function buildApp(o: AppOptions = {}) {
     const c = coll(req.params.coll);
     // Deletes follow the same rules as writes (an agent can't remove settings, picks or orders).
     if (c === "orders") throw new HttpError(403, "Orders are kept as a record.");
-    if (["settings", "daily", "picks", "research", "journal", "ink"].includes(c) && who(req) !== "you") throw new HttpError(403, "Only a signed-in person can delete these.");
+    if (["settings", "daily", "picks", "research", "journal", "trades"].includes(c) && who(req) !== "you") throw new HttpError(403, "Only a signed-in person can delete these.");
     if (c === "tasks" && isOmiTask((records.get("tasks", req.params.id) as any)?.caldav?.uid)) throw new HttpError(403, "This task comes from Omi. Change it in Omi; Orb only reads it.");
     records.remove(c, req.params.id); reply.code(204).send();
   });
@@ -246,8 +243,8 @@ export async function buildApp(o: AppOptions = {}) {
   const daily = dailyApi(app, { records, dav, cfg, guard, who, glance });
   const market = marketApi(app, { records, cfg, guard, who });
   robinhoodApi(app, { records, store, guard, who });
-  const journal = journalApi(app, { records, cfg, guard, who, upstream, hermes, outbox, appsYaml, events: daily.events,
-    filesDir: o.filesDir ?? (o.dataFile && o.dataFile !== ":memory:" ? pjoin(dirname(o.dataFile), "journal") : tempFiles()) });
+  stocksApi(app, { records, cfg, guard, who });
+  const journal = journalApi(app, { records, cfg, guard, who, upstream, hermes, outbox, appsYaml, events: daily.events });
 
   // ---- live updates (Server-Sent Events) ----
   app.get("/api/stream", { preHandler: guard }, (req, reply) => {
@@ -357,11 +354,15 @@ export async function buildApp(o: AppOptions = {}) {
       wiki: { baseUrl: c.wiki.baseUrl, tokenEnv: c.wiki.tokenEnv, keySet: !!secret(c.wiki.tokenEnv), vault: c.wiki.vault, mount: await wiki.hasMount() },
       hermes: { baseUrl: c.hermes.baseUrl, userEnv: c.hermes.userEnv, passwordEnv: c.hermes.passwordEnv, userSet: !!secret(c.hermes.userEnv) },
       allglance: { baseUrl: c.allglance.baseUrl, tokenEnv: c.allglance.tokenEnv, tokenSet: !!secret(c.allglance.tokenEnv) },
-      unraid: { baseUrl: c.unraid.baseUrl, tokenEnv: c.unraid.tokenEnv, tokenSet: !!secret(c.unraid.tokenEnv), linkHost: c.unraid.linkHost } };
+      unraid: { baseUrl: c.unraid.baseUrl, tokenEnv: c.unraid.tokenEnv, tokenSet: !!secret(c.unraid.tokenEnv), linkHost: c.unraid.linkHost },
+      milaclone: { url: /^https?:\/\//i.test(c.milaclone.url) ? c.milaclone.url : "" } };
   });
   app.post("/api/connections/test/:id", { preHandler: guard }, async (req: any) => {
     const c = cfg(), id = req.params.id;
     try {
+      if (id === "milaclone") { if (!c.milaclone.url) return { ok: false, detail: "Set Milaclone's address first." };
+        const r = await call(`${trimSlash(c.milaclone.url)}/api/health`).catch((e: any) => ({ ok: false, status: e?.message }) as any);
+        return { ok: !!r.ok, detail: r.ok ? "Reached Milaclone." : `Orb couldn't reach Milaclone at that address (${r.status}). If it's only reachable from your browser, the Ideas tab still works.` }; }
       if (id === "unraid") { const s = await unraidSystem(c.unraid.baseUrl, secret(c.unraid.tokenEnv)); const a = await unraidContainers(c.unraid.baseUrl, secret(c.unraid.tokenEnv));
         return { ok: true, detail: `Reached the Unraid Management Agent on ${s.hostname || "the server"}${s.version ? ` (Unraid ${s.version})` : ""}: ${a.length} container${a.length === 1 ? "" : "s"}.` }; }
       if (id === "upstream") { const r = await upstream.repos(); return { ok: true, detail: `Reached UpstreamManager: ${r.length} repo${r.length === 1 ? "" : "s"}.` }; }

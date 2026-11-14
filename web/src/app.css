@@ -70,17 +70,6 @@ div:not(.editing) > .react-grid-layout .react-resizable-handle { display: none; 
 .jl-money { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 8px; } .jl-money .big { font-family: var(--f-mono); font-size: 1.35rem; }
 .jn { display: flex; flex-direction: column; gap: 8px; height: 100%; } .jn-text { flex: 1; min-height: 220px; width: 100%; resize: vertical; font: inherit; line-height: 1.6; }
 .btn.on { border-color: var(--gold); color: var(--gold); background: var(--gold-soft); }
-.ink { display: flex; flex-direction: column; gap: 10px; } .ink-head { flex-wrap: wrap; gap: 8px; }
-.ink-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; position: sticky; top: 0; z-index: 2; background: var(--panel); padding: 6px 0; }
-.ink-tools .btn { min-height: 40px; } .ink-sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 2px; }
-.ink-color { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--line); cursor: pointer; padding: 0; } .ink-color.on { outline: 3px solid var(--gold); outline-offset: 2px; }
-.ink-pen { display: inline-flex; align-items: center; gap: 4px; }
-.ink-page { margin: 0; display: flex; flex-direction: column; gap: 6px; max-width: 900px; } .ink-page figcaption { flex-wrap: wrap; gap: 6px; }
-.ink-wrap { position: relative; width: 100%; } .ink-wrap.big { flex: 1; min-height: 0; display: flex; justify-content: center; align-items: flex-start; overflow: auto; }
-.ink-canvas { display: block; touch-action: none; border: 1px solid var(--line); border-radius: 4px; box-shadow: 0 2px 10px -6px rgba(0,0,0,.4); cursor: crosshair; background: #fffdf7; }
-.ink-canvas.erasing { cursor: cell; } .ink-loading { position: absolute; top: 12px; left: 12px; }
-.ink-full { position: fixed; inset: 0; z-index: 1000; background: var(--bg); display: flex; flex-direction: column; gap: 8px; padding: 8px; }
-.ink-full-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; } .ink-full-bar .ink-tools { position: static; padding: 0; background: none; }
 
 /* Links */
 .lk { display: flex; flex-direction: column; gap: 10px; } .lk-bar { flex-wrap: wrap; gap: 8px; } .lk-bar input[type=search] { width: min(260px, 100%); }
@@ -102,4 +91,18 @@ div:not(.editing) > .react-grid-layout .react-resizable-handle { display: none; 
 .lk-modal { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,.45); display: grid; place-items: center; padding: 16px; }
 .lk-form { width: min(460px, 100%); max-height: 90vh; overflow: auto; display: flex; flex-direction: column; gap: 10px; padding: 18px; }
 .lk-form h3 { margin: 0; } .lk-mode { border: 1px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; }
-.ink-full:focus, .lk-modal:focus { outline: none; }
+.lk-modal:focus { outline: none; }
+
+/* Ideas: Milaclone in place */
+.mila { height: 100%; min-height: 70vh; display: flex; } .mila-frame { flex: 1; width: 100%; min-height: 70vh; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+
+/* Daily: places, feeds, watchlist, ticker news */
+.wx-places, .nf-bar { flex-wrap: wrap; gap: 6px; margin-bottom: 8px; } .wx-places .btn, .nf-bar .btn { min-height: 34px; padding: 4px 10px; font-size: .85rem; }
+.nf-bar select { width: auto; max-width: 100%; }
+.wx-manage, .nf-manage { border: 1px dashed var(--line-hi); border-radius: 8px; padding: 8px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 6px; }
+.add-inline { gap: 6px; } .add-inline input { flex: 1; min-width: 0; }
+.linkish { background: none; border: 0; padding: 0; font: inherit; color: var(--ink); cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; } .linkish:hover { color: var(--gold); }
+.tn { width: min(720px, 100%); max-height: 88vh; overflow: auto; display: flex; flex-direction: column; gap: 10px; padding: 18px; }
+.tn-head { gap: 10px; align-items: baseline; } .tn-head h3 { margin: 0; } .tn-overall { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.tn-pos { background: var(--inset); border-radius: 6px; padding: 6px 10px; }
+.hold { display: flex; flex-direction: column; gap: 10px; } .hold-sum { flex-wrap: wrap; gap: 14px; align-items: center; }

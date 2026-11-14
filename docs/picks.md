@@ -4,14 +4,25 @@
 
 The **Daily** tab holds the morning brief and the panels it is written from:
 
-- **Weather** from Open-Meteo (no key). Set the location in Settings → Daily
-  page as `City, Country` or `lat,lon`.
-- **News** from RSS or Atom feeds you list (NPR, BBC World and CNBC by
-  default).
-- **Markets**: your watchlist. Prices come from Tiingo when `TIINGO_API_KEY`
-  is set (free), otherwise Yahoo's chart API, then Stooq. The last two are
-  unofficial and can refuse or rate-limit; Orb doesn't pretend to be a
-  browser to get past that, so set a Tiingo key if prices fail.
+- **Weather** from Open-Meteo (no key), for any place (`City, Country` or
+  `lat,lon`). Keep several: the favourite (★) shows first and goes into the
+  brief; click another to see it. **Places…** adds, removes and changes the
+  favourite.
+- **News** from RSS or Atom feeds you list (NPR, BBC World and CNBC to start;
+  any feed works, including weather alerts for a region). The panel opens on
+  your favourite feed; pick another or **All feeds**, and **Visit** the site
+  a feed comes from. **Feeds…** adds and removes them.
+- **Coverage links**: every headline also links to its coverage on Ground
+  News (`https://ground.news/search?query=<headline>`). Ground News has no
+  public API or feed, so Orb can't read it directly; the link opens it in your
+  browser. Change the site or turn it off in Settings → Daily page.
+- **Markets**: your watchlist. **Edit** adds and removes tickers. Click a
+  ticker for its recent news (Google News), each headline rated good, bad or
+  neutral for the stock by Golem's model, with an overall read, and what you
+  hold of it. Prices come from Tiingo when `TIINGO_API_KEY` is set (free),
+  otherwise Yahoo's chart API, then Stooq. The last two are unofficial and
+  can refuse or rate-limit; Orb doesn't pretend to be a browser to get past
+  that, so set a Tiingo key if prices fail.
 - **Today** and **This week**: events from every CalDAV calendar (recurring
   events are expanded by the server), Orb's own events, tasks due or
   overdue, and chores due.
@@ -56,6 +67,20 @@ Each run (by hand, or on market days after the hour you set):
    *I'm buying* or *Pass*.
 6. **The order** (optional): with Robinhood connected and orders turned on,
    a pick you're buying gets *Place a $N order on Robinhood…*.
+
+## Your Robinhood history (CSV)
+
+Picks → **Your Robinhood history** imports Robinhood's account activity
+report (Robinhood → Account → Reports and statements → Reports → account
+activity, CSV). Orb works out what you hold (shares, average cost, current
+value, open gain), what you sold (realised gain) and dividends, and lists the
+activity. Import a newer report whenever you like: rows already here are
+skipped. **Forget imported history** removes it.
+
+What you hold goes into the decision model's state for that stock
+(`you_own`), and shows in a ticker's news. Nothing is sent to Robinhood.
+Later, [Foliofox](https://github.com/unav4ila8le/foliofox) could be the
+source instead, once it has an API Orb can read.
 
 ## Robinhood
 

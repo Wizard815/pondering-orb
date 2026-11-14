@@ -67,16 +67,28 @@ export function parseFeed(xml: string, fallbackSource = ""): NewsItem[] {
       summary: strip(pick(b, "description") || pick(b, "summary") || pick(b, "content")).slice(0, 280) };
   }).filter(i => i.title && /^https?:\/\//.test(i.link)).sort((a, b) => b.published - a.published);
 }
-export async function news(feeds: string[], limit = 20): Promise<NewsItem[]> {
-  const ok = feeds.map(f => f.trim()).filter(f => /^https?:\/\//i.test(f)).slice(0, 15);
-  if (!ok.length) throw new HttpError(400, "Add news feeds in Settings → Daily page.");
-  return cached(`news:${ok.join("|")}`, 15 * 60000, async () => {
-    const all = await Promise.all(ok.map(f => call(f, { headers: { ...UA, Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml" } })
-      .then(r => (r.ok ? parseFeed(String(r.body), new URL(f).host) : []), () => [] as NewsItem[])));
-    // Drop the same story from two feeds (same title).
-    const seen = new Set<string>();
-    return all.flat().sort((a, b) => b.published - a.published).filter(i => { const k = i.title.toLowerCase().slice(0, 80); if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, limit);
+/** One feed: its name, the site it comes from, and its items. Cached on its own. */
+export type Feed = { url: string; title: string; site: string; items: NewsItem[]; error: string };
+export async function feed(url: string): Promise<Feed> {
+  return cached(`feed:${url}`, 15 * 60000, async () => {
+    const host = (() => { try { return new URL(url).host; } catch { return url; } })(), origin = (() => { try { return new URL(url).origin; } catch { return ""; } })();
+    try {
+      const r = await call(url, { headers: { ...UA, Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml" } });
+      if (!r.ok) return { url, title: host, site: origin, items: [], error: `The feed answered ${r.status}.` };
+      const xml = String(r.body), head = xml.replace(/<(item|entry)\b[\s\S]*$/i, "");
+      const site = strip(pick(head, "link")) || (/<link\b[^>]*rel="alternate"[^>]*href="([^"]+)"/i.exec(head)?.[1] ?? /<link\b[^>]*href="([^"]+)"/i.exec(head)?.[1] ?? "");
+      return { url, title: strip(pick(head, "title")) || host, site: /^https?:\/\//.test(ent(site)) ? ent(site) : origin, items: parseFeed(xml, host), error: "" };
+    } catch (e: any) { return { url, title: host, site: origin, items: [], error: e?.message || "Couldn't read the feed." }; }
   });
+}
+export const okFeeds = (feeds: string[]) => feeds.map(f => f.trim()).filter(f => /^https?:\/\//i.test(f)).slice(0, 20);
+export async function news(feeds: string[], limit = 20): Promise<NewsItem[]> {
+  const ok = okFeeds(feeds);
+  if (!ok.length) throw new HttpError(400, "Add news feeds in Settings → Daily page.");
+  const all = await Promise.all(ok.map(f => feed(f)));
+  // Drop the same story from two feeds (same title).
+  const seen = new Set<string>();
+  return all.flatMap(f => f.items).sort((a, b) => b.published - a.published).filter(i => { const k = i.title.toLowerCase().slice(0, 80); if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, limit);
 }
 /** Headlines about a topic or ticker (Google News search feed). */
 export async function newsSearch(q: string, limit = 10): Promise<NewsItem[]> {
