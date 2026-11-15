@@ -184,7 +184,7 @@ export function fillTemplate(text: string, day: string) {
 export function insertUnderHeading(text: string, heading: string, line: string) {
   const lines = text.split("\n"), bullet = `- ${line}`;
   const start = lines.findIndex(l => /^#{1,6}\s/.test(l) && l.replace(/^#{1,6}\s+/, "").trim() === heading);
-  if (start === -1) return `${text.replace(/\s*$/, "")}\n\n## ${heading}\n\n${bullet}\n`;
+  if (start === -1) return `${text.replace(/\n+$/, "")}\n\n## ${heading}\n\n${bullet}\n`;
   const level = lines[start].match(/^#+/)![0].length;
   let end = lines.length;
   for (let i = start + 1; i < lines.length; i++) { const m = lines[i].match(/^(#+)\s/); if (m && m[1].length <= level) { end = i; break; } }
@@ -199,7 +199,7 @@ export function insertUnderHeading(text: string, heading: string, line: string) 
 export function setSection(text: string, heading: string, body: string) {
   const lines = text.split("\n");
   const start = lines.findIndex(l => /^##\s/.test(l) && l.replace(/^##\s+/, "").trim() === heading);
-  if (start === -1) return `${text.replace(/\s*$/, "")}\n\n## ${heading}\n\n${body}\n`;
+  if (start === -1) return `${text.replace(/\n+$/, "")}\n\n## ${heading}\n\n${body}\n`;
   let end = lines.length;
   for (let i = start + 1; i < lines.length; i++) if (/^#{1,2}\s/.test(lines[i])) { end = i; break; }
   return [...lines.slice(0, start + 1), "", body, "", ...lines.slice(end)].join("\n").replace(/\n{3,}/g, "\n\n");
