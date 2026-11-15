@@ -53,6 +53,12 @@ Qwen2.5-VL, Llama 3.2 Vision or MiniCPM-V). You check the text, fix what it
 got wrong, and **Add to notes** puts it in the day's notes under "Handwritten
 (time)".
 
+**Fixing a page later.** Pages you've added are listed under "Added on this
+day" with their image. **Edit text** changes the page's text: the day's notes
+get the new text in place of the old (if you haven't reworded it there
+yourself), and the training copy is updated. **Model's reading** starts again
+from what the model read.
+
 **Learning your handwriting.** Every page you add is kept with its text in
 `data/handwriting/`: the image, what the model read (`<id>.ocr.txt`), what you
 corrected it to (`<id>.txt`), and one line per page in `manifest.jsonl`

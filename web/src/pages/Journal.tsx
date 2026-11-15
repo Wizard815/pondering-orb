@@ -138,9 +138,35 @@ async function pdfImages(file: File): Promise<Blob[]> {
   }
   return out;
 }
+type Added = { id: string; text: string; ocr: string; at: number; image: string };
+/** A page already added: fix its text any time. The fix replaces the old text in the day's notes and updates what trains on your handwriting. */
+function AddedPage({ a, day, j, onSaved }: { a: Added; day: string; j: ReturnType<typeof useJournal>; onSaved: () => void }) {
+  const ui = useUi(), [edit, setEdit] = useState<string | null>(null);
+  const save = async () => {
+    const next = (edit || "").trim(); if (!next) return;
+    try {
+      const r = await api<{ previous: string }>("POST", `/api/handwriting/${a.id}/text`, { text: next, day });
+      const prev = (r.previous || a.text).trim(); let replaced = false;
+      if (prev && prev !== next) await j.save(day, cur => { const t = cur.text || ""; if (!t.includes(prev)) return {}; replaced = true; return { text: t.replace(prev, next) }; });
+      ui.status(replaced || prev === next ? "Saved: the notes and the training copy have the new text." : "Saved for training. The notes no longer had the old text word for word, so change them there too.");
+      setEdit(null); onSaved();
+    } catch (e) { ui.error(e); }
+  };
+  return <div className="hw-page">
+    <a href={a.image} target="_blank" rel="noopener noreferrer"><img src={a.image} alt="Handwritten page" loading="lazy" /></a>
+    <div className="hw-edit">
+      {edit === null ? <><pre className="hw-text">{a.text}</pre>
+        <div className="row small"><button className="btn" onClick={() => setEdit(a.text)}>Edit text</button>{a.text !== a.ocr && <span className="hint">corrected from what the model read</span>}</div></>
+        : <><textarea value={edit} onChange={e => setEdit(e.target.value)} rows={Math.min(14, Math.max(4, edit.split("\n").length + 1))} aria-label="Text of this page" autoFocus />
+          <div className="row"><button className="btn primary" onClick={save} disabled={!edit.trim()}>Save</button><button className="btn" onClick={() => setEdit(null)}>Cancel</button>
+            {a.ocr && <button className="btn" onClick={() => setEdit(a.ocr)} title="Start again from what the model read">Model's reading</button>}</div></>}
+    </div></div>;
+}
+
 function Handwritten({ day, j }: { day: string; j: ReturnType<typeof useJournal> }) {
   const ui = useUi(), [pages, setPages] = useState<Page[]>([]), file = useRef<HTMLInputElement>(null), [busy, setBusy] = useState("");
   const stats = useFetch<{ samples: number; corrected: number; hints: string[]; model: string }>("/api/handwriting/stats", 0), wikiOn = useSettings().journal?.wiki === true;
+  const added = useFetch<Added[]>(`/api/handwriting?day=${day}`, 0);
   const set = (key: string, p: Partial<Page>) => setPages(list => list.map(x => (x.key === key ? { ...x, ...p } : x)));
   const read = async (name: string, blob: Blob) => {
     const key = Math.random().toString(36).slice(2), url = URL.createObjectURL(blob);
@@ -168,7 +194,7 @@ function Handwritten({ day, j }: { day: string; j: ReturnType<typeof useJournal>
       if (p.id) await api("POST", `/api/handwriting/${p.id}/text`, { text, day }); // kept for training on your handwriting
       const at = new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
       await j.save(day, cur => ({ text: `${(cur.text || "").trimEnd()}${cur.text?.trim() ? "\n\n" : ""}### Handwritten (${at})\n${text}\n` }));
-      set(p.key, { status: "added" }); stats.reload(); ui.status("Added to the day's notes.");
+      set(p.key, { status: "added" }); stats.reload(); added.reload(); ui.status("Added to the day's notes.");
     } catch (e) { ui.error(e); }
   };
   const toWiki = async () => { try { const r = await api<any>("POST", `/api/journal/${day}/wiki`); ui.status(`Written to the wiki: ${r.path}`); } catch (e) { ui.error(e); } };
@@ -189,6 +215,7 @@ function Handwritten({ day, j }: { day: string; j: ReturnType<typeof useJournal>
           <textarea value={p.text} onChange={e => set(p.key, { text: e.target.value })} rows={Math.min(14, Math.max(4, p.text.split("\n").length + 1))} aria-label={`Text of ${p.name}`} placeholder="The page's text" />
           <div className="row"><button className="btn primary" onClick={() => add(p)} disabled={!p.text.trim()}>Add to notes</button><button className="btn" onClick={() => setPages(l => l.filter(x => x.key !== p.key))}>Discard</button></div></>}
       </div></div>)}
+    {(added.data?.length ?? 0) > 0 && <><h4 className="group-name">Added on this day</h4>{added.data!.map(a => <AddedPage key={a.id} a={a} day={day} j={j} onSaved={() => { added.reload(); stats.reload(); }} />)}</>}
     {stats.data && stats.data.samples > 0 && <div className="hint">{stats.data.samples} page{stats.data.samples === 1 ? "" : "s"} kept for training on your handwriting ({stats.data.corrected} corrected){stats.data.hints.length ? `. Words it has learned to watch for: ${stats.data.hints.slice(0, 8).join(", ")}` : ""}.</div>}
   </div>;
 }
