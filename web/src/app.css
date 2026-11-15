@@ -114,3 +114,4 @@ div:not(.editing) > .react-grid-layout .react-resizable-handle { display: none; 
 .hw-page img { width: 100%; border-radius: 4px; border: 1px solid var(--line); background: #fff; } .hw-txt { padding: 8px; background: var(--inset); border-radius: 4px; }
 .hw-edit { display: flex; flex-direction: column; gap: 8px; } .hw-edit textarea { width: 100%; font: inherit; line-height: 1.5; }
 @media (max-width: 640px) { .hw-page { grid-template-columns: 1fr; } }
+.hw-text { white-space: pre-wrap; font: inherit; margin: 0; background: var(--inset); border-radius: 6px; padding: 8px; }

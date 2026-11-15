@@ -85,10 +85,27 @@ export function handwritingApi(app: FastifyInstance, deps: { records: Records; c
     const text = String(req.body?.text ?? "").slice(0, 50000), day = isDay(req.body?.day) ? req.body.day : "";
     if (!text.trim()) throw new HttpError(422, "The page needs its text.");
     const ocr = await readFile(join(dir, `${id}.ocr.txt`), "utf8").catch(() => "");
+    // The text it had before (for replacing it in the notes); a fix is a new manifest line, and the latest one counts.
+    const previous = await readFile(join(dir, `${id}.txt`), "utf8").catch(() => "");
+    const earlier = (await samples()).filter(x => x.id === id).at(-1);
     await writeFile(join(dir, `${id}.txt`), text);
-    const sample: Sample = { id, image: `${id}.${image}`, text, ocr, day, model: ocrSettings(records, cfg).model, at: Date.now() };
+    const sample: Sample = { id, image: `${id}.${image}`, text, ocr, day: day || earlier?.day || "", model: earlier?.model || ocrSettings(records, cfg).model, at: Date.now() };
     await appendFile(manifest, JSON.stringify(sample) + "\n");
-    return { saved: true };
+    return { saved: true, previous };
+  });
+  /** Pages added on a day (the latest text of each), to look at or fix later. */
+  app.get("/api/handwriting", { preHandler: guard }, async (req: any) => {
+    const day = String(req.query.day || ""); if (!isDay(day)) throw new HttpError(400, "The day is YYYY-MM-DD.");
+    const latest = new Map<string, Sample>(); for (const s of await samples()) latest.set(s.id, s);
+    return [...latest.values()].filter(s => s.day === day).sort((a, b) => a.at - b.at).map(s => ({ id: s.id, text: s.text, ocr: s.ocr, at: s.at, image: `/api/handwriting/${s.id}/image` }));
+  });
+  app.get("/api/handwriting/:id/image", { preHandler: guard }, async (req: any, reply) => {
+    const id = String(req.params.id); if (!ID.test(id)) throw new HttpError(404, "No such page.");
+    for (const e of ["png", "jpg", "webp"] as const) {
+      const b = await readFile(join(dir, `${id}.${e}`)).catch(() => null);
+      if (b) { reply.header("Content-Type", TYPES[e]).header("X-Content-Type-Options", "nosniff").header("Content-Security-Policy", "default-src 'none'").header("Cache-Control", "private, max-age=86400"); return reply.send(b); }
+    }
+    throw new HttpError(404, "No such page.");
   });
   app.get("/api/handwriting/stats", { preHandler: guard }, async () => {
     const s = await samples(), latest = new Map(s.map(x => [x.id, x]));

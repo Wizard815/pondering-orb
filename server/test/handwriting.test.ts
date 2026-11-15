@@ -44,6 +44,14 @@ test("TestHandwriting_ReadCorrectTrainAndWiki", async () => {
     assert.equal((await app.inject({ method: "POST", url: `/api/handwriting/${r.id}/text`, cookies: cookie, payload: { text: "- [ ] Buy a UPS for the rack\n- Call Sam about backups", day } })).statusCode, 200);
     const m = (await readFile(join(dir, "handwriting", "manifest.jsonl"), "utf8")).trim().split("\n").map(l => JSON.parse(l));
     assert.equal(m.length, 1); assert.equal(m[0].image, `${r.id}.png`); assert.match(m[0].ocr, /abuot/); assert.match(m[0].text, /about/); assert.equal(m[0].day, day);
+    // Fixing it again later: the latest text counts, the answer gives the text it replaces, and the day's pages list it.
+    const fix = (await app.inject({ method: "POST", url: `/api/handwriting/${r.id}/text`, cookies: cookie, payload: { text: "- [ ] Buy a UPS for the rack\n- Call Sam about the backups" } })).json();
+    assert.match(fix.previous, /Call Sam about backups/);
+    const dayPages = (await app.inject({ method: "GET", url: `/api/handwriting?day=${day}`, cookies: cookie })).json();
+    assert.equal(dayPages.length, 1); assert.match(dayPages[0].text, /about the backups/); assert.equal(dayPages[0].image, `/api/handwriting/${r.id}/image`);
+    const img = await app.inject({ method: "GET", url: dayPages[0].image, cookies: cookie });
+    assert.equal(img.headers["content-type"], "image/png"); assert.equal(img.headers["x-content-type-options"], "nosniff");
+    assert.equal((await app.inject({ method: "GET", url: dayPages[0].image })).statusCode, 401);
     const st = (await app.inject({ method: "GET", url: "/api/handwriting/stats", cookies: cookie })).json();
     assert.deepEqual([st.samples, st.corrected, st.hints], [1, 1, ["about"]]);
     // The next page is read with the words you corrected as hints.
