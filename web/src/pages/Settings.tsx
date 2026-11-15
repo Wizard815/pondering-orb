@@ -175,7 +175,7 @@ function JournalSettingsForm() {
     <div className="row"><label className="small" style={{ flex: 1 }}>Model<input type="text" name="omodel" defaultValue={o.model || ""} placeholder="empty = Golem's model · e.g. qwen2.5-vl-7b" /></label>
       <label className="small" style={{ flex: 1 }}>Key variable (optional)<input type="text" name="okey" defaultValue={o.keyEnv || ""} /></label></div>
     <div className="hint">Reads handwritten pages (BOOX exports, photos of paper). It must accept images: Qwen2.5-VL, Llama 3.2 Vision or MiniCPM-V on llama-server, Ollama or Argos work. Pages you correct are kept in <code>data/handwriting/</code> (images and <code>manifest.jsonl</code>) to train a model on your handwriting later.</div>
-    <label className="small row" style={{ gap: 4 }}><input type="checkbox" name="wiki" defaultChecked={j.wiki === true} /> Send each finished day to the wiki (wiki/journal/Journal - date.md)</label>
+    <label className="small row" style={{ gap: 4 }}><input type="checkbox" name="wiki" defaultChecked={j.wiki === true} /> Send each finished day to the wiki (the Journal section of daily/date.md)</label>
     <div className="row"><button className="btn primary" type="submit">Save</button></div>
   </form>;
 }

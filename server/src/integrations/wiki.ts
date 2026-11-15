@@ -14,13 +14,16 @@ export class Wiki {
   constructor(private base: () => string, private key: () => string, private vault: () => string) {}
   private h(extra: Record<string, string> = {}) { const k = this.key(); return { ...(k ? { Authorization: `Bearer ${k}` } : {}), ...extra }; }
   /** REST address of a vault path. Dot segments are refused (fetch would
-   *  resolve them, so "wiki/../raw/x.md" would reach raw/), and writes must
-   *  stay under wiki/. */
-  private url(path: string, write = false) {
+   *  resolve them, so "wiki/../raw/x.md" would reach raw/). Writes follow the
+   *  vault's Memory Tiers (schema/agents.md): your edits go under wiki/, Orb's
+   *  own log under daily/, and "new-source" only adds a file to raw/sources/
+   *  (callers check it isn't there yet: sources are never changed). */
+  private url(path: string, write: boolean | "new-source" = false) {
     const b = trimSlash(this.base()); if (!b) throw new HttpError(503, "The wiki isn't set up. Add its address in Settings → Connections.");
     const parts = path.replace(/\/$/, "").split("/");
     if (parts.some(x => x === "." || x === ".." || /[\\\x00-\x1f]/.test(x)) || parts.slice(0, -1).some(x => !x)) throw new HttpError(400, "That isn't a vault path.");
-    if (write && parts[0] !== "wiki") throw new HttpError(403, "Orb only edits notes under wiki/, never raw/.");
+    const allowed = write === "new-source" ? parts[0] === "raw" && parts[1] === "sources" && parts.length === 3 : !write || parts[0] === "wiki" || parts[0] === "daily";
+    if (!allowed) throw new HttpError(403, "Orb edits notes under wiki/ and writes its log to daily/; it only adds new files to raw/sources/, never changes raw/.");
     return `${b}/vault/${parts.map(encodeURIComponent).join("/")}${path.endsWith("/") ? "/" : ""}`;
   }
 
@@ -92,39 +95,59 @@ export class Wiki {
     const r = await call(this.url(path, true), { method: "PATCH", headers: this.h({ "Content-Type": "text/markdown", ...headers }), body });
     if (!r.ok) throw new HttpError(502, `The wiki refused the edit (${r.status}): ${typeof r.body === "string" ? r.body.slice(0, 160) : r.body?.message || ""}`);
   }
-  /** Append a bullet under "## Pondering Orb" in today's log, creating the
-   *  file from the LOG template when it doesn't exist. */
+  /** The text of a day's note in daily/ (the vault's short-term memory), or,
+   *  when create is set and it doesn't exist, today's from the DAILY template. */
+  private async dailyText(day: string, create: boolean): Promise<string | null> {
+    const r = await call(this.url(`daily/${day}.md`), { headers: this.h({ Accept: "text/markdown" }) });
+    if (r.ok) return String(r.body || "");
+    if (r.status !== 404) throw new HttpError(502, `The wiki answered ${r.status} for daily/${day}.md.`);
+    if (!create) return null;
+    const t = await call(this.url(DAILY_TEMPLATE), { headers: this.h({ Accept: "text/markdown" }) });
+    return t.ok ? fillTemplate(String(t.body || ""), day) : `---\ntitle: "${day}"\ntype: daily\ntags: [daily]\ncreated: ${day}\nstatus: open\nrelated: []\n---\n\n# ${day}\n\n## Worked on\n\n- \n`;
+  }
+  private async putDaily(day: string, text: string) {
+    const w = await call(this.url(`daily/${day}.md`, true), { method: "PUT", headers: this.h({ "Content-Type": "text/markdown" }), body: text });
+    if (!w.ok) throw new HttpError(502, `The wiki refused daily/${day}.md (${w.status}).`);
+  }
   private logChain: Promise<unknown> = Promise.resolve();
-  /** Log writes run one at a time: two at once on a new day would both
-   *  create the file and the second would overwrite the first. */
+  /** One line under "Worked on" in today's daily note, marked (pondering-orb).
+   *  Writes run one at a time: two at once on a new day would both create the
+   *  note and the second would overwrite the first. Orb never writes wiki/logs:
+   *  automation writes only the short-term tier, and Rollover files the day. */
   log(line: string): Promise<void> {
     const run = this.logChain.then(() => this.logNow(line));
     this.logChain = run.catch(() => {});
     return run;
   }
   private async logNow(line: string) {
-    line = line.replace(/[\r\n]+/g, " ");
-    const d = today(), path = `wiki/logs/Log - ${d}.md`, bullet = `- ${line}\n`;
-    const r = await call(this.url(path), { headers: this.h({ Accept: "text/markdown" }) });
-    if (r.status === 404) {
-      const body = `---\ntitle: "Log - ${d}"\ntype: log\ntags: [wiki, log]\ncreated: ${d}\nupdated: ${d}\nsource: ""\nstatus: draft\n---\n# Log - ${d}\n\n## Pondering Orb\n${bullet}`;
-      const w = await call(this.url(path, true), { method: "PUT", headers: this.h({ "Content-Type": "text/markdown" }), body }); if (!w.ok) throw new HttpError(502, `The wiki refused the log (${w.status}).`); return;
-    }
-    const text = String(r.body || "");
-    if (/^##\s+Pondering Orb\s*$/m.test(text)) { const h1 = /^#\s+(.+)$/m.exec(text)?.[1]?.trim() || `Log - ${d}`; await this.patch(path, { Operation: "append", "Target-Type": "heading", Target: encodeURIComponent(`${h1}::Pondering Orb`) }, bullet); }
-    else { const w = await call(this.url(path, true), { method: "POST", headers: this.h({ "Content-Type": "text/markdown" }), body: `\n## Pondering Orb\n${bullet}` }); if (!w.ok) throw new HttpError(502, `The wiki refused the log (${w.status}).`); }
+    line = line.replace(/[\r\n]+/g, " ").trim();
+    const d = today();
+    const text = (await this.dailyText(d, true))!;
+    await this.putDaily(d, insertUnderHeading(text, "Worked on", `${line} (pondering-orb)`));
   }
-  /** A day's journal as its own note, wiki/journal/Journal - YYYY-MM-DD.md.
-   *  Orb writes the whole note each time (it is Orb's), keeps `created`, and logs the write. */
+  /** A day's journal as the "Journal" section of that day's daily note, so it
+   *  is filed into the wiki with the rest of the day. Orb rewrites the section
+   *  each time (it is Orb's). A past day whose note was already rolled over
+   *  goes to raw/sources/YYYY-MM-DD - Journal.md once, for Ingest. */
   async writeJournal(day: string, body: string) {
-    const path = `wiki/journal/Journal - ${day}.md`, title = `Journal - ${day}`;
-    const old = await call(this.url(path), { headers: this.h({ Accept: "text/markdown" }) });
-    const created = old.ok ? (/^created:\s*(\d{4}-\d{2}-\d{2})/m.exec(String(old.body))?.[1] || day) : today();
-    const text = `---\ntitle: "${title}"\ntype: log\ntags: [wiki, log]\ncreated: ${created}\nupdated: ${today()}\nsource: manual\nstatus: draft\n---\n# ${title}\n\n${body.trim()}\n`;
-    const w = await call(this.url(path, true), { method: "PUT", headers: this.h({ "Content-Type": "text/markdown" }), body: text });
-    if (!w.ok) throw new HttpError(502, `The wiki refused the journal note (${w.status}).`);
-    await this.log(`[[${title}]]: ${old.ok ? "updated" : "written"} from the journal`);
-    return { path, created: !old.ok };
+    const section = body.trim().replace(/^## /gm, "### ");
+    const run = this.logChain.then(async () => {
+      const text = await this.dailyText(day, day === today());
+      if (text !== null) {
+        await this.putDaily(day, setSection(text, "Journal", section));
+        return { path: `daily/${day}.md`, created: false };
+      }
+      const path = `raw/sources/${day} - Journal.md`;
+      const old = await call(this.url(path), { headers: this.h({ Accept: "text/markdown" }) });
+      if (old.ok) return { path, created: false, alreadyFiled: true };
+      const d = today();
+      const src = `---\ntitle: "${day} - Journal"\ntype: source\ntags: [source]\ncreated: ${d}\nupdated: ${d}\nstatus: unprocessed\n---\n\n# Journal - ${day}\n\n${section}\n`;
+      const w = await call(this.url(path, "new-source"), { method: "PUT", headers: this.h({ "Content-Type": "text/markdown" }), body: src });
+      if (!w.ok) throw new HttpError(502, `The wiki refused the journal source (${w.status}).`);
+      return { path, created: true };
+    });
+    this.logChain = run.catch(() => {});
+    return run;
   }
   /** New project note from the PROJECT template, linked from its area hub. */
   async createProject(name: string, area: string, status: string, next: string, hub: string) {
@@ -149,6 +172,39 @@ export class Wiki {
     return (r.body || []).map((x: any) => ({ path: x.filename, score: x.score, snippet: x.matches?.[0]?.context || "" }));
   }
 }
+const DAILY_TEMPLATE = "schema/templates/DAILY.md";
+
+/** The DAILY template with its {{date}} / {{title}} placeholders filled. */
+export function fillTemplate(text: string, day: string) {
+  return text.replace(/\{\{\s*(date|title)(:[^}]*)?\s*\}\}/g, day);
+}
+
+/** Add one bullet at the end of a "## heading" section (an empty "- " placeholder is filled instead),
+ *  or a new section at the end. Same rule as the vault's own memory_log tool. */
+export function insertUnderHeading(text: string, heading: string, line: string) {
+  const lines = text.split("\n"), bullet = `- ${line}`;
+  const start = lines.findIndex(l => /^#{1,6}\s/.test(l) && l.replace(/^#{1,6}\s+/, "").trim() === heading);
+  if (start === -1) return `${text.replace(/\s*$/, "")}\n\n## ${heading}\n\n${bullet}\n`;
+  const level = lines[start].match(/^#+/)![0].length;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i++) { const m = lines[i].match(/^(#+)\s/); if (m && m[1].length <= level) { end = i; break; } }
+  for (let i = start + 1; i < end; i++) if (/^-\s*$/.test(lines[i])) { lines[i] = bullet; return lines.join("\n"); }
+  let last = end - 1;
+  while (last > start && !lines[last].trim()) last--;
+  lines.splice(last + 1, 0, ...(last === start ? ["", bullet] : [bullet]));
+  return lines.join("\n");
+}
+
+/** Replace the body of a "## heading" section, or add the section at the end. */
+export function setSection(text: string, heading: string, body: string) {
+  const lines = text.split("\n");
+  const start = lines.findIndex(l => /^##\s/.test(l) && l.replace(/^##\s+/, "").trim() === heading);
+  if (start === -1) return `${text.replace(/\s*$/, "")}\n\n## ${heading}\n\n${body}\n`;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i++) if (/^#{1,2}\s/.test(lines[i])) { end = i; break; }
+  return [...lines.slice(0, start + 1), "", body, "", ...lines.slice(end)].join("\n").replace(/\n{3,}/g, "\n\n");
+}
+
 function split(text: string) {
   const m = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(text);
   if (!m) return { fm: {} as Record<string, any>, body: text };
@@ -164,7 +220,7 @@ function meta(path: string, fm: Record<string, any>) {
 
 /** A name that is safe as a note file name and inside [[links]]. */
 export const isNoteName = (n: string) => !!n.trim() && !/[\\/\x00-\x1f\[\]|#^:*?"<>]/.test(n) && !n.startsWith(".");
-/** A vault path the API may read, or (write) edit: a .md under wiki/, never raw/. */
+/** A vault path the API may read, or (write) edit: a .md under wiki/, never raw/ (Orb's own daily/ writes don't come through here). */
 export function notePath(p: unknown, write = false) {
   const s = String(p || "");
   if (!s.endsWith(".md") || s.split("/").some(x => x === ".." || x === "." || !x) || s.startsWith("/") || /[\\\x00-\x1f]/.test(s)) throw new HttpError(400, "That isn't a note path.");

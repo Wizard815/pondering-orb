@@ -61,15 +61,20 @@ test("TestHandwriting_ReadCorrectTrainAndWiki", async () => {
     // The day's journal goes to the wiki: on demand, and once a night when turned on.
     records.create("journal", { date: day, text: "## Handwritten\n- Call Sam about backups" }, day);
     const w = (await app.inject({ method: "POST", url: `/api/journal/${day}/wiki`, cookies: cookie })).json();
-    assert.equal(w.path, `wiki/journal/Journal - ${day}.md`);
-    const put = wikiPuts.find(p => p.path.endsWith(`Journal - ${day}.md`))!;
-    assert.match(put.body, /^---\ntitle: "Journal - /); assert.match(put.body, /type: log\ntags: \[wiki, log\]/); assert.match(put.body, /Call Sam about backups/);
+    // Today's journal is the Journal section of today's daily note (the vault's short-term tier).
+    assert.equal(w.path, `daily/${day}.md`);
+    const put = wikiPuts.findLast(p => p.path === `/vault/daily/${day}.md`)!;
+    assert.match(put.body, /type: daily/); assert.match(put.body, /## Journal\n\n### Notes\n\n### Handwritten\n- Call Sam about backups/);
+    assert.ok(!wikiPuts.some(p => p.path.startsWith("/vault/wiki/")), "nothing automatic lands in the long-term wiki");
     assert.equal((await app.inject({ method: "POST", url: `/api/journal/${day}/wiki`, headers: { authorization: "Bearer tok" } })).statusCode, 403);
     const y = localDay(Date.now() - 864e5);
     await app.inject({ method: "PUT", url: "/api/c/settings/app", cookies: cookie, payload: { journal: { wiki: true } } });
-    const before = wikiPuts.filter(p => p.path.includes(`Journal - ${y}`)).length;
+    // Yesterday's daily note was already rolled over (the fake has none): it becomes a new raw source, once.
+    const before = wikiPuts.filter(p => p.path === `/vault/raw/sources/${y} - Journal.md`).length;
     await journal.tick(); await journal.tick();
-    assert.equal(wikiPuts.filter(p => p.path.includes(`Journal - ${y}`)).length - before, 1, "yesterday goes to the wiki once");
+    const filed = wikiPuts.filter(p => p.path === `/vault/raw/sources/${y} - Journal.md`);
+    assert.equal(filed.length - before, 1, "yesterday goes to the wiki once");
+    assert.match(filed.at(-1)!.body, /type: source[\s\S]*status: unprocessed/);
     await app.close();
   } finally { fake.close(); delete process.env.WK; }
 });
