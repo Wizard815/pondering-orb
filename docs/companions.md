@@ -117,6 +117,9 @@ In Coinpile, two linked people can tie their copies of a joint account
 together and agree a split. Coinpile then counts only your share, so the
 savings, net worth and goals Orb gets from Coinpile are your part. They can
 differ from Firefly III's net worth, which counts the whole account.
+Daily totals (`daily`) are the exception: they add up every posted
+transaction in your Firefly III, so a payment from a joint account counts in
+full, whoever made it.
 
 Orb never gets the other person's numbers:
 
