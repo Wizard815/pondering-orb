@@ -122,4 +122,6 @@ test("TestWiki_DailyNoteHelpers", async () => {
   t = setSection(t, "Journal", "### Notes\n\nsecond");
   assert.match(t, /## Journal\n\n### Notes\n\nsecond\n$/); assert.doesNotMatch(t, /first/);
   assert.match(setSection("# d\n\n## Journal\n\nold\n\n## Follow-ups\n\n- x\n", "Journal", "new"), /## Journal\n\nnew\n\n## Follow-ups\n\n- x\n/);
+  // An empty "- " placeholder at the end of the note keeps its space when a section is added after it.
+  assert.match(setSection("## Follow-ups\n\n- \n", "Journal", "j"), /## Follow-ups\n\n- \n\n## Journal\n\nj\n$/);
 });
