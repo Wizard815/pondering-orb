@@ -59,7 +59,7 @@ Each one is optional; leave its address empty and its panels say so.
 | **Unraid Management Agent** | Read only: every container, its state, port mappings and updates, for the Links page; suggests addresses for Orb's other connections from what's running | [docs/links.md](docs/links.md) |
 | **Uptime Kuma** | Monitors from a public status page | |
 | **Firefly III** | Read only: this month (net worth, spent, earned, left to spend), bills due and paid, budgets, piggy banks, accounts, transactions and search; bills also show in Today and This week, and in the brief. Bank data reaches Firefly through [plaid-firefly-connector](https://github.com/Wizard815/plaid-firefly-connector) | [docs/companions.md](docs/companions.md) |
-| **Coinpile** | Read only: what you share with the Orb: savings (free vs set aside), goals, alerts (a bank to sign in again, CDs maturing), the spending forecast, Robinhood value; your share only of joint accounts, never a linked person's numbers | [docs/companions.md](docs/companions.md) |
+| **Coinpile** | Read only: what you share with the Orb: savings (free vs set aside), goals, alerts (a bank to sign in again, CDs maturing), the spending forecast, Robinhood value; joint accounts count your share only in savings and net worth; never a linked person's numbers | [docs/companions.md](docs/companions.md) |
 | **Omi** (omi-local) | Read only: daily recaps, conversations, memory search; its action items come through CalDAV, once | [docs/companions.md](docs/companions.md) |
 | **Robinhood** | Its Trading MCP (OAuth): the agentic account, and orders for picks you approve, within caps you set | [docs/picks.md](docs/picks.md) |
 | **Plex**, **SABnzbd** | Live panels | |
