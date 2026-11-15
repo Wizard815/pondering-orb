@@ -162,7 +162,7 @@ export function journalApi(app: FastifyInstance, deps: {
     sec("Calendar", a.events.map(e => `- ${e.time} ${e.title}`));
     return L.join("\n") || "_Nothing written or logged this day._";
   }
-  /** Write a day's journal to LLMWIKI (wiki/journal/Journal - YYYY-MM-DD.md). */
+  /** Write a day's journal to LLMWIKI: the Journal section of daily/YYYY-MM-DD.md. */
   async function toWiki(day: string) {
     if (!cfg().wiki.baseUrl) throw new HttpError(503, "The wiki isn't set up (Settings → Connections → LLMWIKI).");
     return deps.wiki.writeJournal(day, wikiBody(day, records.get("journal", day), await autoFor(day)));

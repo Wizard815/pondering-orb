@@ -69,13 +69,18 @@ on every new page. Back the folder up with the rest of `data/`.
 
 ## In the wiki
 
-**Send this day to the wiki** writes the day to LLMWIKI as
-`wiki/journal/Journal - YYYY-MM-DD.md`: your notes (typed and handwritten),
-then the day's log in short (money, done, log, code, agents, Omi, calendar).
-It follows the vault's rules: `type: log`, tags `[wiki, log]`,
-`source: manual`, `status: draft`, `updated` today, and a bullet in the day's
-wiki log. Orb owns these notes and rewrites them whole. Tick **every day**
-(or Settings → Journal) to send each finished day once, after midnight.
+**Send this day to the wiki** writes the day into LLMWIKI's short-term
+memory: the `## Journal` section of that day's daily note,
+`daily/YYYY-MM-DD.md` (created from the DAILY template if needed). It holds
+your notes (typed and handwritten), then the day's log in short (money, done,
+log, code, agents, Omi, calendar). Orb owns that section and rewrites it whole;
+the rest of the note (what agents logged) is left alone. The vault's Rollover
+workflow later files the whole day into the wiki.
+
+A past day whose daily note was already rolled over is sent once as a new
+source, `raw/sources/YYYY-MM-DD - Journal.md` (`status: unprocessed`), for the
+vault's Ingest workflow; Orb never changes a source after that. Tick **every
+day** (or Settings → Journal) to send each finished day once, after midnight.
 
 ## Who can change it
 

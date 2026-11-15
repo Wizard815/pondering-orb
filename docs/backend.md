@@ -173,13 +173,17 @@ plugin commits every 10 minutes.
   need the picker once.
 - **`related`:** Orb may add `[[links]]` to other project notes that exist;
   it never removes entries and skips links that don't resolve.
-- **Log:** every write appends a bullet to `wiki/logs/Log - YYYY-MM-DD.md`
-  under `## Pondering Orb`, such as `- [[Argos]]: edited Next steps`. If the
-  file is missing, Orb creates it from the LOG template (`type: log`,
-  `tags: [wiki, log]`, `source: ""`). Orb's own short project logs are not
-  mirrored; an optional daily digest bullet ("Orb: 4 log entries on
-  [[Pondering Orb]]") can be turned on in Settings.
-- **Never** anything under `raw/`, and never secrets in a note.
+- **Log:** every write appends a bullet under `## Worked on` in today's daily
+  note, `daily/YYYY-MM-DD.md`, such as
+  `- [[Argos]]: edited Next steps (pondering-orb)`. That is the vault's
+  short-term tier (schema/agents.md, Memory Tiers): automation never writes
+  `wiki/logs/`, and the vault's Rollover workflow files the day into the wiki.
+  If the note is missing, Orb creates it from `schema/templates/DAILY.md`.
+  Orb's own short project logs are not mirrored; an optional daily digest
+  bullet ("Orb: 4 log entries on [[Pondering Orb]]") can be turned on in
+  Settings.
+- **Never** changes anything under `raw/`: it only adds a new source there
+  (a past day's journal, see docs/journal.md), and never secrets in a note.
 - **Reading the whole vault:** mount the vault folder into Orb **read only**
   (for example `/mnt/user/appdata/llmwiki/vault:/vault:ro`). Orb indexes every
   `.md` file there, including `raw/`, `schema/` and `logs/`, for the Wiki tab:
@@ -411,7 +415,8 @@ Settings picks the brain:
   model name and the env var that holds the key.
 
 The server runs the tool loop with the same tools as the MCP list below,
-plus the LLMWIKI MCP tools (read only) and Argos's `/api/mcp` status tools.
+plus read-only `wiki_search` and `wiki_read` (over the vault's REST API, not
+its MCP endpoint).
 
 ## REST API
 

@@ -95,7 +95,8 @@ test("TestWiki_SectionEditPatchesAndLogs", async () => {
     const patches = seen.filter(s => s.m === "PATCH");
     assert.equal(patches[0].h["target-type"], "heading"); assert.equal(decodeURIComponent(patches[0].h.target), "Argos::Next steps"); assert.equal(patches[0].h.operation, "replace");
     assert.equal(patches[1].h["target-type"], "frontmatter"); assert.equal(patches[1].h.target, "updated");
-    const log = seen.find(s => s.m === "PUT"); assert.match(log.u, /wiki\/logs\/Log - \d{4}-\d{2}-\d{2}\.md/); assert.match(log.b, /## Pondering Orb\n- \[\[Argos\]\]: edited Next steps/); assert.match(log.b, /tags: \[wiki, log\]/);
+    // The log line goes to today's daily note (short-term tier), never wiki/logs.
+    const log = seen.find(s => s.m === "PUT"); assert.match(log.u, /\/vault\/daily\/\d{4}-\d{2}-\d{2}\.md/); assert.match(log.b, /## Worked on\n\n- \[\[Argos\]\]: edited Next steps \(pondering-orb\)/); assert.match(log.b, /type: daily/);
     const bad = await app.inject({ method: "POST", url: "/api/wiki/section", payload: { path: "raw/x.md", heading: "Next steps", text: "no" } });
     assert.equal(bad.statusCode, 403);
   } finally { server.close(); }
@@ -108,4 +109,17 @@ test("TestIcal_InProgressIsInProcess", () => {
   // Done wins over in progress; not started goes back to NEEDS-ACTION.
   assert.equal(parseTodo(writeTodo(started, { uid: "y", summary: "Fix it", done: true, started: true, due: "", priority: 0 }))!.status, "COMPLETED");
   assert.equal(parseTodo(writeTodo(started, { uid: "y", summary: "Fix it", done: false, due: "", priority: 0 }))!.status, "NEEDS-ACTION");
+});
+
+test("TestWiki_DailyNoteHelpers", async () => {
+  const { insertUnderHeading, setSection, fillTemplate } = await import("../src/integrations/wiki.js");
+  let t = fillTemplate("---\ntitle: \"{{date}}\"\n---\n\n# {{date}}\n\n## Worked on\n\n- \n\n## Follow-ups\n\n- \n", "2026-11-15");
+  assert.match(t, /title: "2026-11-15"\n---\n\n# 2026-11-15/);
+  t = insertUnderHeading(t, "Worked on", "a (pondering-orb)");
+  t = insertUnderHeading(t, "Worked on", "b (pondering-orb)");
+  assert.match(t, /## Worked on\n\n- a \(pondering-orb\)\n- b \(pondering-orb\)\n\n## Follow-ups/);
+  t = setSection(t, "Journal", "### Notes\n\nfirst");
+  t = setSection(t, "Journal", "### Notes\n\nsecond");
+  assert.match(t, /## Journal\n\n### Notes\n\nsecond\n$/); assert.doesNotMatch(t, /first/);
+  assert.match(setSection("# d\n\n## Journal\n\nold\n\n## Follow-ups\n\n- x\n", "Journal", "new"), /## Journal\n\nnew\n\n## Follow-ups\n\n- x\n/);
 });

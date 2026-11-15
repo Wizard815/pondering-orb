@@ -7,7 +7,7 @@ import { mdToHtml } from "../lib/markdown";
 
 type Meta = { path: string; title: string; type?: string; area?: string; project_status?: string; status?: string; tags?: string[]; updated?: string };
 type Note = Meta & { body: string };
-const PARA: [string, string][] = [["wiki/1-projects/", "Projects"], ["wiki/2-areas/", "Areas"], ["wiki/3-resources/", "Resources"], ["wiki/4-archive/", "Archive"], ["wiki/logs/", "Logs"]];
+const PARA: [string, string][] = [["wiki/1-projects/", "Projects"], ["wiki/2-areas/", "Areas"], ["wiki/3-resources/", "Resources"], ["wiki/4-archive/", "Archive"], ["wiki/logs/", "Logs"], ["daily/", "Daily (read only)"]];
 
 // The open note is shared between panels on this page.
 let openPath = "", setters = new Set<(p: string) => void>();
