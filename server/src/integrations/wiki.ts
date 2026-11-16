@@ -12,6 +12,12 @@ export type Note = { path: string; title: string; type?: string; area?: string; 
  *  REST API, never the files, so ownership and the vault's rules hold. */
 export class Wiki {
   constructor(private base: () => string, private key: () => string, private vault: () => string) {}
+  /** Family mode: the base URL is the vault's ".../family" endpoint and the key
+   *  is one person's token. Paths are then that person's view: wiki/, daily/,
+   *  raw/ are theirs and household/... is shared. The vault mount isn't used
+   *  in this mode: it holds everyone's notes, and the token decides what a
+   *  person may read. */
+  family() { return /\/family$/.test(trimSlash(this.base())); }
   private h(extra: Record<string, string> = {}) { const k = this.key(); return { ...(k ? { Authorization: `Bearer ${k}` } : {}), ...extra }; }
   /** REST address of a vault path. Dot segments are refused (fetch would
    *  resolve them, so "wiki/../raw/x.md" would reach raw/). Writes follow the
@@ -22,14 +28,15 @@ export class Wiki {
     const b = trimSlash(this.base()); if (!b) throw new HttpError(503, "The wiki isn't set up. Add its address in Settings → Connections.");
     const parts = path.replace(/\/$/, "").split("/");
     if (parts.some(x => x === "." || x === ".." || /[\\\x00-\x1f]/.test(x)) || parts.slice(0, -1).some(x => !x)) throw new HttpError(400, "That isn't a vault path.");
-    const allowed = write === "new-source" ? parts[0] === "raw" && parts[1] === "sources" && parts.length === 3 : !write || parts[0] === "wiki" || parts[0] === "daily";
-    if (!allowed) throw new HttpError(403, "Orb edits notes under wiki/ and writes its log to daily/; it only adds new files to raw/sources/, never changes raw/.");
+    const own = parts[0] === "household" && this.family() ? parts.slice(1) : parts; // household/ has the same layout
+    const allowed = write === "new-source" ? own[0] === "raw" && own[1] === "sources" && own.length === 3 : !write || own[0] === "wiki" || own[0] === "daily";
+    if (!allowed) throw new HttpError(403, "Orb edits notes under wiki/ (or household/wiki/) and writes its log to daily/; it only adds new files to raw/sources/, never changes raw/.");
     return `${b}/vault/${parts.map(encodeURIComponent).join("/")}${path.endsWith("/") ? "/" : ""}`;
   }
 
   /** The mount counts only when it holds the vault (an empty folder Docker
    *  made for a missing path would hide every note). */
-  async hasMount() { try { return (await stat(this.vault())).isDirectory() && (await stat(join(this.vault(), "wiki"))).isDirectory(); } catch { return false; } }
+  async hasMount() { if (this.family()) return false; try { return (await stat(this.vault())).isDirectory() && (await stat(join(this.vault(), "wiki"))).isDirectory(); } catch { return false; } }
 
   /** Every .md note with its front-matter (body left out). */
   async tree(): Promise<Omit<Note, "body">[]> {
@@ -45,14 +52,17 @@ export class Wiki {
       };
       await walk(root); return out;
     }
-    // No mount: list wiki/ through the REST API (front-matter comes per note).
+    // No mount: list wiki/ (and in family mode household/wiki/) through the REST API (front-matter comes per note).
     const out: Omit<Note, "body">[] = [];
-    const walk = async (dir: string) => {
+    const walk = async (dir: string, optional = false) => {
       const r = await call(this.url(dir).replace(/\/?$/, "/"), { headers: this.h() });
+      if (optional && r.status === 404) return;
       if (!r.ok) throw new HttpError(502, `The wiki answered ${r.status} for ${dir}.`);
       for (const f of r.body?.files || []) { if (f.endsWith("/")) await walk(dir.replace(/\/?$/, "/") + f.replace(/\/$/, "")); else if (f.endsWith(".md")) out.push({ path: dir.replace(/\/?$/, "/") + f, title: f.replace(/\.md$/, "").split("/").pop()! }); }
     };
-    await walk("wiki"); return out;
+    await walk("wiki");
+    if (this.family()) await walk("household/wiki", true);
+    return out;
   }
 
   async note(path: string): Promise<Note> {
@@ -160,7 +170,7 @@ export class Wiki {
     const body = `---\ntitle: "${name.replace(/"/g, '\\"')}"\ntype: project\narea: ${area}\nproject_status: ${status}\ntags: [${tags.join(", ")}]\ncreated: ${d}\nupdated: ${d}\nsource: manual\nstatus: draft\nrelated: []\n---\n# ${name}\n\n**Area:** [[${hub}]]\n**Goal / finish line:** \n\n## Current state\n- \n\n## Next steps\n- ${next}\n`;
     const w = await call(this.url(path, true), { method: "PUT", headers: this.h({ "Content-Type": "text/markdown" }), body }); if (!w.ok) throw new HttpError(502, `The wiki refused the new note (${w.status}).`);
     let linked = false;
-    try { const hubPath = (await this.tree()).find(n => n.path.startsWith("wiki/2-areas/") && n.title === hub)?.path;
+    try { const hubPath = (await this.tree()).find(n => /^(household\/)?wiki\/2-areas\//.test(n.path) && n.title === hub)?.path;
       if (hubPath) { await this.patch(hubPath, { Operation: "append", "Target-Type": "heading", Target: encodeURIComponent(`${hub}::Projects`) }, `- [[${name}]]\n`); linked = true; } } catch { /* hub missing or no Projects heading */ }
     await this.log(`[[${name}]]: created from the PROJECT template${linked ? `, linked from [[${hub}]]` : ""}`);
     return { path, created: true, linked };
@@ -220,10 +230,11 @@ function meta(path: string, fm: Record<string, any>) {
 
 /** A name that is safe as a note file name and inside [[links]]. */
 export const isNoteName = (n: string) => !!n.trim() && !/[\\/\x00-\x1f\[\]|#^:*?"<>]/.test(n) && !n.startsWith(".");
-/** A vault path the API may read, or (write) edit: a .md under wiki/, never raw/ (Orb's own daily/ writes don't come through here). */
+/** A vault path the API may read, or (write) edit: a .md under wiki/ or household/wiki/ (the family's shared
+ *  wiki, in family mode), never raw/ (Orb's own daily/ writes don't come through here). */
 export function notePath(p: unknown, write = false) {
   const s = String(p || "");
   if (!s.endsWith(".md") || s.split("/").some(x => x === ".." || x === "." || !x) || s.startsWith("/") || /[\\\x00-\x1f]/.test(s)) throw new HttpError(400, "That isn't a note path.");
-  if (write && (s.startsWith("raw/") || !s.startsWith("wiki/"))) throw new HttpError(403, "Orb only edits notes under wiki/, never raw/.");
+  if (write && !/^(household\/)?wiki\//.test(s)) throw new HttpError(403, "Orb only edits notes under wiki/ or household/wiki/, never raw/.");
   return s;
 }

@@ -7,7 +7,9 @@ import { mdToHtml } from "../lib/markdown";
 
 type Meta = { path: string; title: string; type?: string; area?: string; project_status?: string; status?: string; tags?: string[]; updated?: string };
 type Note = Meta & { body: string };
-const PARA: [string, string][] = [["wiki/1-projects/", "Projects"], ["wiki/2-areas/", "Areas"], ["wiki/3-resources/", "Resources"], ["wiki/4-archive/", "Archive"], ["wiki/logs/", "Logs"], ["daily/", "Daily (read only)"]];
+const PARA_OF = (root: string, who: string): [string, string][] => [["wiki/1-projects/", "Projects"], ["wiki/2-areas/", "Areas"], ["wiki/3-resources/", "Resources"], ["wiki/4-archive/", "Archive"], ["wiki/logs/", "Logs"], ["daily/", "Daily (read only)"]].map(([p, l]) => [root + p, who + l] as [string, string]);
+/** Your own PARA first, then the family's shared household/ (when the wiki is in family mode). */
+const PARA: [string, string][] = [...PARA_OF("", ""), ...PARA_OF("household/", "Household · ")];
 
 // The open note is shared between panels on this page.
 let openPath = "", setters = new Set<(p: string) => void>();
@@ -23,7 +25,8 @@ function section(body: string, heading: string) {
 function Vault({ tree }: { tree: Meta[] }) {
   const cur = useOpen();
   const other = useMemo(() => [...new Set(tree.map(n => n.path.split("/").slice(0, -1).join("/") + "/").filter(f => !PARA.some(([p]) => f.startsWith(p))))], [tree]);
-  const groups: [string, string][] = [...PARA, ...other.map(f => [f, f.replace(/\/$/, "") + " (read only)"] as [string, string])];
+  const shared = tree.some(n => n.path.startsWith("household/"));
+  const groups: [string, string][] = [...PARA.filter(([p]) => shared || !p.startsWith("household/")), ...other.map(f => [f, f.replace(/\/$/, "") + " (read only)"] as [string, string])];
   return <>{groups.map(([pre, label]) => { const notes = tree.filter(n => n.path.startsWith(pre) && n.path.slice(pre.length).indexOf("/") < 0).sort((a, b) => a.title.localeCompare(b.title));
     return <div key={pre}><h4 className="group-name">{label}</h4><ul className="note-list">{notes.length ? notes.map(n => <li key={n.path}><button aria-current={cur === n.path} onClick={() => openNote(n.path)}><span className="grow">{n.title}</span></button></li>) : <li className="empty small">Empty</li>}</ul></div>; })}</>;
 }
@@ -34,7 +37,7 @@ function NoteView() {
   if (!path) return <div className="empty">Pick a note on the left.</div>;
   if (err) return <div className="err-inline">{err}</div>;
   if (!note) return <div className="hint">Opening…</div>;
-  const writable = note.path.startsWith("wiki/") && note.type === "project";
+  const writable = /^(household\/)?wiki\//.test(note.path) && note.type === "project";
   return <>
     <div className="fm"><span className="src">{note.path}</span>{note.type && <span className="pill"><i />{note.type}</span>}{note.area && <span className="pill"><i />area: {note.area}</span>}
       {note.project_status && <span className="pill info"><i />project_status: {note.project_status}</span>}{note.status && <span className="pill"><i />status: {note.status}</span>}

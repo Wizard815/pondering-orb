@@ -116,7 +116,7 @@ Start from [`.env.example`](.env.example). Values here never reach the browser.
 | `LLMWIKI_VAULT` | The vault folder on this host, mounted read only |
 | `CALDAV_USER`, `CALDAV_PASSWORD` | Your CalDAV login; with ALLGlance, your vikunja login |
 | `ALLGLANCE_TOKEN` | The gateway's `GATEWAY_TOKEN` |
-| `WIKI_API_KEY` | Obsidian Local REST API key |
+| `WIKI_API_KEY` | Obsidian Local REST API key, or for a family vault (`WIKI_URL` ending in `/family`) your own person token |
 | `HERMES_USER`, `HERMES_PASSWORD` | A Hermes Studio user for Orb |
 | `OPENROUTER_API_KEY` (or any name) | A frontier model key, named in Settings → Golem |
 | `DECIDER_KEY` (or any name) | Key for your self-hosted decision model, if it needs one |
