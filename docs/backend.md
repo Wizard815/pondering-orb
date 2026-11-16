@@ -140,6 +140,17 @@ plugin commits every 10 minutes.
 
 - **Auth:** `Authorization: Bearer` key from `WIKI_API_KEY`. Never logged,
   never written to a note.
+- **Family wiki (one vault, a private folder per person):** set `WIKI_URL` to
+  the vault's family endpoint, `http://llmwiki:27123/family`, and
+  `WIKI_API_KEY` to **your own** token (`node scripts/family-setup.mjs token
+  <your id>` in the vault). Orb then sees the vault as you do: `wiki/`,
+  `daily/` and `raw/` are yours, `household/wiki/` is the family's shared
+  wiki (shown as "Household" groups in the Wiki tab and editable the same
+  way), and other people's notes are never listed, searched or read. The
+  vault mount is **not used** in this mode, because it holds everyone's
+  notes; leave `LLMWIKI_VAULT` empty. Each person who runs an Orb uses their
+  own token. Don't use the master key with a family vault: Orb would write
+  its log to a top-level `daily/` that belongs to nobody.
 - **Read** a note: `GET /vault/<path>` (URL-encode spaces) with
   `Accept: application/vnd.olrapi.note+json` for parsed front-matter. The
   parser must accept quoted and unquoted `title` values.
@@ -184,7 +195,7 @@ plugin commits every 10 minutes.
   Settings.
 - **Never** changes anything under `raw/`: it only adds a new source there
   (a past day's journal, see docs/journal.md), and never secrets in a note.
-- **Reading the whole vault:** mount the vault folder into Orb **read only**
+- **Reading the whole vault** (single-user vault only): mount the vault folder into Orb **read only**
   (for example `/mnt/user/appdata/llmwiki/vault:/vault:ro`). Orb indexes every
   `.md` file there, including `raw/`, `schema/` and `logs/`, for the Wiki tab:
   folder tree, full-text search, tags, backlinks and front-matter. Obsidian's
