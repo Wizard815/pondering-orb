@@ -489,6 +489,19 @@ export async function buildApp(o: AppOptions = {}) {
     return out;
   });
 
+  // ---- approvals Hermes Studio shared here: decide them in Studio, then clear the alert ----
+  app.post("/api/hermes/approvals/:id/decide", { preHandler: guard }, async (req: any) => {
+    const decision = req.body?.decision === "reject" ? "reject" : req.body?.decision === "approve" ? "approve" : null;
+    if (!decision) throw new HttpError(400, "decision must be approve or reject.");
+    const a: any = records.get("approvals", String(req.params.id));
+    if (!a?.workId) throw new HttpError(404, "No such approval.");
+    const who = (req as any).who;
+    const out = await hermes.decide(a.workId, decision, who === "you" ? "orb" : String(who || "orb"));
+    // Whatever Studio decided (here or first somewhere else) clears the alert.
+    if (out.decision) records.patch("approvals", a.id, { state: out.decision, via: out.via, by: out.by, resolvedAt: Date.now() });
+    return out;
+  });
+
   // ---- writes waiting to reach another app ----
   app.get("/api/outbox", { preHandler: guard }, async () => outbox.list().map(({ payload: _p, ...it }) => it));
   app.post("/api/outbox/retry", { preHandler: guard }, async () => outbox.flush(true));
