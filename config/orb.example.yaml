@@ -47,6 +47,19 @@ unraid:              # the Unraid Management Agent plugin: containers and ports 
   token_env: UNRAID_TOKEN
   link_host: ""      # the address app links use; "" = the agent's host
 
+npm:                 # Nginx Proxy Manager, read only: app links use its proxy hosts' names; "" = NPM_URL
+  base_url: ""       # e.g. http://192.168.20.5:81
+  email_env: NPM_EMAIL
+  password_env: NPM_PASSWORD
+
+nginx:               # plain nginx or SWAG configs mounted read only; "" = NGINX_CONF_DIR
+  conf_dir: ""       # e.g. /nginx (the mount inside the container)
+  domain: ""         # for SWAG's "app.*" server names, e.g. thefellashub.com
+
+technitium:          # Technitium DNS, read only: an app's A record pointing at the server becomes its link
+  base_url: ""       # e.g. http://192.168.20.5:5380
+  token_env: TECHNITIUM_TOKEN
+
 hermes:              # Hermes Studio; "" = HERMES_URL
   base_url: ""       # e.g. http://hermes-studio:6060
   # public_url: https://studio.example.com   # Studio in your browser (Agents tab links); or HERMES_PUBLIC_URL

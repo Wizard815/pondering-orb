@@ -36,7 +36,11 @@ services:
       # another machine or compose project. orb.yaml wins when it sets one.
       MILACLONE_URL: ${MILACLONE_URL:-}              # Milaclone for the Ideas tab (your browser's address for it)
       UNRAID_URL: ${UNRAID_URL:-}                    # Unraid Management Agent (port 8043): containers for the Links page
-      UNRAID_LINK_HOST: ${UNRAID_LINK_HOST:-}
+      UNRAID_LINK_HOST: ${UNRAID_LINK_HOST:-}         # the server's LAN address for app links, e.g. 192.168.20.5
+      NPM_URL: ${NPM_URL:-}                          # Nginx Proxy Manager: app links use its proxy hosts' names
+      NGINX_CONF_DIR: ${NGINX_CONF_DIR:-}            # or nginx/SWAG configs, mounted read only below (e.g. /nginx)
+      NGINX_DOMAIN: ${NGINX_DOMAIN:-}
+      TECHNITIUM_URL: ${TECHNITIUM_URL:-}            # Technitium DNS: app names pointing at the server
       ALLGLANCE_URL: ${ALLGLANCE_URL:-}              # the gateway; also serves vikunja's CalDAV at /dav
       UPSTREAM_URL: ${UPSTREAM_URL:-}
       UPTIME_URL: ${UPTIME_URL:-}
@@ -48,6 +52,9 @@ services:
       DOCKER_HOST: tcp://docker-proxy:2375
       # Logins and keys (the names are what orb.yaml and Settings point at):
       UNRAID_TOKEN: ${UNRAID_TOKEN:-}
+      NPM_EMAIL: ${NPM_EMAIL:-}
+      NPM_PASSWORD: ${NPM_PASSWORD:-}
+      TECHNITIUM_TOKEN: ${TECHNITIUM_TOKEN:-}
       ALLGLANCE_TOKEN: ${ALLGLANCE_TOKEN:-}
       CALDAV_USER: ${CALDAV_USER:-}
       CALDAV_PASSWORD: ${CALDAV_PASSWORD:-}
@@ -67,6 +74,8 @@ services:
       - ./data:/data                                 # orb.db (SQLite); the container runs as uid 1000
       - /proc:/host/proc:ro                          # System tab: the host's cores, memory, uptime
       - ${LLMWIKI_VAULT:-./vault}:/vault:ro          # the Wiki tab reads the vault; writes go through the REST API
+      # Plain nginx or SWAG instead of Nginx Proxy Manager? Mount its configs read only and set NGINX_CONF_DIR=/nginx:
+      # - /mnt/user/appdata/swag/nginx:/nginx:ro
     networks: [orb, dockerapi]
     # To reach apps by container name, join their networks too, e.g.
     #   networks: [orb, dockerapi, ai_net, proxynat]

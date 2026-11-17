@@ -1,6 +1,7 @@
 import { call, trimSlash } from "./http.js";
 import { HttpError } from "../records.js";
 import { docker } from "./system.js";
+import type { Route, DnsName } from "./proxies.js";
 
 /** The Unraid Management Agent plugin (REST on port 8043, a bearer token):
  *  read only here. Orb lists the server's containers with their state and
@@ -89,6 +90,8 @@ const KNOWN: { conn: string; field: string; label: string; name: RegExp; port?: 
   { conn: "uptime", field: "baseUrl", label: "Uptime Kuma", name: /uptime[-_]?kuma|^kuma$/i, port: 3001 },
   { conn: "hermes", field: "baseUrl", label: "Hermes Studio", name: /hermes[-_]?studio/i },
   { conn: "wiki", field: "baseUrl", label: "LLMWIKI (Obsidian REST)", name: /obsidian|llmwiki/i, port: 27123 },
+  { conn: "npm", field: "baseUrl", label: "Nginx Proxy Manager", name: /nginx[-_]?proxy[-_]?manager|^npm$/i, port: 81 },
+  { conn: "technitium", field: "baseUrl", label: "Technitium DNS", name: /technitium/i, port: 5380 },
   { conn: "golem", field: "baseUrl", label: "Golem's model (Argos)", name: /^argos|llama[-_.]?(server|cpp)|ollama/i, suffix: "/v1" },
 ];
 export function suggestions(apps: AppSource[], host: string, current: (conn: string, field: string) => string) {
@@ -101,4 +104,31 @@ export function suggestions(apps: AppSource[], host: string, current: (conn: str
     if (url) out.push({ conn: k.conn, field: k.field, label: k.label, container: c.name, url: url.replace(/\/$/, "") + (k.suffix || ""), running: c.state === "running" });
   }
   return out;
+}
+
+/** The server's private IPv4 addresses from the Unraid agent's network answer, the LAN one first (Docker's bridges last). */
+export async function agentNetworkIps(base: string, token: string): Promise<string[]> {
+  const b = await agent(base, token, "/network");
+  const ips = [...new Set(JSON.stringify(b).match(/\b(10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)\b/g) || [])];
+  const bridge = (ip: string) => /^172\.(1[7-9]|2\d|3[01])\./.test(ip) || ip.endsWith(".1");
+  return [...ips.filter(ip => !bridge(ip)), ...ips.filter(bridge)];
+}
+
+export type LinkContext = { server: string; aliases: string[]; routes: Route[]; dns: DnsName[] };
+export type Link = { url: string; via: "npm" | "nginx" | "dns" | "lan" | "" };
+const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+/** Where to open an app: its reverse-proxy name when Nginx (Proxy Manager or config files) knows it, else a DNS
+ *  name for it that points at the server, else the server's LAN address and the app's port. Never the address Orb
+ *  itself was opened with: behind a proxy, orb.example.com:8989 doesn't answer. */
+export function linkFor(a: AppSource, ctx: LinkContext): Link {
+  const here = new Set([ctx.server, ...ctx.aliases, "localhost", "127.0.0.1", "host.docker.internal"].filter(Boolean).map(x => x.toLowerCase()));
+  const pub = a.ports.filter(p => p.type === "tcp").map(p => p.public || (a.networkMode === "host" ? p.private : 0)).filter(Boolean);
+  const priv = a.ports.filter(p => p.type === "tcp").map(p => p.private);
+  if (a.networkMode === "host") pub.push(...priv);
+  const me = new Set([a.name.toLowerCase(), a.ip].filter(Boolean));
+  const route = ctx.routes.find(r => (here.has(r.host) && pub.includes(r.port)) || (me.has(r.host) && (priv.includes(r.port) || pub.includes(r.port))));
+  if (route) return { url: `${route.https ? "https" : "http"}://${route.names[0]}`, via: route.via };
+  const named = ctx.dns.find(d => here.has(d.ip) && norm(d.name.split(".")[0]) === norm(a.name));
+  if (named) { const u = appUrl(a, named.name); if (u) return { url: u, via: "dns" }; }
+  const u = appUrl(a, ctx.server); return { url: u, via: u ? "lan" : "" };
 }

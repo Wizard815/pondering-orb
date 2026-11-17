@@ -17,6 +17,10 @@ export interface OrbConfig {
   unraid: { baseUrl: string; tokenEnv: string; linkHost: string };
   /** Milaclone (Miladash): its address as your browser reaches it, shown in the Ideas tab. */
   milaclone: { url: string };
+  /** Reverse proxy and DNS, read only, so app links use names that work (see integrations/proxies.ts). */
+  npm: { baseUrl: string; emailEnv: string; passwordEnv: string };
+  nginx: { confDir: string; domain: string };
+  technitium: { baseUrl: string; tokenEnv: string };
   pollMinutes: number;
 }
 
@@ -33,6 +37,9 @@ const DEFAULTS: OrbConfig = {
   allglance: { baseUrl: "", tokenEnv: "ALLGLANCE_TOKEN" },
   unraid: { baseUrl: "", tokenEnv: "UNRAID_TOKEN", linkHost: "" },
   milaclone: { url: "" },
+  npm: { baseUrl: "", emailEnv: "NPM_EMAIL", passwordEnv: "NPM_PASSWORD" },
+  nginx: { confDir: "", domain: "" },
+  technitium: { baseUrl: "", tokenEnv: "TECHNITIUM_TOKEN" },
   pollMinutes: 15,
 };
 
@@ -68,6 +75,9 @@ export function loadConfig(path = process.env.ORB_CONFIG || "/config/orb.yaml", 
     allglance: { ...DEFAULTS.allglance, ...(raw.allglance ?? {}) },
     unraid: { ...DEFAULTS.unraid, ...(raw.unraid ?? {}) },
     milaclone: { ...DEFAULTS.milaclone, ...(raw.milaclone ?? {}) },
+    npm: { ...DEFAULTS.npm, ...(raw.npm ?? {}) },
+    nginx: { ...DEFAULTS.nginx, ...(raw.nginx ?? {}) },
+    technitium: { ...DEFAULTS.technitium, ...(raw.technitium ?? {}) },
   };
   // Addresses can also come from the environment (docker-compose.example.yml).
   // orb.yaml wins when it sets the same thing, so editing the YAML always works.
@@ -81,6 +91,10 @@ export function loadConfig(path = process.env.ORB_CONFIG || "/config/orb.yaml", 
   // Links people click (Watch, Chat) need Studio's browser address, which can differ from the container one.
   if (env.HERMES_PUBLIC_URL && !has("hermes", "publicUrl")) c.hermes.publicUrl = env.HERMES_PUBLIC_URL;
   if (env.ALLGLANCE_URL && !has("allglance", "baseUrl")) c.allglance.baseUrl = env.ALLGLANCE_URL;
+  if (env.NPM_URL && !has("npm", "baseUrl")) c.npm.baseUrl = env.NPM_URL;
+  if (env.NGINX_CONF_DIR && !has("nginx", "confDir")) c.nginx.confDir = env.NGINX_CONF_DIR;
+  if (env.NGINX_DOMAIN && !has("nginx", "domain")) c.nginx.domain = env.NGINX_DOMAIN;
+  if (env.TECHNITIUM_URL && !has("technitium", "baseUrl")) c.technitium.baseUrl = env.TECHNITIUM_URL;
   if (env.MILACLONE_URL && !has("milaclone", "url")) c.milaclone.url = env.MILACLONE_URL;
   if (env.UNRAID_URL && !has("unraid", "baseUrl")) c.unraid.baseUrl = env.UNRAID_URL;
   if (env.UNRAID_LINK_HOST && !has("unraid", "linkHost")) c.unraid.linkHost = env.UNRAID_LINK_HOST;
