@@ -40,7 +40,7 @@ test("TestUnraid_LinksFromAgentAndDockerLabels", async () => {
 
     const r = (await app.inject({ method: "GET", url: "/api/links?host=evil%20host" })).json();
     assert.equal(r.host, "127.0.0.1", "links use the agent's host when no link address is set");
-    assert.deepEqual(r.sources, { unraid: true, docker: true });
+    assert.deepEqual([r.sources.unraid, r.sources.docker], [true, true]);
     const by = Object.fromEntries(r.apps.map((a: any) => [a.name, a]));
     assert.equal(by.plex.url, "http://127.0.0.1:32400/web", "Unraid's WebUI label, with the host-network port");
     assert.equal(by.plex.icon, "https://example.com/plex.png");

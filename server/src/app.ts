@@ -34,7 +34,8 @@ import { journalApi } from "./journal.js";
 import { stocksApi } from "./stocks.js";
 import { reviewsApi } from "./reviews.js";
 import { handwritingApi } from "./handwriting.js";
-import { serverApps, linkHost, appUrl, suggestions, unraidSystem, unraidContainers } from "./integrations/unraid.js";
+import { serverApps, linkFor, suggestions, unraidSystem, unraidContainers, agentNetworkIps } from "./integrations/unraid.js";
+import { npmRoutes, nginxRoutes, technitiumNames, serverAddress, type Route, type DnsName } from "./integrations/proxies.js";
 import { today, localDay, isDay, timeZone } from "./dates.js";
 
 export const VERSION = "0.1.0";
@@ -63,6 +64,10 @@ export async function buildApp(o: AppOptions = {}) {
       allglance: { ...base.allglance, ...envSafe(c.allglance) },
       unraid: { ...base.unraid, ...envSafe(c.unraid) },
       milaclone: { ...base.milaclone, ...envSafe(c.milaclone) },
+      npm: { ...base.npm, ...envSafe(c.npm) },
+      technitium: { ...base.technitium, ...envSafe(c.technitium) },
+      // The config folder is a mount, fixed by orb.yaml / .env; only the domain can be set in Settings.
+      nginx: { ...base.nginx, domain: String(c.nginx?.domain ?? base.nginx.domain).trim(), confDir: base.nginx.confDir },
     };
     // The ALLGlance stack serves Vikunja's CalDAV at the gateway's /dav: with
     // no CalDAV URL of its own, Orb uses that one address for tasks too.
@@ -303,15 +308,36 @@ export async function buildApp(o: AppOptions = {}) {
     if (!appsCache || appsCache.key !== key || Date.now() - appsCache.at > 30000) appsCache = { at: Date.now(), key, v: await serverApps({ base: c.unraid.baseUrl, token: secret(c.unraid.tokenEnv), dockerHost: c.system.docker }) };
     return appsCache.v;
   };
-  /** The page passes its own host name, used when neither a link address nor the agent's is known. */
-  const hostFor = (q: unknown) => { const c = cfg(), h = linkHost(c.unraid.linkHost, c.unraid.baseUrl); if (h) return h; const v = String(q || ""); return /^[A-Za-z0-9.-]{1,253}$|^\[[0-9a-fA-F:]+\]$/.test(v) ? v : ""; };
-  app.get("/api/links", { preHandler: guard }, async (req: any) => {
-    const { apps, notes, sources } = await linkApps(), host = hostFor(req.query.host);
-    return { host, sources, notes, apps: apps.map(a => ({ ...a, url: appUrl(a, host) })) };
+  /** Where links point: the reverse proxy's names (Nginx Proxy Manager, nginx files), Technitium DNS names, and the
+   *  Unraid server's LAN address. Never the address Orb was opened with (behind a proxy, orb.example.com:8989 fails). */
+  let ctxCache: { at: number; key: string; v: { server: string; how: string; aliases: string[]; routes: Route[]; dns: DnsName[]; notes: string[]; found: { npm: number; nginx: number; dns: number } } } | null = null;
+  const linkContext = async () => {
+    const c = cfg(), key = JSON.stringify([c.unraid, c.npm, c.nginx, c.technitium, secret(c.npm.emailEnv), secret(c.npm.passwordEnv), secret(c.technitium.tokenEnv), secret(c.unraid.tokenEnv)]);
+    if (ctxCache && ctxCache.key === key && Date.now() - ctxCache.at < 5 * 60000) return ctxCache.v;
+    const notes: string[] = [], tok = secret(c.unraid.tokenEnv);
+    const soft = <T>(what: string, p: Promise<T>, d: T) => p.catch((e: any) => { notes.push(`${what}: ${e.message}`); return d; });
+    const lan = c.unraid.baseUrl ? await agentNetworkIps(c.unraid.baseUrl, tok).catch(() => [] as string[]) : [];
+    const [addr, sys, npm, ngx, dns] = await Promise.all([
+      serverAddress(c.unraid.linkHost, c.unraid.baseUrl, lan.length ? async () => lan[0] : undefined),
+      c.unraid.baseUrl ? unraidSystem(c.unraid.baseUrl, tok).catch(() => null) : Promise.resolve(null),
+      soft("Nginx Proxy Manager", npmRoutes(c.npm.baseUrl, secret(c.npm.emailEnv), secret(c.npm.passwordEnv)), [] as Route[]),
+      soft("nginx config", nginxRoutes(c.nginx.confDir, c.nginx.domain), [] as Route[]),
+      soft("Technitium DNS", technitiumNames(c.technitium.baseUrl, secret(c.technitium.tokenEnv)), [] as DnsName[]),
+    ]);
+    if (c.npm.baseUrl && (!secret(c.npm.emailEnv) || !secret(c.npm.passwordEnv))) notes.push(`Nginx Proxy Manager: set ${c.npm.emailEnv} and ${c.npm.passwordEnv} in .env.`);
+    if (c.technitium.baseUrl && !secret(c.technitium.tokenEnv)) notes.push(`Technitium DNS: set ${c.technitium.tokenEnv} in .env.`);
+    const aliases = [...lan, sys?.hostname || "", ...(() => { try { return c.unraid.baseUrl ? [new URL(c.unraid.baseUrl).hostname] : []; } catch { return []; } })()].filter(Boolean);
+    const v = { server: addr.host, how: addr.how, aliases, routes: [...npm, ...ngx], dns, notes, found: { npm: npm.length, nginx: ngx.length, dns: dns.length } };
+    ctxCache = { at: Date.now(), key, v }; return v;
+  };
+  app.get("/api/links", { preHandler: guard }, async () => {
+    const [{ apps, notes, sources }, ctx] = await Promise.all([linkApps(), linkContext()]);
+    return { host: ctx.server, hostFrom: ctx.how, sources: { ...sources, ...ctx.found }, notes: [...notes, ...ctx.notes], apps: apps.map(a => { const l = linkFor(a, ctx); return { ...a, url: l.url, via: l.via }; }) };
   });
-  app.get("/api/links/suggest", { preHandler: guard }, async (req: any) => {
-    const c: any = cfg(), host = hostFor(req.query.host);
-    return suggestions((await linkApps()).apps, host, (conn, field) => String(c[conn]?.[field] || ""));
+  app.get("/api/links/suggest", { preHandler: guard }, async () => {
+    // Orb's own connections are server to server: the LAN address, not proxy names.
+    const c: any = cfg(), ctx = await linkContext();
+    return suggestions((await linkApps()).apps, ctx.server, (conn, field) => String(c[conn]?.[field] || ""));
   });
 
   app.get("/api/uptime", { preHandler: guard }, async () => uptime(cfg().uptime.baseUrl, cfg().uptime.statusPage));
@@ -365,7 +391,10 @@ export async function buildApp(o: AppOptions = {}) {
       hermes: { baseUrl: c.hermes.baseUrl, userEnv: c.hermes.userEnv, passwordEnv: c.hermes.passwordEnv, userSet: !!secret(c.hermes.userEnv) },
       allglance: { baseUrl: c.allglance.baseUrl, tokenEnv: c.allglance.tokenEnv, tokenSet: !!secret(c.allglance.tokenEnv) },
       unraid: { baseUrl: c.unraid.baseUrl, tokenEnv: c.unraid.tokenEnv, tokenSet: !!secret(c.unraid.tokenEnv), linkHost: c.unraid.linkHost },
-      milaclone: { url: /^https?:\/\//i.test(c.milaclone.url) ? c.milaclone.url : "" } };
+      milaclone: { url: /^https?:\/\//i.test(c.milaclone.url) ? c.milaclone.url : "" },
+      npm: { baseUrl: c.npm.baseUrl, emailEnv: c.npm.emailEnv, passwordEnv: c.npm.passwordEnv, keySet: !!(secret(c.npm.emailEnv) && secret(c.npm.passwordEnv)) },
+      nginx: { confDir: c.nginx.confDir, domain: c.nginx.domain },
+      technitium: { baseUrl: c.technitium.baseUrl, tokenEnv: c.technitium.tokenEnv, keySet: !!secret(c.technitium.tokenEnv) } };
   });
   app.post("/api/connections/test/:id", { preHandler: guard }, async (req: any) => {
     const c = cfg(), id = req.params.id;
@@ -373,6 +402,12 @@ export async function buildApp(o: AppOptions = {}) {
       if (id === "milaclone") { if (!c.milaclone.url) return { ok: false, detail: "Set Milaclone's address first." };
         const r = await call(`${trimSlash(c.milaclone.url)}/api/health`).catch((e: any) => ({ ok: false, status: e?.message }) as any);
         return { ok: !!r.ok, detail: r.ok ? "Reached Milaclone." : `Orb couldn't reach Milaclone at that address (${r.status}). If it's only reachable from your browser, the Ideas tab still works.` }; }
+      if (id === "npm") { const r = await npmRoutes(c.npm.baseUrl, secret(c.npm.emailEnv), secret(c.npm.passwordEnv)); if (!c.npm.baseUrl) return { ok: false, detail: "Set its address first." };
+        return { ok: true, detail: `Signed in to Nginx Proxy Manager: ${r.length} proxy host${r.length === 1 ? "" : "s"}.` }; }
+      if (id === "nginx") { if (!c.nginx.confDir) return { ok: false, detail: "Mount the nginx config folder read only and set NGINX_CONF_DIR." }; const r = await nginxRoutes(c.nginx.confDir, c.nginx.domain);
+        return { ok: r.length > 0, detail: r.length ? `Read ${r.length} proxied site${r.length === 1 ? "" : "s"} from ${c.nginx.confDir}.` : `No proxied sites found in ${c.nginx.confDir}.` }; }
+      if (id === "technitium") { if (!c.technitium.baseUrl) return { ok: false, detail: "Set its address first." }; const r = await technitiumNames(c.technitium.baseUrl, secret(c.technitium.tokenEnv));
+        return { ok: true, detail: `Read Technitium DNS: ${r.length} A record${r.length === 1 ? "" : "s"}.` }; }
       if (id === "unraid") { const s = await unraidSystem(c.unraid.baseUrl, secret(c.unraid.tokenEnv)); const a = await unraidContainers(c.unraid.baseUrl, secret(c.unraid.tokenEnv));
         return { ok: true, detail: `Reached the Unraid Management Agent on ${s.hostname || "the server"}${s.version ? ` (Unraid ${s.version})` : ""}: ${a.length} container${a.length === 1 ? "" : "s"}.` }; }
       if (id === "upstream") { const r = await upstream.repos(); return { ok: true, detail: `Reached UpstreamManager: ${r.length} repo${r.length === 1 ? "" : "s"}.` }; }

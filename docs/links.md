@@ -31,10 +31,42 @@ Orb merges them.
 3. Press **Test**: it names the server, its Unraid version and how many
    containers it found.
 
-Links use the agent's host (`tower` above). If your browser reaches the server
-by another name or IP, set **Address for app links** (`UNRAID_LINK_HOST`).
+Links fall back to the server's LAN address (see below). Set
+**Server's LAN address for app links** (`UNRAID_LINK_HOST`, e.g.
+`192.168.20.5`) to choose it yourself.
 
 Orb only reads from the agent; it never starts, stops or changes anything.
+
+## Which address a link uses
+
+Orb never builds a link from the address you opened Orb with: behind a
+reverse proxy, `orb.example.com:8989` doesn't answer. For each app it uses,
+in order:
+
+1. **Its name on your reverse proxy**, when the proxy knows the app:
+   - **Nginx Proxy Manager** (`NPM_URL`, `NPM_EMAIL`, `NPM_PASSWORD`): its
+     proxy hosts, read only. A host that forwards to the server's address and
+     the app's port, or to the container by name, becomes
+     `https://sonarr.example.com` (http when it has no certificate). Disabled
+     hosts don't count.
+   - **nginx or SWAG configs** mounted read only (`NGINX_CONF_DIR`): each
+     `server` block's `server_name` and `proxy_pass http://host:port`, or
+     SWAG's `set $upstream_app` / `$upstream_port`. SWAG's `sonarr.*` names
+     need your domain (`NGINX_DOMAIN`). `.sample` files are skipped.
+2. **Its DNS name** in **Technitium DNS** (`TECHNITIUM_URL`,
+   `TECHNITIUM_TOKEN`): an A record named after the app (`plex.home.lan`) that
+   points at the server, with the app's port: `http://plex.home.lan:32400`.
+3. **The server's LAN address** and the app's port, e.g.
+   `http://192.168.20.5:8989`. The address is `UNRAID_LINK_HOST` if you set
+   it, else the Unraid agent's address (looked up if it is a name), else the
+   LAN address the agent reports.
+
+Proxy and DNS lists are read every five minutes. A tile's tooltip says which
+of these its link came from, and the Links page says which server address it
+used. **Found on your server** also suggests Nginx Proxy Manager's and
+Technitium's addresses when it sees their containers. Orb's own connections
+(UpstreamManager, Uptime Kuma, ...) keep using the LAN address: they are
+server to server.
 
 ## Arrange
 

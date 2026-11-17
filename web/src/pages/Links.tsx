@@ -14,7 +14,8 @@ import { useDialog } from "../lib/useDialog";
  *  category and dragged into place. Saved in settings/links. */
 
 type Port = { private: number; public: number; type: string };
-type Found = { key: string; name: string; state: string; image: string; ports: Port[]; networkMode: string; icon: string; url: string; updateAvailable: boolean };
+type Found = { key: string; name: string; state: string; image: string; ports: Port[]; networkMode: string; icon: string; url: string; via?: string; updateAvailable: boolean };
+const VIA: Record<string, string> = { npm: "through Nginx Proxy Manager", nginx: "through nginx", dns: "by its DNS name", lan: "on the server's LAN address" };
 type Over = { name?: string; cat?: string; hidden?: boolean; mode?: "auto" | "port" | "url"; port?: number; scheme?: "http" | "https"; url?: string; icon?: string };
 type Extra = { key: string; name: string; url: string; icon?: string; cat?: string };
 type Cfg = { order: string[]; cats: string[]; items: Record<string, Over>; extra: Extra[] };
@@ -26,8 +27,10 @@ const runeOf = (n: string) => (n.replace(/[^A-Za-z0-9]/g, "").slice(0, 2) || "?"
 const safeUrl = (u: string) => (/^https?:\/\//i.test(u) ? u : "");
 
 function useLinks() {
-  const doc = useColl("settings").find(d => d.id === "links"), host = typeof location !== "undefined" ? location.hostname : "";
-  const found = useFetch<{ host: string; apps: Found[]; notes: string[]; sources: { unraid: boolean; docker: boolean } }>(`/api/links?host=${encodeURIComponent(host)}`, 60000);
+  // Links never use the address Orb was opened with: behind a reverse proxy, orb.example.com:8989 doesn't answer.
+  const doc = useColl("settings").find(d => d.id === "links");
+  const found = useFetch<{ host: string; hostFrom: string; apps: Found[]; notes: string[]; sources: { unraid: boolean; docker: boolean; npm: number; nginx: number; dns: number } }>("/api/links", 60000);
+  const host = found.data?.host || "";
   const yaml = useColl("settings").find(d => d.id === "apps")?.yaml as string | undefined;
   // Changes show at once and build on each other, so two quick edits can't undo one another.
   const [local, setLocal] = useState<Cfg | null>(null), inflight = useRef(0);
@@ -37,7 +40,7 @@ function useLinks() {
     const out: Tile[] = [];
     const add = (t: Omit<Tile, "url" | "hidden" | "name" | "cat" | "icon" | "over"> & { name: string; cat: string; icon: string }) => {
       const o = cfg.items[t.key] || {}, f = t.found;
-      const url = o.mode === "url" ? safeUrl(o.url || "") : o.mode === "port" && o.port ? `${o.scheme || "http"}://${found.data?.host || host}:${o.port}` : t.detected;
+      const url = o.mode === "url" ? safeUrl(o.url || "") : o.mode === "port" && o.port ? (host ? `${o.scheme || "http"}://${host}:${o.port}` : "") : t.detected;
       out.push({ ...t, name: o.name || t.name, cat: o.cat || t.cat, icon: safeUrl(o.icon || "") || t.icon, url, hidden: !!o.hidden, over: o, update: !!f?.updateAvailable });
     };
     for (const f of found.data?.apps || []) add({ key: f.key, kind: "container", name: f.name, cat: "Server", icon: safeUrl(f.icon), rune: runeOf(f.name), state: f.state, update: f.updateAvailable, found: f, detected: safeUrl(f.url) });
@@ -158,6 +161,10 @@ function Portals() {
       {arrange && <><button className="btn" onClick={() => setEdit("new")}>Add link</button><button className="btn" onClick={addCat}>New category</button></>}
       <span className="hint">{arrange ? "Drag icons to move them. ✎ edits, the eye shows or hides." : found.data ? `${tiles.filter(t => !t.hidden).length} links${found.data.sources.unraid ? " · from Unraid" : found.data.sources.docker ? " · from Docker" : ""}` : "Looking for apps…"}</span>
     </div>
+    {found.data && (found.data.sources.unraid || found.data.sources.docker) && !arrange && (() => { const d = found.data!, n = (v: string) => d.apps.filter(a => a.via === v).length;
+      return <div className="hint small">{d.host ? <>Links: {n("npm") + n("nginx") ? `${n("npm") + n("nginx")} through your reverse proxy, ` : ""}{n("dns") ? `${n("dns")} by DNS name, ` : ""}the rest on <b>{d.host}</b>{d.hostFrom ? ` (${d.hostFrom})` : ""}.</>
+        : <>Orb doesn't know the server's LAN address yet, so apps your reverse proxy doesn't know have no link. Set <code>UNRAID_LINK_HOST</code> (e.g. 192.168.20.5) or the Unraid agent in <a href="#config">Settings → Connections</a>.</>}
+        {!d.sources.npm && !d.sources.nginx ? <> Connect Nginx Proxy Manager (or mount your nginx configs) and Technitium DNS in Settings → Connections to use their names.</> : null}</div>; })()}
     {notConnected && <div className="empty small">Connect the Unraid Management Agent in <a href="#config">Settings → Connections</a> to list every container here. Apps from the apps list and links you add show either way.</div>}
     {(found.data?.notes || []).map((n, k) => <div key={k} className="err-inline small">{n}</div>)}
     {cats.map(c => { const list = show.filter(t => t.cat === c); if (!list.length && !arrange) return null;
@@ -168,13 +175,13 @@ function Portals() {
             const body = <><Icon t={t} />{t.state && <i className={"lk-dot " + (t.state === "running" ? "up" : "down")} title={t.state} />}{t.update && <i className="lk-upd" title="Update available">↑</i>}<span className="lk-name">{t.name}</span></>;
             return <div key={t.key} className={cls} data-lk={t.key} onPointerDown={e => start(e, t)} onDragStart={e => { if (arrange) e.preventDefault(); }}>
               {arrange || !t.url ? <button className="lk-face" onClick={() => { if (!moved.current) setEdit(t); }} title={t.url || "No link yet: set one"}>{body}</button>
-                : <a className="lk-face" href={t.url} target="_blank" rel="noopener noreferrer" title={t.url}>{body}</a>}
+                : <a className="lk-face" href={t.url} target="_blank" rel="noopener noreferrer" title={`${t.url}${t.found?.via && !t.over.mode ? ` (${VIA[t.found.via] || t.found.via})` : ""}`}>{body}</a>}
               {arrange && <span className="lk-acts"><button className="btn" onClick={() => setOver(t.key, { hidden: !t.hidden })} aria-label={t.hidden ? `Show ${t.name}` : `Hide ${t.name}`}>{t.hidden ? "◌" : "◉"}</button><button className="btn" onClick={() => setEdit(t)} aria-label={`Edit ${t.name}`}>✎</button></span>}
             </div>; })}
           {arrange && !list.length && <div className="hint lk-emptycat">Drag icons here.</div>}
         </div></section>; })}
     {!tiles.length && found.data && <div className="empty">No apps yet. Connect Unraid, add apps in Settings → Apps, or add a link.</div>}
-    {edit && <Editor t={edit === "new" ? null : edit} cats={cats.length ? cats : ["Links"]} host={found.data?.host || location.hostname} onClose={() => setEdit(null)}
+    {edit && <Editor t={edit === "new" ? null : edit} cats={cats.length ? cats : ["Links"]} host={found.data?.host || ""} onClose={() => setEdit(null)}
       onSave={(o, extra) => { const t = edit === "new" ? null : edit;
         const p = extra ? save({ extra: t ? cfg.extra.map(x => (x.key === extra.key ? extra : x)) : [...cfg.extra, extra], items: { ...cfg.items, [extra.key]: { ...cfg.items[extra.key], hidden: o.hidden } } }) : setOver(t!.key, o);
         Promise.resolve(p).then(() => setEdit(null), ui.error); }}
