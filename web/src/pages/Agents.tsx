@@ -76,6 +76,44 @@ function SendPlan({ kinds, agents, onSent }: { kinds: Kind[]; agents: Agents | n
   </>;
 }
 
+/** Agent work Hermes Studio asked you to approve (shared only when Studio's sharing is on).
+ *  Approving here, in Studio or in Mattermost decides it everywhere; the alert then clears. */
+function Approvals() {
+  const ui = useUi();
+  const approvals = useColl("approvals");
+  const [busy, setBusy] = useState("");
+  const pending = approvals.filter((a: any) => a.state === "pending").sort((a: any, b: any) => (a.askedAt || 0) - (b.askedAt || 0));
+  const recent = approvals.filter((a: any) => a.state !== "pending").sort((a: any, b: any) => (b.resolvedAt || 0) - (a.resolvedAt || 0)).slice(0, 5);
+  const decide = async (a: any, decision: "approve" | "reject") => {
+    setBusy(a.id);
+    try {
+      const out = await post<{ changed: boolean; message: string }>(`/api/hermes/approvals/${encodeURIComponent(a.id)}/decide`, { decision });
+      ui.status(out.changed ? `${decision === "approve" ? "Approved" : "Rejected"} “${clip(a.title, 40)}” in Hermes Studio.` : out.message || "Already decided.");
+    } catch (e) { ui.error(e); } finally { setBusy(""); }
+  };
+  const where: Record<string, string> = { studio: "Studio", mattermost: "Mattermost", orb: "the Orb" };
+  return <>
+    {pending.length ? <ul className="list">{pending.map((a: any) => <li key={a.id} data-testid="approval">
+      <div className="grow"><b>{a.title}</b> <span className="small muted">{[a.vikunjaTaskId ? `Vikunja #${a.vikunjaTaskId}` : "", a.agent].filter(Boolean).join(" · ")}</span>
+        {a.summary && <div className="small">{clip(a.summary, 300)}</div>}</div>
+      <button className="btn" disabled={!!busy} onClick={() => decide(a, "approve")}>{busy === a.id ? "…" : "Approve"}</button>
+      <button className="btn" disabled={!!busy} onClick={() => decide(a, "reject")}>Reject</button>
+    </li>)}</ul> : <div className="empty">Nothing waiting for your approval.</div>}
+    {recent.length > 0 && <><h4 className="small muted" style={{ margin: "8px 0 4px" }}>Decided</h4>
+      <ul className="list">{recent.map((a: any) => <li key={a.id}><div className="grow small">{a.title} <span className={a.state === "approved" ? "st-active" : "muted"}>· {a.state}{a.via ? ` in ${where[a.via] || a.via}` : ""}{a.by ? ` by ${a.by}` : ""}</span></div></li>)}</ul></>}
+  </>;
+}
+
+/** Agent activity Hermes Studio shares with the Orb, newest first. */
+function StudioActivity() {
+  const items = useColl("agentActivity");
+  const list = [...items].sort((a: any, b: any) => (b.at || 0) - (a.at || 0)).slice(0, 40);
+  if (!list.length) return <div className="empty">Nothing shared yet. Studio shares agent activity here when “Share agent activity with Pondering Orb” is on (Studio → Connections → Agent work).</div>;
+  return <ul className="list">{list.map((a: any) => <li key={a.id}><div className="grow small">
+    <span className="muted">{new Date(a.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span> <b>{a.title}</b> <span className="muted">{a.kind}</span> {clip(a.message || "", 160)}
+  </div></li>)}</ul>;
+}
+
 function How() {
   return <div className="small">
     <p style={{ marginTop: 0 }}>Orb sends work to <b>Hermes Studio</b> (Settings → Connections → Hermes Studio, with a Studio admin's sign-in): each plan becomes a Studio chat with the agent you pick.</p>
@@ -88,15 +126,19 @@ export const AgentsPage: PageDef = {
   usePanels: () => {
     const agents = useFetch<Agents>("/api/hermes/agents", 5000);
     const kinds = useFetch<Kind[]>("/api/hermes/agent-kinds", 0);
+    const waiting = useColl("approvals").filter((a: any) => a.state === "pending").length;
     const counts = (agents.data?.agents || []).reduce<Record<string, number>>((m, a) => ({ ...m, [a.status]: (m[a.status] || 0) + 1 }), {});
     const extra = <>
       <span className={"pill " + (agents.error ? "bad" : agents.data?.connected ? "ok" : "")} title={agents.error || ""}><i />{agents.error ? clip(agents.error, 70) : agents.data?.connected ? "Live from Hermes Studio" : "Reaching Hermes Studio…"}</span>
+      {waiting > 0 && <span className="pill bad" data-testid="approvals-pill">{waiting} awaiting approval</span>}
       {["blocked", "working", "done", "idle"].map(s => counts[s] ? <span key={s} className={"pill " + (s === "blocked" ? "bad" : s === "working" ? "ok" : "")}>{GLYPH[s]} {counts[s]} {s}</span> : null)}
       {agents.data?.studioUrl && <a className="btn" href={`${agents.data.studioUrl}/`} target="_blank" rel="noopener">Open Hermes Studio</a>}
     </>;
     const panels: PanelDef[] = [
       { key: "agents", title: "Work in Studio", node: <AgentList data={agents.data} error={agents.error} />, w: 7, h: 12 },
       { key: "send", title: "Send a plan to Studio", node: <SendPlan kinds={kinds.data || []} agents={agents.data} onSent={agents.reload} />, w: 5, h: 12 },
+      { key: "approvals", title: "Waiting for your approval", node: <Approvals />, w: 7, h: 8 },
+      { key: "activity", title: "Studio activity", node: <StudioActivity />, w: 5, h: 8 },
       { key: "how", title: "How this connects", node: <How />, w: 12, h: 5 },
     ];
     return { panels, extra };

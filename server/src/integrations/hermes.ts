@@ -59,6 +59,13 @@ export class Hermes {
       60_000);
     return { chatId: String(r?.work?.sessionId || "") };
   }
+  /** Approve or reject agent work in Studio (the approval Studio shared here). Studio
+   *  decides once: a second decision anywhere answers changed: false with the first one. */
+  async decide(workId: string, decision: "approve" | "reject", by: string) {
+    const r = await this.send("POST", `/api/studio/agent-work/${encodeURIComponent(workId)}/${decision}`, { via: "orb", by });
+    const w = r?.work || {};
+    return { changed: !!r?.changed, message: String(r?.message || ""), decision: String(w.decision || ""), via: String(w.decidedVia || ""), by: String(w.decidedBy || ""), status: String(w.status || "") };
+  }
   /** One chat's newest messages as plain text (for Golem, read only). */
   async session(id: string, limit = 20) {
     const r = await this.get(`/api/studio/sessions/${encodeURIComponent(id)}`);

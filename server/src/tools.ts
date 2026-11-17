@@ -14,6 +14,8 @@ const listOf = (t: any) => t.list || t.project || "Inbox";
 const same = (a: unknown, b: unknown) => String(a).toLowerCase() === String(b).toLowerCase();
 /** The states of the agent working on a task or project (as Hermes Studio reports them), plus gone (it stopped). */
 const AGENT_STATUSES = ["working", "blocked", "done", "idle", "gone"];
+/** Approval alerts Hermes Studio opens and clears. */
+const APPROVAL_STATES = ["pending", "approved", "rejected", "withdrawn"];
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const isDay = (s: string) => DAY.test(s) && !Number.isNaN(Date.parse(s + "T12:00:00Z")) && new Date(s + "T12:00:00Z").toISOString().startsWith(s);
 
@@ -169,6 +171,55 @@ export function orbTools(r: Records, caldavLists: () => string[] = () => []): To
         const by = byWho(who);
         r.patch("tasks", t.id, { done: true, doneAt: today(), doneBy: by }); logFor(t, `Done: ${t.title}`, by);
         return { id: t.id, title: t.title, list: listOf(t), done: true };
+      } },
+    { name: "orb_studio_approval", write: true, description: "Hermes Studio only: open or clear an approval alert for agent work. state pending shows it in Orb with Approve / Reject; approved, rejected or withdrawn clears it (it was decided in Studio, Mattermost or here). Calling it again with the same state changes nothing.",
+      parameters: { type: "object", properties: {
+        workId: { type: "string", description: "Studio's agent work id." },
+        title: { type: "string", description: "What the work is, usually the Vikunja task title." },
+        summary: { type: "string", description: "What the agent did or needs approved." },
+        state: { type: "string", enum: APPROVAL_STATES, description: "pending, approved, rejected or withdrawn." },
+        via: { type: "string", description: "Where it was decided: studio, mattermost or orb." },
+        by: { type: "string", description: "Who decided it." },
+        vikunjaTaskId: { type: "string", description: "The linked Vikunja task id, if any." },
+        agent: { type: "string", description: "The agent doing the work." } }, required: ["workId", "state"] },
+      run: (a) => {
+        if (!String(a.workId || "").trim()) throw new Error("workId is required.");
+        if (!APPROVAL_STATES.includes(a.state)) throw new Error(`state must be one of ${APPROVAL_STATES.join(", ")}.`);
+        const id = `studio-${String(a.workId).slice(0, 80)}`, cur: any = r.get("approvals", id);
+        if (cur && cur.state === a.state) return { id, state: cur.state, unchanged: true };
+        // A decision is final: a late "pending" never reopens it.
+        if (cur && cur.state !== "pending" && a.state === "pending") return { id, state: cur.state, unchanged: true };
+        const str = (v: unknown, n: number) => String(v ?? "").slice(0, n);
+        const doc = { source: "hermes-studio", workId: str(a.workId, 80), title: str(a.title || cur?.title, 300), summary: str(a.summary ?? cur?.summary, 2000),
+          state: a.state, via: str(a.via, 20), by: str(a.by, 80), vikunjaTaskId: str(a.vikunjaTaskId ?? cur?.vikunjaTaskId, 64), agent: str(a.agent ?? cur?.agent, 80),
+          askedAt: cur?.askedAt || Date.now(), resolvedAt: a.state === "pending" ? 0 : Date.now() };
+        r.put("approvals", id, doc);
+        return { id, state: a.state };
+      } },
+    { name: "orb_studio_activity", write: true, description: "Hermes Studio only: one entry of agent activity it shares with Orb (shown on the Agents page and in the day's log). Only sent while sharing is on in Studio.",
+      parameters: { type: "object", properties: {
+        id: { type: "string", description: "Studio's activity id (the same id again changes nothing)." },
+        workId: { type: "string", description: "Studio's agent work id." },
+        title: { type: "string", description: "The work's title." },
+        status: { type: "string", description: "The work's state after this entry." },
+        kind: { type: "string", description: "created, status, approved, rejected, vikunja_done …" },
+        message: { type: "string", description: "What happened." },
+        via: { type: "string", description: "Where a decision was made." },
+        actor: { type: "string", description: "Who did it." },
+        at: { type: "number", description: "When, in milliseconds since 1970." },
+        vikunjaTaskId: { type: "string", description: "The linked Vikunja task id, if any." },
+        agent: { type: "string", description: "The agent doing the work." } }, required: ["id", "workId", "kind"] },
+      run: (a) => {
+        const id = `studio-${String(a.id || "").slice(0, 40)}`;
+        if (id === "studio-" || !a.workId) throw new Error("id and workId are required.");
+        if (r.get("agentActivity", id)) return { id, unchanged: true };
+        const str = (v: unknown, n: number) => String(v ?? "").slice(0, n);
+        r.put("agentActivity", id, { source: "hermes-studio", workId: str(a.workId, 80), title: str(a.title, 300), status: str(a.status, 30), kind: str(a.kind, 40),
+          message: str(a.message, 500), via: str(a.via, 20), actor: str(a.actor, 80), at: Number(a.at) || Date.now(), vikunjaTaskId: str(a.vikunjaTaskId, 64), agent: str(a.agent, 80), day: today() });
+        // Keep the newest 500.
+        const all = r.list("agentActivity") as any[];
+        if (all.length > 500) for (const old of all.sort((x, y) => x.at - y.at).slice(0, all.length - 500)) r.remove("agentActivity", old.id);
+        return { id };
       } },
     { name: "orb_list_chores", description: "Recurring chores: how often (everyDays), when last done, and days left until due (negative = overdue).",
       parameters: { type: "object", properties: {} },
