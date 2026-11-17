@@ -72,6 +72,13 @@ scope (Coinpile → Settings → Home Assistant & API → new token, tick *orb*)
 On the same page you tick what Orb may see; nothing else is shared, and
 never transactions.
 
+If the Coinpile panel stops with "sign in to Coinpile again": Firefly III no
+longer accepts Coinpile's sign-in for you (the token was revoked or ran
+out). Coinpile's API tokens, Orb's included, keep answering for a day and
+then stop until you sign in to Coinpile again; the same token works again
+after that. "Sign out everywhere … and end API tokens" in Coinpile revokes
+Orb's tokens for good: make new ones and put them in `.env`.
+
 Firefly III already gives Orb accounts, bills, budgets and piggy banks, so
 Coinpile is for what Firefly has no place for:
 
