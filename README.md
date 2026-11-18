@@ -63,7 +63,7 @@ Each one is optional; leave its address empty and its panels say so.
 | **Omi** (omi-local) | Read only: daily recaps, conversations, memory search; its action items come through CalDAV, once | [docs/companions.md](docs/companions.md) |
 | **Robinhood** | Its Trading MCP (OAuth): the agentic account, and orders for picks you approve, within caps you set | [docs/picks.md](docs/picks.md) |
 | **Plex**, **SABnzbd** | Live panels | |
-| Agents (MCP) | `POST /mcp` with a token: projects, logs, tasks, chores | [docs/backend.md](docs/backend.md) |
+| Agents (MCP) | `POST /mcp` with a token: projects, logs, tasks, chores. An agent token can also read the money panels (Coinpile, Firefly III) and ask Golem, so give one only to agents you trust with that | [docs/backend.md](docs/backend.md) |
 
 Every key stays on the server. Settings and the apps YAML only name the
 environment variable that holds it.

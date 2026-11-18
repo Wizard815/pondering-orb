@@ -8,8 +8,12 @@ import type { App } from "../lib/apps";
 /** Firefly III, read only: this month, accounts, bills, budgets, piggy banks
  *  and transactions. The full page is turned on with `page: true` on the
  *  app's widget in the apps YAML. */
-export const money = (n: number | null | undefined, cur = "USD") => (n === null || n === undefined ? "—"
-  : n.toLocaleString(undefined, { style: "currency", currency: cur || "USD", maximumFractionDigits: Math.abs(n) >= 1000 ? 0 : 2 }));
+export const money = (n: number | null | undefined, cur = "USD") => {
+  if (n === null || n === undefined) return "—";
+  // Firefly III allows codes that aren't ISO (USDT, POINTS): those would throw, so show the number and the code.
+  try { return n.toLocaleString(undefined, { style: "currency", currency: cur || "USD", maximumFractionDigits: Math.abs(n) >= 1000 ? 0 : 2 }); }
+  catch { return `${n.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${cur}`; }
+};
 const base = (app: App) => `/api/apps/${encodeURIComponent(app.name)}/firefly`;
 function useOverview(app: App) { return useFetch<any>(`${base(app)}/overview`, 5 * 60000); }
 const Err = ({ e }: { e: string }) => <div className="err-inline">{e}</div>;

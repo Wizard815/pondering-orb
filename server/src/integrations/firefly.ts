@@ -2,7 +2,7 @@ import { call, trimSlash } from "./http.js";
 import { secret } from "../config.js";
 import { HttpError } from "../records.js";
 import { localDay } from "../dates.js";
-import type { Companion } from "./companions.js";
+import { tokenKey, type Companion } from "./companions.js";
 
 /** Firefly III (your finances), read only, through its REST API with a
  *  Personal Access Token (Options → Profile → OAuth → Personal access tokens).
@@ -20,6 +20,8 @@ async function get(c: Companion, path: string, what: string) {
   const r = await call(`${base}${path}`, { method: "GET", headers: { Accept: "application/json", ...(key ? { Authorization: `Bearer ${key}` } : {}) } });
   if (r.status === 401 || r.status === 403) throw new HttpError(502, `${c.name} refused the token${c.keyEnv ? ` in ${c.keyEnv}` : ""} (${r.status}).`);
   if (!r.ok) throw new HttpError(502, `${c.name} answered ${r.status} for ${what}.`);
+  // A login page or a proxy's HTML is not Firefly's answer: say so, and don't cache an empty result.
+  if (!r.body || typeof r.body !== "object" || Array.isArray(r.body)) throw new HttpError(502, `${c.name} sent something that isn't Firefly III's answer for ${what} (a sign-in page?).`);
   return r.body;
 }
 /** Every page of a list endpoint (Firefly pages at 50 by default). */
@@ -43,7 +45,7 @@ export const clearFireflyCache = () => cache.clear();
 export type FfSummary = { currency: string; netWorth: number | null; balance: number | null; spent: number | null; earned: number | null; leftToSpend: number | null; billsPaid: number | null; billsUnpaid: number | null; from: string; to: string };
 /** This month's boxes from Firefly's dashboard (summary/basic), in your primary currency. */
 export async function ffSummary(c: Companion, from = monthStart(), to = monthEnd()): Promise<FfSummary> {
-  return cached(`ff:s:${c.url}:${from}:${to}`, 5 * 60000, async () => {
+  return cached(`ff:s:${tokenKey(c)}:${from}:${to}`, 5 * 60000, async () => {
     const b = await get(c, `/api/v1/summary/basic?start=${from}&end=${to}`, "the summary") || {};
     // One entry per key and currency ("spent-in-USD"); use the currency that has a net worth (the primary one).
     const entries = Object.values(b) as any[], cur = String(entries.find(e => String(e?.key || "").startsWith("net-worth-in-"))?.currency_code || entries[0]?.currency_code || "USD");
@@ -56,7 +58,7 @@ export async function ffSummary(c: Companion, from = monthStart(), to = monthEnd
 export type FfBill = { id: string; name: string; date: string; amount: number; currency: string; paid: boolean; repeat: string };
 /** Bills due between two days: one row per expected pay date, marked paid when Firefly matched a payment. */
 export async function ffBills(c: Companion, from = localDay(), to = plusDays(localDay(), 30)): Promise<FfBill[]> {
-  return cached(`ff:b:${c.url}:${from}:${to}`, 10 * 60000, async () => {
+  return cached(`ff:b:${tokenKey(c)}:${from}:${to}`, 10 * 60000, async () => {
     const rows: FfBill[] = [];
     for (const d of await all(c, `/api/v1/bills?start=${from}&end=${to}`, "bills")) {
       const a = d?.attributes || {}; if (a.active === false) continue;
@@ -71,7 +73,7 @@ export async function ffBills(c: Companion, from = localDay(), to = plusDays(loc
 export type FfBudget = { name: string; amount: number; spent: number; currency: string; pct: number };
 /** This month's budgets: limit, spent and how much of it is used (0–100+). */
 export async function ffBudgets(c: Companion, from = monthStart(), to = monthEnd()): Promise<FfBudget[]> {
-  return cached(`ff:bu:${c.url}:${from}:${to}`, 10 * 60000, async () => {
+  return cached(`ff:bu:${tokenKey(c)}:${from}:${to}`, 10 * 60000, async () => {
     const [limits, budgets] = await Promise.all([all(c, `/api/v1/budget-limits?start=${from}&end=${to}`, "budget limits"), all(c, "/api/v1/budgets", "budgets")]);
     const names = new Map(budgets.map((b: any) => [String(b.id), String(b.attributes?.name || "Budget")]));
     // `spent` is a negative amount (older versions: a list of {sum} per currency).
@@ -84,7 +86,7 @@ export async function ffBudgets(c: Companion, from = monthStart(), to = monthEnd
 
 export type FfPiggy = { name: string; saved: number; target: number | null; pct: number; targetDate: string; currency: string };
 export async function ffPiggyBanks(c: Companion): Promise<FfPiggy[]> {
-  return cached(`ff:p:${c.url}`, 10 * 60000, async () => (await all(c, "/api/v1/piggy-banks", "piggy banks")).filter((p: any) => p.attributes?.active !== false).map((p: any) => {
+  return cached(`ff:p:${tokenKey(c)}`, 10 * 60000, async () => (await all(c, "/api/v1/piggy-banks", "piggy banks")).filter((p: any) => p.attributes?.active !== false).map((p: any) => {
     const a = p.attributes || {};
     return { name: String(a.name || "Piggy bank"), saved: n(a.current_amount) ?? 0, target: n(a.target_amount), pct: Math.max(0, Math.min(100, Number(a.percentage) || 0)), targetDate: day(a.target_date), currency: String(a.currency_code || "") };
   }));
@@ -92,7 +94,7 @@ export async function ffPiggyBanks(c: Companion): Promise<FfPiggy[]> {
 
 export type FfAccount = { name: string; type: string; balance: number; currency: string; inNetWorth: boolean };
 export async function ffAccounts(c: Companion): Promise<FfAccount[]> {
-  return cached(`ff:a:${c.url}`, 5 * 60000, async () => {
+  return cached(`ff:a:${tokenKey(c)}`, 5 * 60000, async () => {
     const rows = [...await all(c, "/api/v1/accounts?type=asset", "accounts"), ...await all(c, "/api/v1/accounts?type=liabilities", "liabilities")];
     return rows.filter((r: any) => r.attributes?.active !== false).map((r: any) => { const a = r.attributes || {};
       return { name: String(a.name || "Account"), type: String(a.type || ""), balance: n(a.current_balance) ?? 0, currency: String(a.currency_code || ""), inNetWorth: a.include_net_worth !== false };
@@ -108,13 +110,13 @@ const txRows = (groups: any[]): FfTx[] => groups.flatMap((g: any) => (g.attribut
 }));
 /** The most recent transactions (withdrawals, deposits and transfers). */
 export async function ffRecent(c: Companion, limit = 20): Promise<FfTx[]> {
-  return cached(`ff:t:${c.url}:${limit}`, 2 * 60000, async () => txRows((await get(c, `/api/v1/transactions?limit=${Math.max(1, Math.min(100, limit))}&page=1`, "transactions"))?.data || []).slice(0, limit));
+  return cached(`ff:t:${tokenKey(c)}:${limit}`, 2 * 60000, async () => txRows((await get(c, `/api/v1/transactions?limit=${Math.max(1, Math.min(100, limit))}&page=1`, "transactions"))?.data || []).slice(0, limit));
 }
 /** One day's money: what went out (withdrawals) and came in (deposits), with
  *  the transactions. Transfers between your own accounts count as neither. */
 export type FfDay = { date: string; spent: number; income: number; currency: string; items: FfTx[] };
 export async function ffDay(c: Companion, date: string): Promise<FfDay> {
-  return cached(`ff:d:${c.url}:${date}`, 2 * 60000, async () => {
+  return cached(`ff:d:${tokenKey(c)}:${date}`, 2 * 60000, async () => {
     const items = txRows(await all(c, `/api/v1/transactions?type=all&start=${date}&end=${date}`, "transactions", 300)).filter(t => t.date === date);
     const sum = (k: string) => +items.filter(t => t.type === k).reduce((a, t) => a + Math.abs(t.amount), 0).toFixed(2);
     return { date, spent: sum("withdrawal"), income: sum("deposit"), currency: items[0]?.currency || "", items };

@@ -14,7 +14,7 @@ const journalSettings = () => (getDoc("settings", "app") as any)?.journal;
 type Doc = { id?: string; version?: number; date: string; text: string; auto?: any };
 const shift = (iso: string, n: number) => { const d = new Date(iso + "T12:00:00"); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const longDay = (iso: string) => new Date(iso + "T12:00:00").toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
-const usd = (n: number, cur = "") => n.toLocaleString(undefined, { style: "currency", currency: cur || "USD" });
+const usd = (n: number, cur = "") => { try { return n.toLocaleString(undefined, { style: "currency", currency: cur || "USD" }); } catch { return `${n.toFixed(2)} ${cur}`; } };
 const newId = (day: string) => `${day}-${Math.random().toString(36).slice(2, 10)}`;
 
 /** Journal records by day: loaded one day at a time, saved in small pieces.

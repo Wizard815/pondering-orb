@@ -2,7 +2,20 @@ import { call, trimSlash } from "./http.js";
 import { HttpError } from "../records.js";
 
 export type Msg = { role: "system" | "user" | "assistant" | "tool"; content: string | null; tool_calls?: any[]; tool_call_id?: string };
-export type Tool = { name: string; description: string; parameters: Record<string, unknown>; run: (args: any, who: string) => Promise<unknown> | unknown; write?: boolean };
+export type Tool = { name: string; description: string; parameters: Record<string, unknown>; run: (args: any, who: string) => Promise<unknown> | unknown; write?: boolean;
+  /** Its result holds text from outside (bank payees, web pages): after one runs, write tools wait for the person's say-so. */
+  external?: boolean };
+
+/** Runs one tool call. Once a turn has read an external result, Orb's write tools refuse instead of running, so text in a
+ *  payee or web page can't make Golem change things; the model is told to ask, and the next message can do it. */
+async function runTool(t: Tool | undefined, raw: string | undefined, who: string, st: { tainted: boolean }, did: string[]) {
+  if (!t) return { error: "unknown tool" };
+  if (t.write && st.tainted) return { error: "Not done. This turn read outside text (money or web results), so changes wait: tell the user what you would do and do it only after they say yes in their next message." };
+  const out = await t.run(raw ? JSON.parse(raw) : {}, who);
+  if (t.write) did.push(t.name);
+  if (t.external) st.tainted = true;
+  return out;
+}
 
 /** One OpenAI-compatible chat API covers Golem's brains: Argos or any local
  *  /v1 server, OpenRouter, and the Claude API's OpenAI-compatible endpoint.
@@ -10,7 +23,7 @@ export type Tool = { name: string; description: string; parameters: Record<strin
 export async function chat(opts: { baseUrl: string; model: string; key?: string; messages: Msg[]; tools: Tool[]; who: string; maxRounds?: number }) {
   const base = trimSlash(opts.baseUrl);
   if (!base) throw new HttpError(503, "Golem has no model endpoint. Set one in Settings → Golem.");
-  const msgs = [...opts.messages], did: string[] = [];
+  const msgs = [...opts.messages], did: string[] = [], st = { tainted: false };
   const tools = opts.tools.map(t => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.parameters } }));
   for (let round = 0; round < (opts.maxRounds ?? 6); round++) {
     const r = await call(`${base}/chat/completions`, {
@@ -27,8 +40,8 @@ export async function chat(opts: { baseUrl: string; model: string; key?: string;
     for (const c of calls) {
       const t = opts.tools.find(x => x.name === c.function?.name);
       let out: unknown;
-      try { const args = c.function?.arguments ? JSON.parse(c.function.arguments) : {}; out = t ? await t.run(args, opts.who) : { error: "unknown tool" }; if (t?.write) did.push(t.name); }
-      catch (e: any) { out = { error: e?.message || String(e) }; }
+      try { out = await runTool(t, c.function?.arguments, opts.who, st, did); }
+      catch (e: any) { out = { error: e?.message || String(e) }; if (t?.external) st.tainted = true; }
       msgs.push({ role: "tool", tool_call_id: c.id, content: JSON.stringify(out).slice(0, 30000) });
     }
   }
@@ -41,7 +54,7 @@ export async function chat(opts: { baseUrl: string; model: string; key?: string;
 export async function chatStream(opts: Parameters<typeof chat>[0] & { onEvent: (e: { type: "text"; delta: string } | { type: "tool"; name: string }) => void; signal?: AbortSignal }) {
   const base = trimSlash(opts.baseUrl);
   if (!base) throw new HttpError(503, "Golem has no model endpoint. Set one in Settings → Golem.");
-  const msgs = [...opts.messages], did: string[] = []; let full = "";
+  const msgs = [...opts.messages], did: string[] = [], st = { tainted: false }; let full = "";
   const tools = opts.tools.map(t => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.parameters } }));
   for (let round = 0; round < (opts.maxRounds ?? 6); round++) {
     let res: Response;
@@ -90,8 +103,8 @@ export async function chatStream(opts: Parameters<typeof chat>[0] & { onEvent: (
       if (opts.signal?.aborted) throw new HttpError(499, "Stopped.");
       const t = opts.tools.find(x => x.name === c.name); opts.onEvent({ type: "tool", name: c.name });
       let out: unknown;
-      try { out = t ? await t.run(c.args ? JSON.parse(c.args) : {}, opts.who) : { error: "unknown tool" }; if (t?.write) did.push(t.name); }
-      catch (e: any) { out = { error: e?.message || String(e) }; }
+      try { out = await runTool(t, c.args, opts.who, st, did); }
+      catch (e: any) { out = { error: e?.message || String(e) }; if (t?.external) st.tainted = true; }
       msgs.push({ role: "tool", tool_call_id: c.id, content: JSON.stringify(out).slice(0, 30000) });
     }
     if (text) { full += "\n\n"; opts.onEvent({ type: "text", delta: "\n\n" }); }
