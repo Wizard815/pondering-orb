@@ -1,7 +1,7 @@
 import { call, trimSlash } from "./http.js";
 import { secret } from "../config.js";
 import { HttpError } from "../records.js";
-import type { Companion } from "./companions.js";
+import { tokenKey, type Companion } from "./companions.js";
 import type { Tool } from "./llm.js";
 import { McpClient } from "./mcpclient.js";
 
@@ -51,10 +51,13 @@ async function get(c: Companion, path: string) {
   const base = trimSlash(c.url); if (!base) throw new HttpError(400, `${c.name} has no url in the apps YAML.`);
   const key = secret(c.keyEnv);
   const r = await call(`${base}${path}`, { method: "GET", headers: { Accept: "application/json", ...(key ? { Authorization: `Bearer ${key}` } : {}) } });
-  if (r.status === 401) throw new HttpError(502, `${c.name} refused the token${c.keyEnv ? ` in ${c.keyEnv}` : ""}.`);
+  // Coinpile says why in `detail` (e.g. Firefly III no longer accepts its sign-in: sign in to Coinpile again).
+  const detail = typeof r.body?.detail === "string" ? ` ${r.body.detail.slice(0, 300)}` : "";
+  if (r.status === 401) throw new HttpError(502, `${c.name} refused the token${c.keyEnv ? ` in ${c.keyEnv}` : ""}.${detail}`);
   if (r.status === 403) throw new HttpError(502, `${c.name}'s token needs the "orb" scope (Coinpile → Settings → Home Assistant & API).`);
   if (r.status === 429) throw new HttpError(502, `${c.name} says Orb asks too often; it will try again shortly.`);
   if (!r.ok) throw new HttpError(502, `${c.name} answered ${r.status}.`);
+  if (!r.body || typeof r.body !== "object" || Array.isArray(r.body) || (r.body.goblins != null && typeof r.body.goblins !== "object")) throw new HttpError(502, `${c.name} sent something that isn't its summary (a sign-in page?).`);
   return r.body;
 }
 
@@ -62,10 +65,11 @@ const cache = new Map<string, { at: number; v: CpSummary }>();
 export const clearCoinpileCache = () => cache.clear();
 
 export async function cpSummary(c: Companion): Promise<CpSummary> {
-  const hit = cache.get(c.url); if (hit && Date.now() - hit.at < 5 * 60000) return hit.v;
+  const ck = tokenKey(c), hit = cache.get(ck); if (hit && Date.now() - hit.at < 5 * 60000) return hit.v;
   const body = await get(c, "/api/v1/summary");
   // The token belongs to one person: the answer holds just them.
-  const [name, g]: [string, any] = Object.entries(body?.goblins || {})[0] as any || ["me", {}];
+  const [name, g0]: [string, any] = Object.entries(body?.goblins || {})[0] as any || ["me", {}];
+  const g: any = g0 && typeof g0 === "object" ? g0 : {};
   const rh = (x: any) => (x && typeof x === "object" ? { value: num(x.value), asOf: String(x.as_of || "") } : null);
   const alertList: CpAlert[] | null = Array.isArray(g.alert_list) ? g.alert_list.slice(0, 50).map((a: any) => ({
     severity: (SEV.includes(a?.severity) ? a.severity : "info") as CpAlert["severity"], kind: String(a?.kind || ""), title: String(a?.title || ""), detail: String(a?.detail || ""), date: isDay(a?.date) ? String(a.date) : "",
@@ -95,7 +99,7 @@ export async function cpSummary(c: Companion): Promise<CpSummary> {
     daily: Array.isArray(g.daily) ? g.daily.filter((d: any) => isDay(d?.date)).sort((a: any, b: any) => String(b.date).localeCompare(String(a.date))).slice(0, 400).map((d: any) => ({ date: String(d.date), spent: Math.abs(Number(d.spent) || 0), income: Number(d.income) || 0 })) : null,
     at: Date.now(),
   };
-  cache.set(c.url, { at: Date.now(), v }); return v;
+  cache.set(ck, { at: Date.now(), v }); return v;
 }
 
 /** Golem's Coinpile tools: Coinpile's own agent tools over MCP (POST /api/v1/mcp), with a Coinpile token that has the "mcp" scope
@@ -104,23 +108,25 @@ export async function cpSummary(c: Companion): Promise<CpSummary> {
 const mcpClients = new Map<string, { client: McpClient; tools?: { at: number; list: Tool[] } }>();
 export const clearCoinpileMcp = () => mcpClients.clear();
 
-export async function cpMcpTools(c: Companion | null): Promise<Tool[]> {
+export async function cpMcpTools(c: Companion | null, reserved: string[] = []): Promise<Tool[]> {
   if (!c?.mcpKeyEnv || !secret(c.mcpKeyEnv) || !trimSlash(c.url)) return [];
   const key = `${trimSlash(c.url)}|${c.mcpKeyEnv}`;
   let e = mcpClients.get(key);
   if (!e) {
     const client = new McpClient(() => `${trimSlash(c.url)}/api/v1/mcp`, async () => secret(c.mcpKeyEnv) || "",
-      async () => { throw new HttpError(502, `${c.name} refused the token in ${c.mcpKeyEnv}: it needs the "mcp" scope (Coinpile → Settings → Home Assistant & API).`); });
+      async () => { throw new HttpError(502, `${c.name} refused the token in ${c.mcpKeyEnv} (401): check the token, or sign in to Coinpile again if it says Firefly III stopped accepting it.`); });
     e = { client }; mcpClients.set(key, e);
   }
-  if (e.tools && Date.now() - e.tools.at < 10 * 60000) return e.tools.list;
-  let listed;
-  try { listed = await e.client.tools(); } catch { e.client.reset(); return []; }     // Coinpile down: Golem still works without these
-  const client = e.client;
-  const list: Tool[] = listed.map(t => {
+  if (e.tools && Date.now() - e.tools.at < (e.tools.list.length ? 10 * 60000 : 60000)) return e.tools.list;
+  const client = e.client, taken = new Set(reserved);
+  let list: Tool[];
+  try {
+    const listed = await client.tools();
+    if (!Array.isArray(listed)) throw new Error("tools is not a list");
+    list = listed.filter(t => t && typeof t === "object" && /^[A-Za-z0-9_-]{1,55}$/.test(String(t.name))).map(t => {
     const asks = t.annotations?.readOnlyHint === false;
     return {
-      name: `coinpile_${t.name}`.slice(0, 64),
+      name: `coinpile_${t.name}`.slice(0, 64), external: true,
       description: `Coinpile (the user's money, from their Firefly III)${asks ? ", ASKS FIRST: only creates a request the user approves on Coinpile's Agent page; tell them that" : ""}: ${String(t.description || "").replace(/^ASKS THE USER FIRST, nothing happens until they say yes\. /, "")}`.slice(0, 1024),
       parameters: t.inputSchema && typeof t.inputSchema === "object" ? t.inputSchema : { type: "object", properties: {} },
       run: async (args: any) => {
@@ -129,6 +135,7 @@ export async function cpMcpTools(c: Companion | null): Promise<Tool[]> {
         return r.isError ? { error: typeof out === "string" ? out : (out as any)?.error || out } : out;
       },
     };
-  });
+    }).filter(t => !taken.has(t.name) && taken.add(t.name));    // never two tools with one name (the Orb's coinpile_summary wins)
+  } catch { client.reset(); list = []; }     // Coinpile down or odd: Golem still works without these, and asks again in a minute
   e.tools = { at: Date.now(), list }; return list;
 }

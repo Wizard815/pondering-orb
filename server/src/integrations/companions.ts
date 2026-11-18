@@ -1,4 +1,5 @@
 import { parse } from "yaml";
+import { createHash } from "node:crypto";
 import { call, trimSlash } from "./http.js";
 import { secret } from "../config.js";
 import { HttpError } from "../records.js";
@@ -10,6 +11,10 @@ import { HttpError } from "../records.js";
  *  Every request here is a GET. Omi's action items are NOT read from Omi:
  *  Omi already writes them to CalDAV (UID omi-task-...@omi-local), and Orb
  *  reads every task from that one CalDAV server, so nothing is listed twice. */
+/** A cache key for answers read with this app's token: the address plus a hash of the token itself, so two apps on one
+ *  address with different people's tokens (or a changed token) never share an answer. */
+export const tokenKey = (c: { url: string; keyEnv?: string }) => `${c.url}|${createHash("sha256").update(secret(c.keyEnv) || "").digest("hex").slice(0, 16)}`;
+
 export type Companion = { name: string; url: string; keyEnv?: string; page?: string; /** Coinpile: env var holding a token with the "mcp" scope, for Golem's Coinpile tools. */ mcpKeyEnv?: string };
 
 /** The first app of a widget type in the apps YAML. */

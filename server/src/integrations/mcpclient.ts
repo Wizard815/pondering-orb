@@ -65,12 +65,12 @@ export type McpTool = { name: string; description?: string; inputSchema?: any; a
 export class McpClient {
   private session = ""; private nextId = 1; private ready = false; private sessionFor = "";
   constructor(private urlOf: () => string, private auth: () => Promise<string>, private onUnauthorized: () => Promise<void>) {}
-  private async post(msg: any, retry = true): Promise<any> {
+  private async post(msg: any, retry = true, timeoutMs = 60000): Promise<any> {
     const url = this.urlOf(); if (url !== this.sessionFor) { this.session = ""; this.ready = false; this.sessionFor = url; }
-    const r = await fetch(url, { method: "POST", signal: AbortSignal.timeout(60000), headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream", "MCP-Protocol-Version": "2025-06-18",
+    const r = await fetch(url, { method: "POST", signal: AbortSignal.timeout(timeoutMs), headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream", "MCP-Protocol-Version": "2025-06-18",
       Authorization: `Bearer ${await this.auth()}`, ...(this.session ? { "Mcp-Session-Id": this.session } : {}) }, body: JSON.stringify(msg) });
-    if (r.status === 401 && retry) { await this.onUnauthorized(); return this.post(msg, false); }
-    if (r.status === 404 && this.session && retry) { this.session = ""; this.ready = false; await this.init(); return this.post(msg, false); }
+    if (r.status === 401 && retry) { await this.onUnauthorized(); return this.post(msg, false, timeoutMs); }
+    if (r.status === 404 && this.session && retry) { this.session = ""; this.ready = false; await this.init(); return this.post(msg, false, timeoutMs); }
     if (!r.ok && r.status !== 202) throw new HttpError(502, `The MCP server answered ${r.status}: ${(await r.text()).slice(0, 160)}`);
     const sid = r.headers.get("mcp-session-id"); if (sid) this.session = sid;
     if (msg.id === undefined || r.status === 202) return null;
@@ -83,11 +83,11 @@ export class McpClient {
   }
   private async init() {
     if (this.ready && this.sessionFor === this.urlOf()) return;
-    await this.post({ jsonrpc: "2.0", id: this.nextId++, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "pondering-orb", version: "0.1.0" } } });
-    await this.post({ jsonrpc: "2.0", method: "notifications/initialized" });
+    await this.post({ jsonrpc: "2.0", id: this.nextId++, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "pondering-orb", version: "0.1.0" } } }, true, 10000);
+    await this.post({ jsonrpc: "2.0", method: "notifications/initialized" }, true, 10000);
     this.ready = true;
   }
-  async tools(): Promise<McpTool[]> { await this.init(); return (await this.post({ jsonrpc: "2.0", id: this.nextId++, method: "tools/list", params: {} }))?.tools || []; }
+  async tools(): Promise<McpTool[]> { await this.init(); return (await this.post({ jsonrpc: "2.0", id: this.nextId++, method: "tools/list", params: {} }, true, 10000))?.tools || []; }
   async call(name: string, args: Record<string, unknown>) {
     await this.init();
     const r = await this.post({ jsonrpc: "2.0", id: this.nextId++, method: "tools/call", params: { name, arguments: args } });

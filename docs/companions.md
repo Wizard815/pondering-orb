@@ -118,6 +118,11 @@ would change something only **ask**: the request waits on Coinpile's Agent
 page for your Yes, so nothing changes from Orb. Without `mcp_key_env`, or if
 Coinpile is down, Golem works as before.
 
+Payee names, bill names and web pages are text from outside, so once Golem
+has read a `coinpile_` or `finance_` result in a reply, it won't change
+anything in Orb (tasks, logs, chores, projects) in that same reply. It tells
+you what it would do; say yes in your next message and it does it.
+
 ### Joint accounts and linked people
 
 In Coinpile, two linked people can tie their copies of a joint account
