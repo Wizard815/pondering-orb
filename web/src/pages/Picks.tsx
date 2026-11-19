@@ -215,6 +215,44 @@ function HoldingsPanel() {
   </div>;
 }
 
+type CpTrading = { enabled: boolean; wallet: "paper" | "live"; value: number | null; cash: number | null; startOfDay: number | null; stopped: string | null; nextSession: string | null; running: boolean; waiting: number;
+  positions: { symbol: string; quantity: number; price: number | null; value: number | null }[];
+  lastSession: { day: string; slot: string; mode: string; status: string; summary: string; finished: string } | null;
+  orders: { ts: string; symbol: string; side: string; quantity: number; price: number | null; status: string; reason: string; rating: string }[];
+  ideas: { account: "main" | "agent"; symbol: string; rating: string; action: string; summary: string; ts: string }[] };
+const RATED: Record<string, string> = { Buy: "up", Overweight: "up", Underweight: "down", Sell: "down" };
+/** Coinpile's auto wallet and its ideas for your stocks. Read only: approving orders, guidance and rules are in Coinpile → Trading. */
+function AutoWallet() {
+  const { data, error } = useFetch<{ trading: CpTrading | null; url: string; note: string }>("/api/trading", 2 * 60000), [open, setOpen] = useState("");
+  const cov = useSettings().daily?.coverage;
+  if (error && !data) return <div className="empty">{error}</div>;
+  if (!data) return <div className="hint">Asking Coinpile…</div>;
+  const t = data.trading, link = data.url ? data.url.replace(/\/$/, "") + "/#trading" : "";
+  if (!t) return <div className="empty">{data.note}</div>;
+  const change = t.value != null && t.startOfDay ? t.value - t.startOfDay : null;
+  const next = t.nextSession ? new Date(t.nextSession).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" }) : "—";
+  const mine = t.ideas.filter(i => i.account === "main"), wallet = t.ideas.filter(i => i.account === "agent");
+  const idea = (i: CpTrading["ideas"][number]) => <tr key={i.account + i.symbol}><td><button className="linkish" onClick={() => setOpen(i.symbol)}><b>{i.symbol}</b></button></td>
+    <td className={RATED[i.rating] || ""}>{i.rating || "—"}</td><td><b>{i.action}</b> <span className="hint" title={i.summary}>{i.summary ? i.summary.slice(0, 140) + (i.summary.length > 140 ? "…" : "") : ""}</span></td><td className="hint">{i.ts ? ago(Date.parse(i.ts)) : ""}</td></tr>;
+  return <div className="hold">
+    <div className="row small hold-sum">
+      <span>{t.wallet === "live" ? "Live" : "Paper"} wallet <b>{t.value == null ? "—" : money(t.value)}</b></span><span>Cash <b>{t.cash == null ? "—" : money(t.cash)}</b></span>
+      <span className={change == null ? "" : change >= 0 ? "up" : "down"}>Today {signed(change)}</span>
+      <span>Next {next}</span>{t.running && <span>running now…</span>}
+      {!t.enabled && <span className="hint">auto wallet off: ideas only</span>}
+    </div>
+    {t.stopped && <div className="empty down">{t.stopped}</div>}
+    {t.waiting > 0 && <div className="empty">{t.waiting} order{t.waiting === 1 ? "" : "s"} waiting for you in {link ? <a href={link} target="_blank" rel="noreferrer">Coinpile → Trading</a> : "Coinpile → Trading"}.</div>}
+    {mine.length > 0 && <><h4>Ideas for your stocks</h4><div style={{ overflowX: "auto" }}><table className="tbl"><tbody>{mine.map(idea)}</tbody></table></div></>}
+    {t.positions.length > 0 && <><h4>The wallet holds</h4><div className="row small" style={{ flexWrap: "wrap", gap: 12 }}>{t.positions.map(p => <span key={p.symbol}><b>{p.symbol}</b> {+p.quantity.toFixed(4)} · {p.value == null ? "—" : money(p.value)}</span>)}</div></>}
+    {wallet.length > 0 && <details><summary className="small">The wallet's latest calls</summary><table className="tbl"><tbody>{wallet.map(idea)}</tbody></table></details>}
+    {t.orders.length > 0 && <details><summary className="small">Recent orders</summary><table className="tbl small"><tbody>{t.orders.map((o, k) => <tr key={k}><td>{o.ts ? fmtDate(o.ts.slice(0, 10)) : ""}</td><td>{o.side} {+o.quantity.toFixed(4)} <b>{o.symbol}</b>{o.price ? ` @ ${money(o.price)}` : ""}</td><td>{o.status}</td><td className="hint">{o.reason}</td></tr>)}</tbody></table></details>}
+    {t.lastSession && <div className="hint">Last session {t.lastSession.day} {t.lastSession.slot} ({t.lastSession.mode}, {t.lastSession.status}): {t.lastSession.summary}</div>}
+    <div className="hint">From Coinpile, read only. Steer it, approve orders and edit its rules in {link ? <a href={link} target="_blank" rel="noreferrer">Coinpile → Trading</a> : "Coinpile → Trading"}. Click a stock for its news.</div>
+    {open && <TickerNews symbol={open} coverage={cov ? { on: cov.on !== false, label: cov.label || "Ground News", template: cov.template || "https://ground.news/search?query={q}" } : undefined} onClose={() => setOpen("")} />}
+  </div>;
+}
+
 export const PicksPage: PageDef = {
   id: "picks", label: "Picks", title: "Augury", flavor: "Daily research, a verdict per stock, your call, and what came of it.",
   usePanels: () => {
@@ -226,6 +264,7 @@ export const PicksPage: PageDef = {
       { key: "history", title: "History", node: <History />, w: 12, h: 10 },
       { key: "account", title: "Robinhood agentic account", node: <Account />, w: 5, h: 7 },
       { key: "ideas", title: "Decision ideas", node: <Ideas />, w: 12, h: 18 },
+      { key: "autowallet", title: "Auto wallet & trade ideas (Coinpile)", node: <AutoWallet />, w: 12, h: 16 },
       { key: "holdings", title: "What you hold", node: <HoldingsPanel />, w: 12, h: 14 },
     ];
     return { panels: [...own, ...apps], defaults: own.map(p => p.key) };
