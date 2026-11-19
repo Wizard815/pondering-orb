@@ -8,7 +8,7 @@ export interface OrbConfig {
   logMax: number;
   golem: { baseUrl: string; model: string; keyEnv: string; canWrite: boolean };
   upstream: { baseUrl: string; headerEnv?: string };
-  uptime: { baseUrl: string; statusPage: string };
+  uptime: { baseUrl: string; statusPage: string; userEnv: string; passwordEnv: string };
   system: { proc: string; docker: string; disks: string[] };
   caldav: { url: string; userEnv: string; passwordEnv: string; choresList: string };
   wiki: { baseUrl: string; tokenEnv: string; vault: string };
@@ -29,7 +29,7 @@ const DEFAULTS: OrbConfig = {
   logMax: 50,
   golem: { baseUrl: "http://argos:8080/v1", model: "", keyEnv: "", canWrite: true },
   upstream: { baseUrl: "" },
-  uptime: { baseUrl: "", statusPage: "orb" },
+  uptime: { baseUrl: "", statusPage: "orb", userEnv: "UPTIME_KUMA_USER", passwordEnv: "UPTIME_KUMA_PASSWORD" },
   system: { proc: "/proc", docker: "", disks: ["/"] },
   caldav: { url: "", userEnv: "CALDAV_USER", passwordEnv: "CALDAV_PASSWORD", choresList: "Chores" },
   wiki: { baseUrl: "http://llmwiki:27123", tokenEnv: "WIKI_API_KEY", vault: "/vault" },

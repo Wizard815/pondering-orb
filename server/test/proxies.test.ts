@@ -19,6 +19,9 @@ test("TestProxies_NginxConfigs", () => {
   assert.deepEqual(parseNginx(swag, "thefellashub.com"), [{ names: ["sonarr.thefellashub.com"], https: true, host: "sonarr", port: 8989, via: "nginx" }]);
   assert.deepEqual(parseNginx(plain), [{ names: ["plex.example.com"], https: false, host: "192.168.20.5", port: 32400, via: "nginx" }]);
   assert.deepEqual(parseNginx(swag), [], "app.* needs the domain");
+  // Nginx Proxy Manager's proxy_host/*.conf: quoted $server, proxy_pass hidden in an include
+  const npm = `server {\n  set $forward_scheme http;\n  set $server "Tachidesk-Docker";\n  set $port 4567;\n  listen 80;\n  listen 443 ssl;\n  server_name manga.example.com;\n  location / { include conf.d/include/proxy.conf; }\n}`;
+  assert.deepEqual(parseNginx(npm), [{ names: ["manga.example.com"], https: true, host: "tachidesk-docker", port: 4567, via: "nginx" }]);
 });
 
 test("TestProxies_LinksUseProxyThenDnsThenLanAddress", async () => {

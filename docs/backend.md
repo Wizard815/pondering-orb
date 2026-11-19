@@ -395,6 +395,30 @@ UpstreamManager can track it).
 - The Uptime tab shows groups, heartbeat bars and 24-hour uptime; a compact
   version is a Main panel.
 
+### Watching new sites (Settings → Scripts)
+
+The script *Watch new sites in Uptime Kuma* is the one place Orb writes to
+Uptime Kuma. Run it from Settings → Scripts, or turn it on with a cron
+schedule (default `*/15 * * * *`, in the `TZ` time zone). Each run:
+
+- reads the reverse proxy's sites, the same ones the Links page uses (Nginx
+  Proxy Manager's proxy hosts and the nginx config folder);
+- signs in to Uptime Kuma's Socket.IO API with `UPTIME_KUMA_USER` and
+  `UPTIME_KUMA_PASSWORD` (Kuma 1.x has no REST API for monitors);
+- adds an HTTP monitor for every site no monitor already checks (matched by
+  URL; `https` when the proxy serves TLS; 2xx, 3xx, 401 and 403 count as up);
+- puts the new monitors on the status page Orb reads, making it if missing;
+- pauses monitors it added itself (their description says so) once their site
+  is gone, and resumes them if it comes back. Monitors you made are never
+  touched.
+
+Names in the script's *Never watch* box are skipped. The last 20 runs, with
+what each one changed, are kept and shown under the script. Scripts are
+built into Orb: the web page can turn them on, schedule and run them, but
+can't add commands. Only a signed-in person can run one
+(`POST /api/scripts/:id/run`); `GET /api/scripts` lists them with their
+schedule, next run and recent runs.
+
 ## System (btop style)
 
 btop is a terminal app (C++, Apache-2.0), so its code can't run in a web

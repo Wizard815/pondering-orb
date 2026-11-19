@@ -48,12 +48,14 @@ export function parseNginx(text: string, domain = ""): Route[] {
       .map(n => (n.endsWith(".*") && domain ? n.slice(0, -1) + domain.replace(/^\./, "") : n)).filter(n => /^[a-z0-9.-]+\.[a-z0-9-]+$/.test(n));
     if (!names.length) continue;
     const https = /\blisten\s+[^;]*\b443\b[^;]*;/.test(block) || /\blisten\s+[^;]*\bssl\b/.test(block);
-    const set = (k: string) => new RegExp(`\\bset\\s+\\$${k}\\s+([^;\\s]+)\\s*;`).exec(block)?.[1] || "";
+    const set = (k: string) => (new RegExp(`\\bset\\s+\\$${k}\\s+([^;\\s]+)\\s*;`).exec(block)?.[1] || "").replace(/^["']|["']$/g, "");
     let host = "", port = 0;
     const pp = /\bproxy_pass\s+([^;]+);/.exec(block)?.[1]?.trim() || "";
     const direct = /^https?:\/\/([^/:$]+):(\d+)/.exec(pp);
     if (direct) { host = direct[1]; port = Number(direct[2]); }
     else if (set("upstream_app")) { host = set("upstream_app"); port = Number(set("upstream_port")) || 0; }
+    // Nginx Proxy Manager: set $server "app"; set $port 1234; (proxy_pass sits in an include)
+    else if (set("server")) { host = set("server"); port = Number(set("port")) || 0; }
     if (host && port) out.push({ names, https, host: host.toLowerCase(), port, via: "nginx" });
   }
   return out;
