@@ -17,12 +17,16 @@ test("TestStocks_HoldingsNewsAndFeeds", async () => {
     if (u.pathname.startsWith("/chart/")) { const ts = [0, 1, 2].map(k => Math.floor(Date.now() / 1000) - (2 - k) * 86400); return J(res, { chart: { result: [{ meta: { shortName: "Acme Corp", regularMarketPrice: 25, chartPreviousClose: 24, regularMarketTime: ts[2] }, timestamp: ts, indicators: { quote: [{ close: [23, 24, 25] }] } }] } }); }
     if (u.pathname === "/news") { res.writeHead(200, { "content-type": "application/rss+xml" }); return res.end(`<rss><channel><title>GN</title><item><title>Acme beats estimates</title><link>https://example.com/a</link><pubDate>${new Date().toUTCString()}</pubDate></item><item><title>Acme faces lawsuit</title><link>https://example.com/b</link><pubDate>${new Date().toUTCString()}</pubDate></item></channel></rss>`); }
     if (u.pathname === "/feed/world") { res.writeHead(200, { "content-type": "application/rss+xml" }); return res.end(`<rss><channel><title>World Desk</title><link>https://world.example.com/</link><item><title>Headline one</title><link>https://world.example.com/1</link></item></channel></rss>`); }
-    if (u.pathname === "/cp/api/v1/summary") return J(res, { goblins: { me: shareHoldings ? { holdings: [{ symbol: "ACME", quantity: 10, net_cost: 200, equity: 240, account: "rh:main" }, { symbol: "acme", quantity: 5, net_cost: 100, equity: 120, account: "rh:agent" }, { symbol: "<bad>", quantity: 1 }] } : {} } });
+    if (u.pathname === "/cp/api/v1/summary") return J(res, { goblins: { me: shareHoldings ? { holdings: [{ symbol: "ACME", quantity: 10, net_cost: 200, equity: 240, account: "rh:main" }, { symbol: "acme", quantity: 5, net_cost: 100, equity: 120, account: "rh:agent" }, { symbol: "<bad>", quantity: 1 }], ...(shareTrading ? { trading: TRADING } : {}) } : {} } });
     if (u.pathname === "/v1/chat/completions") { const m = JSON.parse(body).messages; assert.match(m[1].content, /Stock: ACME/);
       return J(res, { choices: [{ message: { content: JSON.stringify({ items: [{ n: 1, rating: "good", why: "Beat" }, { n: 2, rating: "bad", why: "Legal risk" }, { n: 9, rating: "good" }], overall: "mixed", summary: "Beat, but a lawsuit." }) } }] }); }
     res.writeHead(404); res.end();
   });
-  let shareHoldings = false;
+  let shareHoldings = false, shareTrading = false;
+  const TRADING = { enabled: true, wallet: "paper", value: 1012.5, cash: 900, start_of_day: 1000, stopped: null, next_session: "2026-11-20T09:45-05:00", running: false, waiting: 1,
+    positions: [{ symbol: "nvda", quantity: 2, price: 56.25, value: 112.5 }], last_session: { day: "2026-11-19", slot: "15:30", mode: "auto", status: "done", summary: "1 order(s) done.", finished: "x" },
+    orders: [{ ts: "2026-11-19T20:31:00+00:00", symbol: "NVDA", side: "buy", quantity: 2, price: 50, status: "filled", reason: "", rating: "Buy" }, { symbol: "<x>", side: "buy" }],
+    ideas: [{ account: "main", symbol: "ACME", rating: "Underweight", action: "trim", summary: "Margins slipping.", ts: "2026-11-19T20:31:00+00:00" }, { account: "agent", symbol: "NVDA", rating: "Buy", action: "add" }] };
   const saved = { ...sources };
   Object.assign(sources, { yahoo: `${fake.url}/chart`, tiingo: `${fake.url}/none`, stooq: `${fake.url}/none`, googleNews: `${fake.url}/news` });
   clearDailyCache();
@@ -38,6 +42,14 @@ test("TestStocks_HoldingsNewsAndFeeds", async () => {
     const h = (await app.inject({ method: "GET", url: "/api/holdings", cookies: cookie })).json();
     assert.equal(h.source, "coinpile"); assert.equal(h.positions.length, 1, "one line per symbol, bad symbols dropped");
     const p = h.positions[0]; assert.deepEqual([p.symbol, p.shares, p.cost, p.avgCost, p.price, p.value, p.unrealized, p.account], ["ACME", 15, 300, 20, 25, 375, 75, "several"]);
+    // Coinpile's auto wallet, read only, once Coinpile shares it
+    assert.match((await app.inject({ method: "GET", url: "/api/trading", cookies: cookie })).json().note, /isn't sharing trading/);
+    shareTrading = true; clearCoinpileCache();
+    const tr = (await app.inject({ method: "GET", url: "/api/trading", cookies: cookie })).json();
+    assert.equal(tr.url, `${fake.url}/cp`); assert.equal(tr.trading.value, 1012.5); assert.equal(tr.trading.waiting, 1);
+    assert.deepEqual(tr.trading.positions[0], { symbol: "NVDA", quantity: 2, price: 56.25, value: 112.5 });
+    assert.equal(tr.trading.orders.length, 1, "an order without a proper symbol is dropped");
+    assert.deepEqual(tr.trading.ideas.map((i: any) => [i.account, i.symbol, i.action]), [["main", "ACME", "trim"], ["agent", "NVDA", "add"]]);
     assert.equal((await app.inject({ method: "POST", url: "/api/robinhood/csv", cookies: cookie, headers: { "content-type": "text/csv" }, payload: "a,b" })).statusCode, 404, "Robinhood history is Coinpile's now");
     const n = (await app.inject({ method: "GET", url: "/api/market/news/acme", cookies: cookie })).json();
     assert.equal(n.symbol, "ACME"); assert.equal(n.price, 25); assert.equal(n.position.shares, 15);

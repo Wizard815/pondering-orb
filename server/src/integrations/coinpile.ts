@@ -44,8 +44,36 @@ export type CpSummary = {
   daily: { date: string; spent: number; income: number }[] | null;
   /** Stocks you hold (Coinpile reads them from Robinhood: its activity CSV, MCP or connector), when Coinpile shares them. */
   holdings: { symbol: string; quantity: number; netCost: number | null; equity: number | null; account: string }[] | null;
+  /** Coinpile's auto wallet and its ideas (Coinpile → Trading), when shared. Read only: approving, guidance and rules stay in Coinpile. */
+  trading: CpTrading | null;
   at: number;
 };
+
+export type CpTrading = {
+  enabled: boolean; wallet: "paper" | "live"; value: number | null; cash: number | null; startOfDay: number | null; stopped: string | null; nextSession: string | null;
+  running: boolean; waiting: number;
+  positions: { symbol: string; quantity: number; price: number | null; value: number | null }[];
+  lastSession: { day: string; slot: string; mode: string; status: string; summary: string; finished: string } | null;
+  orders: { ts: string; symbol: string; side: string; quantity: number; price: number | null; status: string; reason: string; rating: string }[];
+  ideas: { account: "main" | "agent"; symbol: string; rating: string; action: string; summary: string; ts: string }[];
+};
+const str = (v: unknown, n = 300) => String(v ?? "").slice(0, n);
+const sym = (v: unknown) => { const x = str(v, 12).toUpperCase(); return /^[A-Z0-9.^=-]{1,12}$/.test(x) ? x : ""; };
+function parseTrading(t: any): CpTrading | null {
+  if (!t || typeof t !== "object" || Array.isArray(t)) return null;
+  const num = (v: any) => (v == null || !Number.isFinite(Number(v)) ? null : Number(v));
+  const ls = t.last_session && typeof t.last_session === "object" ? t.last_session : null;
+  return {
+    enabled: t.enabled === true, wallet: t.wallet === "live" ? "live" : "paper", value: num(t.value), cash: num(t.cash), startOfDay: num(t.start_of_day),
+    stopped: t.stopped ? str(t.stopped) : null, nextSession: t.next_session ? str(t.next_session, 40) : null, running: t.running === true, waiting: Number(t.waiting) || 0,
+    positions: (Array.isArray(t.positions) ? t.positions : []).slice(0, 100).map((p: any) => ({ symbol: sym(p?.symbol), quantity: Number(p?.quantity) || 0, price: num(p?.price), value: num(p?.value) })).filter((p: any) => p.symbol),
+    lastSession: ls ? { day: str(ls.day, 10), slot: str(ls.slot, 8), mode: str(ls.mode, 10), status: str(ls.status, 12), summary: str(ls.summary, 2000), finished: str(ls.finished, 40) } : null,
+    orders: (Array.isArray(t.orders) ? t.orders : []).slice(0, 30).map((o: any) => ({ ts: str(o?.ts, 40), symbol: sym(o?.symbol), side: o?.side === "sell" ? "sell" : "buy", quantity: Number(o?.quantity) || 0,
+      price: num(o?.price), status: str(o?.status, 12), reason: str(o?.reason), rating: str(o?.rating, 16) })).filter((o: any) => o.symbol),
+    ideas: (Array.isArray(t.ideas) ? t.ideas : []).slice(0, 60).map((i: any) => ({ account: i?.account === "agent" ? "agent" : "main", symbol: sym(i?.symbol), rating: str(i?.rating, 16), action: str(i?.action, 40),
+      summary: str(i?.summary, 1500), ts: str(i?.ts, 40) })).filter((i: any) => i.symbol),
+  } as CpTrading;
+}
 
 async function get(c: Companion, path: string) {
   const base = trimSlash(c.url); if (!base) throw new HttpError(400, `${c.name} has no url in the apps YAML.`);
@@ -96,6 +124,7 @@ export async function cpSummary(c: Companion): Promise<CpSummary> {
     alertList, maturities: (alertList || []).filter(a => (a.kind === "maturing" || a.kind === "matured_idle") && a.date).sort((x, y) => x.date.localeCompare(y.date)),
     holdings: Array.isArray(g.holdings ?? g.positions) ? (g.holdings ?? g.positions).slice(0, 300).map((h: any) => ({ symbol: String(h?.symbol || "").toUpperCase().slice(0, 12), quantity: Number(h?.quantity ?? h?.shares) || 0,
       netCost: num(h?.net_cost ?? h?.cost), equity: num(h?.equity ?? h?.value), account: String(h?.account || "") })).filter((h: any) => /^[A-Z0-9.^=-]{1,12}$/.test(h.symbol) && h.quantity > 0) : null,
+    trading: parseTrading(g.trading),
     daily: Array.isArray(g.daily) ? g.daily.filter((d: any) => isDay(d?.date)).sort((a: any, b: any) => String(b.date).localeCompare(String(a.date))).slice(0, 400).map((d: any) => ({ date: String(d.date), spent: Math.abs(Number(d.spent) || 0), income: Number(d.income) || 0 })) : null,
     at: Date.now(),
   };

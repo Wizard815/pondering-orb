@@ -82,5 +82,13 @@ export function stocksApi(app: FastifyInstance, deps: { records: Records; cfg: (
     return { source: "coinpile", note: "", positions: positions.sort((a, b) => (b.value ?? 0) - (a.value ?? 0)), totals: { value: sum(p => p.value), cost: sum(p => p.cost), unrealized: sum(p => p.unrealized) } };
   });
 
+  /** Coinpile's auto wallet and its ideas (Coinpile → Trading), read only. */
+  app.get("/api/trading", { preHandler: guard }, async () => {
+    const cp = companion(appsYaml(), "coinpile");
+    if (!cp) return { trading: null, url: "", note: "Add Coinpile in Settings → Apps to see its trading." };
+    let s; try { s = await cpSummary(cp); } catch (e: any) { return { trading: null, url: cp.url, note: e.message }; }
+    return { trading: s.trading, url: cp.url, note: s.trading ? "" : "Coinpile isn't sharing trading with the Orb (Coinpile → Settings → Home Assistant & API → Trading; only the Robinhood owner has it)." };
+  });
+
   return { positionOf };
 }
