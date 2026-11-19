@@ -58,7 +58,8 @@ export async function buildApp(o: AppOptions = {}) {
       ...base, logMax: Math.max(20, Math.min(200, Number(s.logMax) || base.logMax || 50)),
       golem: { ...base.golem, ...envSafe(s.golem) },
       upstream: { ...base.upstream, ...envSafe(c.upstream) },
-      uptime: { ...base.uptime, ...envSafe(c.uptime) },
+      // Monitors you ignore on the Uptime page (names): still shown, never counted as down or alerted.
+      uptime: { ...base.uptime, ...envSafe(c.uptime), ignore: Array.isArray(s.uptimeIgnore) ? s.uptimeIgnore.map(String) : [] },
       caldav: { ...base.caldav, ...envSafe(c.caldav) },
       // The vault mount path is fixed by orb.yaml / compose, never by settings.
       wiki: { ...base.wiki, ...envSafe(c.wiki), vault: base.wiki.vault },
@@ -344,7 +345,7 @@ export async function buildApp(o: AppOptions = {}) {
     return suggestions((await linkApps()).apps, ctx.server, (conn, field) => String(c[conn]?.[field] || ""));
   });
 
-  app.get("/api/uptime", { preHandler: guard }, async () => uptime(cfg().uptime.baseUrl, cfg().uptime.statusPage));
+  app.get("/api/uptime", { preHandler: guard }, async () => uptime(cfg().uptime.baseUrl, cfg().uptime.statusPage, cfg().uptime.ignore));
 
   // ---- scripts (Settings → Scripts): built-in jobs, run by hand or on a cron ----
   const scripts = new Scripts(store, [{

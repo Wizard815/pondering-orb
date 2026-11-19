@@ -114,7 +114,7 @@ export function journalApi(app: FastifyInstance, deps: {
     const alerts: AutoLog["alerts"] = [];
     if (isToday) {
       if (cp) for (const a of (await safe("Coinpile alerts", async () => (await cpSummary(cp)).alertList || [], [] as any[]))) if (a.severity !== "info") alerts.push({ source: "Coinpile", severity: a.severity, title: a.title, detail: a.detail });
-      if (c.uptime.baseUrl) for (const m of (await safe("Uptime", async () => (await uptime(c.uptime.baseUrl, c.uptime.statusPage)).monitors, [] as any[]))) if (m.status === "down") alerts.push({ source: "Uptime", severity: "critical", title: `${m.name} is down`, detail: m.group });
+      if (c.uptime.baseUrl) for (const m of (await safe("Uptime", async () => (await uptime(c.uptime.baseUrl, c.uptime.statusPage, c.uptime.ignore)).monitors, [] as any[]))) if (m.status === "down" && !m.ignored) alerts.push({ source: "Uptime", severity: "critical", title: `${m.name} is down`, detail: m.group });
       for (const a of records.list("approvals") as any[]) if (a.state === "pending") alerts.push({ source: "Hermes Studio", severity: "warning", title: `Awaiting approval: ${a.title}`, detail: a.summary || "" });
       for (const o of deps.outbox.list()) alerts.push({ source: "Sync", severity: "warning", title: `Waiting to sync: ${o.label}`, detail: o.lastError || "" });
       const r: any = records.get("research", day); if (r?.status === "failed") alerts.push({ source: "Picks", severity: "warning", title: "Stock research failed", detail: r.error || "" });

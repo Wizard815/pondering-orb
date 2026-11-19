@@ -26,7 +26,7 @@ function TopPriority() {
 function UptimeMini() {
   const { data, error } = useFetch<{ monitors: any[] }>("/api/uptime", 60000);
   if (error) return <div className="empty">{error}</div>;
-  const ms = data?.monitors || [], down = ms.filter(m => m.status === "down");
+  const ms = (data?.monitors || []).filter(m => !m.ignored), down = ms.filter(m => m.status === "down");
   return <><div className="row"><span className="pill ok"><i />{ms.filter(m => m.status === "up").length} up</span>{down.length > 0 && <span className="pill bad"><i />{down.length} down</span>}</div>
     <div className="mons">{[...down, ...ms.filter(m => m.status !== "down")].slice(0, 6).map(m => <div key={m.id} className={"mon " + m.status}><span className="dot" /><span className="grow">{m.name}</span><span className="mono small">{m.uptime24 != null ? m.uptime24 + "%" : ""}</span></div>)}</div></>;
 }

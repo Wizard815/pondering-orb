@@ -8,7 +8,7 @@ export interface OrbConfig {
   logMax: number;
   golem: { baseUrl: string; model: string; keyEnv: string; canWrite: boolean };
   upstream: { baseUrl: string; headerEnv?: string };
-  uptime: { baseUrl: string; statusPage: string; userEnv: string; passwordEnv: string };
+  uptime: { baseUrl: string; statusPage: string; userEnv: string; passwordEnv: string; ignore?: string[] };
   system: { proc: string; docker: string; disks: string[] };
   caldav: { url: string; userEnv: string; passwordEnv: string; choresList: string };
   wiki: { baseUrl: string; tokenEnv: string; vault: string };
