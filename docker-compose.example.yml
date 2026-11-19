@@ -44,6 +44,8 @@ services:
       ALLGLANCE_URL: ${ALLGLANCE_URL:-}              # the gateway; also serves vikunja's CalDAV at /dav
       UPSTREAM_URL: ${UPSTREAM_URL:-}
       UPTIME_URL: ${UPTIME_URL:-}
+      UPTIME_KUMA_USER: ${UPTIME_KUMA_USER:-}        # an Uptime Kuma admin, only for Settings → Scripts → Watch new sites
+      UPTIME_KUMA_PASSWORD: ${UPTIME_KUMA_PASSWORD:-}
       HERMES_URL: ${HERMES_URL:-}
       HERMES_PUBLIC_URL: ${HERMES_PUBLIC_URL:-}      # Studio in your browser (Agents tab links); defaults to HERMES_URL
       ARGOS_URL: ${ARGOS_URL:-}                      # Golem's local model (OpenAI-compatible /v1)
@@ -101,7 +103,7 @@ services:
     profiles: [uptime]
     restart: unless-stopped
     ports:
-      - "3001:3001"
+      - "${UPTIME_PORT:-3001}:3001"                    # change UPTIME_PORT if 3001 is taken on the host
     environment:
       TZ: ${TZ:-UTC}
     volumes:

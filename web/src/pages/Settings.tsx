@@ -12,7 +12,7 @@ import { useAllPages, usePageSetup, pageMode } from "./index";
 
 const CONNS: { id: string; name: string; fields: [string, string][]; note?: string }[] = [
   { id: "upstream", name: "UpstreamManager", fields: [["baseUrl", "Base URL (on its own computer, e.g. http://192.168.1.20:5000)"]], note: "Start it there with HOST=0.0.0.0 and allow only this server in its firewall." },
-  { id: "uptime", name: "Uptime Kuma", fields: [["baseUrl", "Base URL"], ["statusPage", "Status page slug"]] },
+  { id: "uptime", name: "Uptime Kuma", fields: [["baseUrl", "Base URL"], ["statusPage", "Status page slug"], ["userEnv", "Admin user variable (for Scripts)"], ["passwordEnv", "Admin password variable (for Scripts)"]], note: "Orb reads the published status page. The admin login is only used by the Watch new sites script." },
   { id: "caldav", name: "CalDAV tasks", fields: [["url", "CalDAV URL (empty: the ALLGlance gateway's /dav/)"], ["userEnv", "User variable"], ["passwordEnv", "Password variable"], ["choresList", "List that holds chores"]] },
   { id: "wiki", name: "LLMWIKI", fields: [["baseUrl", "REST API URL"], ["tokenEnv", "API key variable"], ["vault", "Vault folder in the container (read only)"]] },
   { id: "allglance", name: "ALLGlance gateway", fields: [["baseUrl", "Base URL (e.g. http://allglance-gateway:8090)"], ["tokenEnv", "Token variable (same value as GATEWAY_TOKEN)"]], note: "Brings in dayGLANCE's day plan and inbox, lastGLANCE chores and lifeGLANCE milestones. vikunja tasks still come over CalDAV." },
@@ -37,6 +37,34 @@ function Connections() {
       <div className="row"><button className="btn primary" type="submit">Save</button><button className="btn" type="button" onClick={async () => { setRes({ ...res, [c.id]: { ok: true, detail: "Testing…" } }); try { setRes({ ...res, [c.id]: await post(`/api/connections/test/${c.id}`) }); } catch (x: any) { setRes({ ...res, [c.id]: { ok: false, detail: x.message } }); } }}>Test</button></div>
       {res[c.id] && <div className={res[c.id].ok ? "okmsg" : "err-inline"}>{res[c.id].detail}</div>}
     </form>)}</div></>;
+}
+
+type ScriptRow = { id: string; name: string; description: string; options: { key: string; label: string; placeholder?: string }[]; on: boolean; cron: string; defaultCron: string; values: Record<string, string>;
+  cronOk: boolean; next: string | null; running: boolean; runs: { at: string; ok: boolean; by: string; summary: string; details: string[]; ms: number }[] };
+const when = (iso: string) => new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+
+/** Built-in jobs: run now, or turn on and give a cron schedule. */
+function ScriptsSettings() {
+  const ui = useUi(), s = useSettings(), { data, error, reload } = useFetch<ScriptRow[]>("/api/scripts", 30000), [busy, setBusy] = useState("");
+  if (error) return <div className="err-inline small">{error}</div>;
+  if (!data) return <div className="hint">Loading scripts…</div>;
+  const save = (id: string, v: Record<string, any>) => saveSettings({ scripts: { ...(s.scripts || {}), [id]: { ...(s.scripts?.[id] || {}), ...v } } }).then(reload);
+  return <><p className="hint" style={{ margin: 0 }}>Jobs built into Orb. Run one now, or turn it on to run on its schedule. Schedules are cron: minute hour day month weekday, in the {getZone() || "server's"} time zone (<code>*/15 * * * *</code> is every 15 minutes, <code>0 6 * * 1-5</code> is 6:00 on weekdays).</p>
+    {data.map(x => <form key={x.id + JSON.stringify(s.scripts?.[x.id] || {})} className="editor" style={{ borderTop: "1px solid var(--line)", paddingTop: 8 }} onSubmit={e => { e.preventDefault(); const f = new FormData(e.currentTarget);
+        const cron = String(f.get("cron") || "").trim() || x.defaultCron;
+        save(x.id, { on: !!f.get("on"), cron, options: Object.fromEntries(x.options.map(o => [o.key, String(f.get("opt_" + o.key) || "").trim()])) }).then(() => ui.status(`${x.name} saved.`)).catch(ui.error); }}>
+      <h4 className="group-name" style={{ margin: 0 }}>{x.name}</h4>
+      <div className="hint">{x.description}</div>
+      <div className="row"><label className="small row" style={{ gap: 4 }}><input type="checkbox" name="on" defaultChecked={x.on} /> Run on schedule</label>
+        <input type="text" name="cron" className="mono" defaultValue={x.cron} placeholder={x.defaultCron} aria-label="Cron schedule" style={{ width: "11em" }} />
+        {!x.cronOk ? <span className="err-inline">That schedule isn't valid cron.</span> : x.next && <span className="hint">next {when(x.next)}</span>}</div>
+      {x.options.map(o => <label key={o.key} className="small">{o.label}<input type="text" name={"opt_" + o.key} defaultValue={x.values[o.key] || ""} placeholder={o.placeholder} /></label>)}
+      <div className="row"><button className="btn primary" type="submit">Save</button>
+        <button className="btn" type="button" disabled={x.running || busy === x.id} onClick={async () => { setBusy(x.id); try { const r = await post<ScriptRow["runs"][number]>(`/api/scripts/${x.id}/run`); (r.ok ? ui.status : ui.error)(r.summary); } catch (e) { ui.error(e); } finally { setBusy(""); reload(); } }}>{x.running || busy === x.id ? "Running…" : "Run now"}</button></div>
+      {x.runs.length > 0 && <ul className="list small">{x.runs.slice(0, 5).map((r, i) => <li key={i}><span className={"pill " + (r.ok ? "ok" : "bad")}><i />{r.ok ? "ok" : "failed"}</span>
+        <div className="grow"><span className="hint">{when(r.at)} · {r.by === "cron" ? "on schedule" : "by you"}</span> {r.summary}
+          {r.details.length > 0 && <details><summary className="hint">{r.details.length} changes</summary><ul className="mono small">{r.details.map((d, j) => <li key={j}>{d}</li>)}</ul></details>}</div></li>)}</ul>}
+    </form>)}</>;
 }
 
 /** Containers on the server that look like apps Orb connects to, for connections that are still empty. */
@@ -113,7 +141,7 @@ function MainLists() {
 }
 
 export const SettingsPage: PageDef = {
-  id: "config", label: "Settings", title: "Sanctum", flavor: "Golem, connections, appearance, logs and apps.",
+  id: "config", label: "Settings", title: "Sanctum", flavor: "Golem, connections, scripts, appearance, logs and apps.",
   usePanels: () => {
     const s = useSettings(), ui = useUi();
     return { panels: [
@@ -122,6 +150,7 @@ export const SettingsPage: PageDef = {
       { key: "pages", title: "Pages", node: <PagesSetting />, w: 6, h: 17 },
       { key: "connections", title: "Connections", node: <Connections />, w: 12, h: 12 },
       { key: "suggested", title: "Found on your server", node: <Suggested />, w: 6, h: 8 },
+      { key: "scripts", title: "Scripts", node: <ScriptsSettings />, w: 6, h: 12 },
       { key: "logs", title: "Logs", node: <form className="setting" onSubmit={e => { e.preventDefault(); const v = Number(new FormData(e.currentTarget).get("logmax")); saveSettings({ logMax: Math.max(20, Math.min(200, v || 50)) }).then(() => ui.status("Log length saved.")).catch(ui.error); }}>
           <div><label htmlFor="logmax">Log entry length</label><div className="d">Most characters in one entry, for you, Golem and agents. 20 to 200.</div></div>
           <div className="row"><input type="number" id="logmax" name="logmax" min={20} max={200} defaultValue={s.logMax || 50} key={s.logMax} /><button className="btn" type="submit">Save</button></div>

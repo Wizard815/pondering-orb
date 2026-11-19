@@ -29,7 +29,7 @@ layout**. Drag a tab onto another to show two pages side by side.
 | **Upkeep** | UpstreamManager's repos, approval requests and daily check, and your chores |
 | **Uptime** | Monitors from an Uptime Kuma status page |
 | **System** | btop-style cores, memory, disks and containers (with CPU and memory), or real btop |
-| **Settings** | Connections, Golem, appearance and themes, which pages show, Daily page, stock picks, Robinhood, apps YAML, what's waiting to sync |
+| **Settings** | Connections, Golem, scripts (built-in jobs run by hand or on a cron schedule), appearance and themes, which pages show, Daily page, stock picks, Robinhood, apps YAML, what's waiting to sync |
 
 Pages that need an app you haven't set up stay out of the tabs: Agents (Hermes
 Studio), Wiki (the vault mount or its REST key), Upkeep (UpstreamManager, or
@@ -113,6 +113,7 @@ Start from [`.env.example`](.env.example). Values here never reach the browser.
 | `MILACLONE_URL` | Milaclone's address as your browser reaches it, for the Ideas tab |
 | `UNRAID_URL`, `UNRAID_TOKEN`, `UNRAID_LINK_HOST` | The Unraid Management Agent (`http://tower:8043`), its API token, and optionally the address app links use |
 | `ALLGLANCE_URL`, `UPSTREAM_URL`, `UPTIME_URL`, `HERMES_URL`, `HERMES_PUBLIC_URL`, `ARGOS_URL`, `WIKI_URL` | Addresses of your apps. Empty means not used. Use a container name if Orb shares the app's network, else `http://<host>:<port>`. |
+| `UPTIME_KUMA_USER`, `UPTIME_KUMA_PASSWORD`, `UPTIME_PORT` | An Uptime Kuma admin login, used only by Settings → Scripts → *Watch new sites in Uptime Kuma*, and the bundled Uptime Kuma's host port (default 3001) |
 | `LLMWIKI_VAULT` | The vault folder on this host, mounted read only |
 | `CALDAV_USER`, `CALDAV_PASSWORD` | Your CalDAV login; with ALLGlance, your vikunja login |
 | `ALLGLANCE_TOKEN` | The gateway's `GATEWAY_TOKEN` |

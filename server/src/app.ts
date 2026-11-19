@@ -11,6 +11,8 @@ import { Auth } from "./auth.js";
 import { OrbConfig, loadConfig, secret, envSafe } from "./config.js";
 import { Upstream } from "./integrations/upstream.js";
 import { uptime } from "./integrations/uptime.js";
+import { syncKuma, sitesFrom } from "./integrations/kumasync.js";
+import { Scripts, type ScriptSetting } from "./scripts.js";
 import { hostStats, containers } from "./integrations/system.js";
 import { chat, chatStream, Msg, Tool } from "./integrations/llm.js";
 import { widgetsFrom, widgetData } from "./integrations/widgets.js";
@@ -343,6 +345,29 @@ export async function buildApp(o: AppOptions = {}) {
   });
 
   app.get("/api/uptime", { preHandler: guard }, async () => uptime(cfg().uptime.baseUrl, cfg().uptime.statusPage));
+
+  // ---- scripts (Settings → Scripts): built-in jobs, run by hand or on a cron ----
+  const scripts = new Scripts(store, [{
+    id: "uptime-sync", name: "Watch new sites in Uptime Kuma",
+    description: "Adds an Uptime Kuma monitor for every site your reverse proxy serves (Nginx Proxy Manager or nginx files) that isn't watched yet, and puts it on Orb's status page. Monitors it added for sites that are gone get paused, not deleted.",
+    defaultCron: "*/15 * * * *",
+    options: [{ key: "skip", label: "Never watch (names, comma separated)", placeholder: "e.g. guac, test.example.com" }],
+    run: async opts => {
+      ctxCache = null; // read the proxy fresh
+      const c = cfg(), ctx = await linkContext(), sites = sitesFrom(ctx.routes, String(opts.skip || "").split(/[\s,]+/));
+      if (!sites.length) throw new Error(`Found no proxied sites${ctx.notes.length ? ` (${ctx.notes.join("; ")})` : ". Connect Nginx Proxy Manager or the nginx configs in Connections"}.`);
+      const r = await syncKuma({ base: c.uptime.baseUrl, user: secret(c.uptime.userEnv), password: secret(c.uptime.passwordEnv), slug: c.uptime.statusPage || "orb", sites });
+      const bits = [r.added.length && `added ${r.added.length}`, r.paused.length && `paused ${r.paused.length}`, r.resumed.length && `resumed ${r.resumed.length}`].filter(Boolean);
+      return { summary: `${bits.length ? bits.join(", ").replace(/^./, x => x.toUpperCase()) + "; " : "Nothing new; "}${r.kept} of ${sites.length} sites already watched.`,
+        details: [...r.added.map(n => `added ${n}`), ...r.paused.map(n => `paused ${n} (no longer proxied)`), ...r.resumed.map(n => `resumed ${n}`), ...ctx.notes] };
+    },
+  }], () => ((store.get("settings", "app") as any)?.scripts || {}) as Record<string, ScriptSetting>, (msg, extra) => app.log.info(extra, msg));
+  app.get("/api/scripts", { preHandler: guard }, async () => scripts.list());
+  app.post("/api/scripts/:id/run", { preHandler: guard }, async (req: any) => {
+    if (who(req) !== "you") throw new HttpError(403, "Only a signed-in person can run scripts.");
+    if (!scripts.get(req.params.id)) throw new HttpError(404, "No such script.");
+    try { return await scripts.run(req.params.id, "you"); } catch (e: any) { throw new HttpError(409, e.message); }
+  });
   app.get("/api/system", { preHandler: guard }, async () => {
     const c = cfg().system;
     const stats = await hostStats(c.proc, c.disks);
@@ -522,7 +547,7 @@ export async function buildApp(o: AppOptions = {}) {
   app.get("/api/widgets/:name", { preHandler: guard }, async (req: any) => {
     const w = widgetsFrom(String((store.get("settings", "apps") as any)?.yaml || ""))[req.params.name];
     if (!w) throw new HttpError(404, `${req.params.name} has no widget in the apps YAML.`);
-    return widgetData(req.params.name, w);
+    return widgetData(req.params.name, w, store);
   });
 
   // ---- wiki related links (add only) ----
@@ -572,5 +597,5 @@ export async function buildApp(o: AppOptions = {}) {
     app.setNotFoundHandler((req, reply) => req.url.startsWith("/api/") || req.url.startsWith("/mcp") ? reply.code(404).send({ error: "Not found." }) : reply.sendFile("index.html"));
   }
 
-  return { app, records, store, auth, upstream, cfg, sync, outbox, writeDigest, daily, market, journal, reviews };
+  return { app, records, store, auth, upstream, cfg, sync, outbox, writeDigest, daily, market, journal, reviews, scripts };
 }
