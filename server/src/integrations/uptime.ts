@@ -1,10 +1,12 @@
 import { call, trimSlash } from "./http.js";
 import { HttpError } from "../records.js";
 
-export type Monitor = { id: number; name: string; group: string; status: "up" | "down" | "pending"; uptime24: number | null; ping: number | null; beats: number[] };
+export type Monitor = { id: number; name: string; group: string; status: "up" | "down" | "pending"; uptime24: number | null; ping: number | null; beats: number[]; ignored: boolean };
 
 /** Uptime Kuma's public status-page API (the page must be published). */
-export async function uptime(base: string, slug: string): Promise<{ monitors: Monitor[] }> {
+/** `ignore`: monitor names you don't want counted or alerted (still listed, marked ignored). */
+export async function uptime(base: string, slug: string, ignore: string[] = []): Promise<{ monitors: Monitor[] }> {
+  const skip = new Set(ignore.map(n => n.toLowerCase()));
   const b = trimSlash(base);
   if (!b) throw new HttpError(503, "Uptime Kuma isn't set up. Add its address in Settings → Connections.");
   const [page, hb] = await Promise.all([call(`${b}/api/status-page/${encodeURIComponent(slug)}`), call(`${b}/api/status-page/heartbeat/${encodeURIComponent(slug)}`)]);
@@ -17,7 +19,7 @@ export async function uptime(base: string, slug: string): Promise<{ monitors: Mo
       id: m.id, name: m.name, group: g.name || "Services",
       status: !last ? "pending" : last.status === 1 ? "up" : last.status === 0 ? "down" : "pending",
       uptime24: up[`${m.id}_24`] != null ? Math.round(up[`${m.id}_24`] * 1000) / 10 : null,
-      ping: last?.ping ?? null, beats: list.slice(-40).map(x => (x.status === 1 ? 1 : 0)),
+      ping: last?.ping ?? null, beats: list.slice(-40).map(x => (x.status === 1 ? 1 : 0)), ignored: skip.has(String(m.name).toLowerCase()),
     });
   }
   return { monitors };
