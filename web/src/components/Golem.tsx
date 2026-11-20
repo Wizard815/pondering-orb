@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Markdown } from "../lib/markdown";
 
-type M = { role: "user" | "assistant"; content: string; did?: string[] };
+/** notes: what Orb's own tools returned for that answer, sent back so follow-ups ("the first one") have the real ids. */
+type M = { role: "user" | "assistant"; content: string; did?: string[]; notes?: string };
 const load = (): M[] => { try { const v = JSON.parse(localStorage.getItem("orb.golem") || "[]"); return Array.isArray(v) ? v.slice(-30) : []; } catch { return []; } };
 const CHIPS = ["What should I work on next?", "Log: fixed the Argos watcher tests", "What chores are overdue?", "Summarize this week's logs"];
 
@@ -28,9 +29,9 @@ export function Golem() {
     const ctl = new AbortController(); stop.current = ctl; let textSoFar = ""; const g = gen.current;
     try {
       const res = await fetch("/api/golem/stream", { method: "POST", credentials: "same-origin", signal: ctl.signal, headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: next.map(m => ({ role: m.role, content: m.content })) }) });
+        body: JSON.stringify({ messages: next.map(m => ({ role: m.role, content: m.content, ...(m.notes ? { notes: m.notes } : {}) })) }) });
       if (!res.ok || !res.body) { const t = await res.text(); let e = t; try { e = JSON.parse(t).error || t; } catch { /* plain text */ } throw new Error(e || `The server answered ${res.status}.`); }
-      const reader = res.body.getReader(), dec = new TextDecoder(); let buf = "", final: { text: string; did: string[] } | null = null;
+      const reader = res.body.getReader(), dec = new TextDecoder(); let buf = "", final: { text: string; did: string[]; notes?: string } | null = null;
       for (;;) {
         const { done, value } = await reader.read(); if (done) break;
         buf += dec.decode(value, { stream: true });
@@ -44,7 +45,7 @@ export function Golem() {
           else if (ev === "error") throw new Error(d.error);
         }
       }
-      finish(g, next, { role: "assistant", content: (final?.text || textSoFar || "…").trim(), did: final?.did });
+      finish(g, next, { role: "assistant", content: (final?.text || textSoFar || "…").trim(), did: final?.did, ...(final?.notes ? { notes: final.notes } : {}) });
     } catch (e: any) {
       if (e?.name === "AbortError") finish(g, next, { role: "assistant", content: (textSoFar ? textSoFar + "\n\n" : "") + "_Stopped._" });
       else finish(g, next, { role: "assistant", content: `${textSoFar ? textSoFar + "\n\n" : ""}Something cracked: ${e.message}` });
