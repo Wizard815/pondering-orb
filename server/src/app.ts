@@ -30,7 +30,7 @@ import { Hermes } from "./integrations/hermes.js";
 import { AllGlance } from "./integrations/allglance.js";
 import { Outbox } from "./outbox.js";
 import { dailyApi } from "./daily.js";
-import { marketApi } from "./market.js";
+import { marketApi, marketTools } from "./market.js";
 import { robinhoodApi } from "./robinhood.js";
 import { journalApi } from "./journal.js";
 import { stocksApi } from "./stocks.js";
@@ -159,7 +159,7 @@ export async function buildApp(o: AppOptions = {}) {
   const tools = () => { const all = [...orbTools(records, () => sync.lists.map(l => l.name)), ...glanceTools(), ...readTools()]; return cfg().golem.canWrite ? all : all.filter(t => !(t as any).write); };
   /** Golem's chat also gets Coinpile's own tools over MCP when the coinpile widget has mcp_key_env (none of them change anything without the user's Yes in Coinpile). */
   // Money tools carry payee, bill and web page text from outside: they count as external, so Orb's write tools wait for a yes.
-  const golemTools = async () => { const own = tools(); return [...own, ...await cpMcpTools(companion(appsYaml(), "coinpile"), own.map(t => t.name))]
+  const golemTools = async () => { const own = [...tools(), ...marketTools()]; return [...own, ...await cpMcpTools(companion(appsYaml(), "coinpile"), own.map(t => t.name))]
     .map(t => /^(coinpile|finance)_/.test(t.name) ? { ...t, external: true } : t); };
 
   const app: FastifyInstance = Fastify({ logger: o.logger ?? false, bodyLimit: 2 * 1024 * 1024 });

@@ -449,7 +449,24 @@ Settings picks the brain:
 
 The server runs the tool loop with the same tools as the MCP list below,
 plus read-only `wiki_search` and `wiki_read` (over the vault's REST API, not
-its MCP endpoint).
+its MCP endpoint), and the market tools `stock_quote`, `news_search` and
+`read_page` (Golem only; agents on `/mcp` don't get a web reader). News,
+web pages and money results are outside text: once a turn has read one,
+Orb's write tools refuse and Golem asks first; your next message can do it.
+
+### Testing a model with Golem
+
+`npm run eval:golem -w server <model>` runs real conversations through Golem
+against stand-ins for every integration (Firefly III, Coinpile and its maths
+tools, Omi, ALLGlance, LLMWIKI, prices and news) and scores each one: which
+tools the model chose, what it changed in Orb, and what it said. It covers
+tasks, chores, logs, projects, money, the wiki, Omi, the calendar, stocks,
+a bank payee that tries to give orders, and news followed by a change that
+must wait for a yes. By default it uses OpenRouter with the key in
+`OPENROUTER_API_KEY` (`EVAL_KEY_ENV` names another variable, `EVAL_BASE_URL`
+another endpoint, e.g. Argos); a relay records each call's tokens, cost and
+time and stops at `EVAL_BUDGET` dollars (default 1). `EVAL_ONLY=spend,wiki`
+runs some. Results go to `server/eval/results/` (not committed).
 
 ## REST API
 
