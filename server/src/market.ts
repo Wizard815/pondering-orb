@@ -48,20 +48,23 @@ const questions = (asOf: string): Record<string, Question> => ({
 const FALLBACK = { action: "skip", direction_5d: "flat", direction_20d: "flat", conviction: "weak" };
 const dirOf = (ret: number, band: number) => (ret > band ? "up" : ret < -band ? "down" : "flat");
 
+/** Read-only market tools: the research passes use them, and so does Golem. News headlines and pages are outside text,
+ *  so they're marked external: after one runs, Orb's write tools wait for the person's say-so that turn. */
+export const marketTools = (): Tool[] => [
+  { name: "news_search", external: true, description: "Search recent news headlines (Google News). Returns title, source, date and link. Search several times with different queries.",
+    parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
+    run: async ({ query }: any) => (await newsSearch(String(query || "").slice(0, 200), 12)).map(n => ({ title: n.title, source: n.source, date: n.published ? new Date(n.published).toISOString().slice(0, 10) : "", link: n.link })) },
+  { name: "read_page", external: true, description: "Read the text of a public news article by its link (first 8,000 characters).", parameters: { type: "object", properties: { url: { type: "string" } }, required: ["url"] },
+    run: ({ url }: any) => readPage(String(url)) },
+  { name: "stock_quote", description: "Latest price, day change and recent returns for a US ticker.", parameters: { type: "object", properties: { symbol: { type: "string" } }, required: ["symbol"] },
+    run: async ({ symbol }: any) => { const q = await quote(symbol); return { symbol: q.symbol, name: q.name, price: q.price, changePct: +q.changePct.toFixed(2), indicators: indicators(q.history) }; } },
+];
+
 export function marketApi(app: FastifyInstance, deps: { records: Records; cfg: () => OrbConfig; guard: any; who: (req: any) => string }) {
   const { records, cfg, guard } = deps;
   const golem = () => { const g = cfg().golem; return { baseUrl: g.baseUrl, model: g.model, key: secret(g.keyEnv) }; };
 
-  // Read-only tools for the research passes.
-  const researchTools: Tool[] = [
-    { name: "news_search", description: "Search recent news headlines (Google News). Returns title, source, date and link. Search several times with different queries.",
-      parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
-      run: async ({ query }: any) => (await newsSearch(String(query || "").slice(0, 200), 12)).map(n => ({ title: n.title, source: n.source, date: n.published ? new Date(n.published).toISOString().slice(0, 10) : "", link: n.link })) },
-    { name: "read_page", description: "Read the text of a public news article by its link (first 8,000 characters).", parameters: { type: "object", properties: { url: { type: "string" } }, required: ["url"] },
-      run: ({ url }: any) => readPage(String(url)) },
-    { name: "stock_quote", description: "Latest price, day change and recent returns for a US ticker.", parameters: { type: "object", properties: { symbol: { type: "string" } }, required: ["symbol"] },
-      run: async ({ symbol }: any) => { const q = await quote(symbol); return { symbol: q.symbol, name: q.name, price: q.price, changePct: +q.changePct.toFixed(2), indicators: indicators(q.history) }; } },
-  ];
+  const researchTools = marketTools();
 
   /** What happened to past picks, in a few numbers, for the next verdicts. */
   function trackRecord() {
