@@ -61,7 +61,9 @@ export function orderDollars(args: Record<string, unknown>, price: number) {
   return NaN;
 }
 
-export function robinhoodApi(app: FastifyInstance, deps: { records: Records; store: Store; guard: any; who: (req: any) => string }) {
+export function robinhoodApi(app: FastifyInstance, deps: { records: Records; store: Store; guard: any; who: (req: any) => string;
+  /** Coinpile's auto wallet, when Coinpile shares it: while it trades the Agentic account live, Orb places no orders there. */
+  autoWallet?: () => Promise<{ enabled: boolean; wallet: string } | null> }) {
   const { records, store, guard } = deps;
   // Tokens stay in the server's own store, never in a collection the API can read.
   const load = () => (store.get("secrets", "robinhood") as any as OAuthState & { id?: string; version?: number }) || null;
@@ -120,6 +122,14 @@ export function robinhoodApi(app: FastifyInstance, deps: { records: Records; sto
     return client.call(t.name, {});
   });
 
+  /** One account, one trader: Coinpile's auto wallet keeps its own day-trade guard and daily loss stop for this account,
+   *  and an order from here would be invisible to both (a pick bought here and sold by the wallet the same day is a day trade). */
+  async function walletBusy(symbol: string) {
+    const w = await (deps.autoWallet?.() ?? Promise.resolve(null)).catch(() => null);
+    return w && w.enabled && w.wallet === "live"
+      ? `Coinpile's auto wallet is trading your Robinhood Agentic account, so Orb doesn't place orders there. To buy ${symbol}, add "buy <shares> ${symbol}" to Coinpile → Trading → Next session (your plan is checked against its rules), or buy it in your main account.`
+      : "";
+  }
   async function forPick(id: string) {
     const p: any = records.get("picks", id); if (!p) throw new HttpError(404, "No such pick.");
     if (p.decision !== "yes") throw new HttpError(409, "Say “I'm buying” on this pick first.");
@@ -130,7 +140,8 @@ export function robinhoodApi(app: FastifyInstance, deps: { records: Records; sto
     const s = rhSettings(records), p = await forPick(String(req.body?.pickId || "")), amount = Number(req.body?.amount ?? p.amount);
     const t = (await tools()).find(x => x.name === s.orderTool); if (!t) throw new HttpError(409, "Pick the order tool in Settings → Robinhood.");
     const price = (await quote(p.symbol)).price, b = buildOrder(t, p.symbol, amount, price);
-    return { tool: t.name, description: t.description || "", schema: t.inputSchema, args: b.args, warnings: b.warnings, price, tradingOn: s.tradingOn, maxOrder: s.maxOrder, maxDay: s.maxDay };
+    const busy = await walletBusy(p.symbol);
+    return { tool: t.name, description: t.description || "", schema: t.inputSchema, args: b.args, warnings: busy ? [busy, ...b.warnings] : b.warnings, price, tradingOn: s.tradingOn && !busy, maxOrder: s.maxOrder, maxDay: s.maxDay };
   });
   app.post("/api/robinhood/order", { preHandler: guard }, async (req: any) => {
     you(req);
@@ -138,6 +149,7 @@ export function robinhoodApi(app: FastifyInstance, deps: { records: Records; sto
     if (!s.tradingOn) throw new HttpError(403, "Placing orders is off. Turn it on in Settings → Robinhood.");
     if (req.body?.confirm !== true) throw new HttpError(400, "Confirm the order first.");
     const p = await forPick(String(req.body?.pickId || "")), args = req.body?.args;
+    const busy = await walletBusy(p.symbol); if (busy) throw new HttpError(409, busy);
     if (!args || typeof args !== "object" || Array.isArray(args)) throw new HttpError(400, "Send the order's arguments.");
     const t = (await tools()).find(x => x.name === s.orderTool); if (!t || req.body?.tool !== t.name) throw new HttpError(409, "That isn't the order tool chosen in Settings.");
     // The order must be what the pick says: its ticker, a buy, within the caps.

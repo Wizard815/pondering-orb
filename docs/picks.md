@@ -127,6 +127,13 @@ The server checks every order, whatever the page sends:
 - within the per-order cap, and the day's total within the daily cap;
 - written to `orders` before it is sent, with Robinhood's answer after.
   Orders can't be edited or deleted through the API.
+- not while Coinpile's auto wallet trades the same Agentic account live
+  (Coinpile → Trading, shared with the Orb). One account has one trader:
+  Coinpile's day-trade guard and daily loss stop only see its own orders, so
+  a pick bought here and sold by the wallet the same day would be a day trade.
+  Put the buy in Coinpile → Trading → Next session (`buy 2 ACME`) instead; it
+  goes through Coinpile's rules. Orb can only tell when Coinpile shares
+  **Trading**, so tick that if you use both.
 
 The Picks tab also shows the agentic account through the account tool. Tokens
 stay in Orb's database, outside every collection the API serves.

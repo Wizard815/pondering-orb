@@ -259,7 +259,10 @@ export async function buildApp(o: AppOptions = {}) {
 
   const daily = dailyApi(app, { records, dav, cfg, guard, who, glance });
   const market = marketApi(app, { records, cfg, guard, who });
-  robinhoodApi(app, { records, store, guard, who });
+  robinhoodApi(app, { records, store, guard, who, autoWallet: async () => {
+    const cp = companion(appsYaml(), "coinpile"); if (!cp) return null;
+    return (await cpSummary(cp)).trading;
+  } });
   stocksApi(app, { records, cfg, guard, who });
   const reviews = reviewsApi(app, { records, cfg, guard, who });
   const dataDir = o.dataFile && o.dataFile !== ":memory:" ? dirname(o.dataFile) : tempData();
