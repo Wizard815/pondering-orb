@@ -548,7 +548,7 @@ export async function buildApp(o: AppOptions = {}) {
   app.get("/api/widgets/:name", { preHandler: guard }, async (req: any) => {
     const w = widgetsFrom(String((store.get("settings", "apps") as any)?.yaml || ""))[req.params.name];
     if (!w) throw new HttpError(404, `${req.params.name} has no widget in the apps YAML.`);
-    return widgetData(req.params.name, w, store);
+    return widgetData(req.params.name, w);
   });
 
   // ---- wiki related links (add only) ----
