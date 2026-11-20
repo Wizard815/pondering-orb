@@ -454,6 +454,34 @@ its MCP endpoint), and the market tools `stock_quote`, `news_search` and
 web pages and money results are outside text: once a turn has read one,
 Orb's write tools refuse and Golem asks first; your next message can do it.
 
+Hermes Studio's own reporting tools (`orb_studio_approval`,
+`orb_studio_activity`, `orb_set_agent_status`) are for Studio over `/mcp`;
+Golem gets `studio_pending_approvals` and `studio_decide` instead, which
+approve or reject in Studio itself like the Approve button. The pending list
+is agent-written text, so a decision after reading it waits for your yes.
+
+When the model server answers 429 or 5xx, or the connection drops, Golem
+tries twice more (after 1.5 s and 4 s) before the turn fails.
+
+### What Golem remembers
+
+- **The chat:** the browser keeps the last 30 messages; each question sends
+  the last 16. Clear starts over.
+- **Turn notes:** each answer carries a short digest of what Orb's own tools
+  returned (tasks with their ids, chores, projects, logs, lists, calendar,
+  journal), and the last three go back with the next question, so "mark the
+  first one done" uses the real task. Money, news, web pages, Omi, the wiki
+  and Studio text never ride along: something planted there can't steer a
+  later turn, where the ask-first rule no longer applies.
+- **Memory:** "remember that…" makes Golem keep a short note
+  (`golem_remember`, at most 200 characters, up to 50 notes); every chat starts
+  with them, after Clear too. "Forget…" drops one (`golem_forget`). Settings →
+  Golem lists them with Forget buttons. Only you can read or change them;
+  agents on `/mcp` don't get these tools. They are write tools, so read-only
+  Golem can't keep notes and outside text can't add one without your yes.
+- **Search:** there is no search over past chats. Golem finds things with its
+  tools: wiki search, Omi memories, transaction search, news search.
+
 ### Testing a model with Golem
 
 `npm run eval:golem -w server <model>` runs real conversations through Golem

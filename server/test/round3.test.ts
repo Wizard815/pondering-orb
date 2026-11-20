@@ -111,7 +111,7 @@ test("TestGolem_StreamsTextAndRunsTools", async () => {
     const r = await app.inject({ method: "POST", url: "/api/golem/stream", payload: { messages: [{ role: "user", content: "log it" }] } });
     assert.match(r.body, /event: tool\ndata: {"name":"orb_add_log"}/);
     assert.match(r.body, /event: text\ndata: {"delta":"Logged "}/);
-    assert.match(r.body, /event: done\ndata: {"text":"Logged \*\*it\*\*\.","did":\["orb_add_log"\]}/);
+    assert.match(r.body, /event: done\ndata: {"text":"Logged \*\*it\*\*\.","did":\["orb_add_log"\],"notes":"orb_add_log\(/);
     assert.equal((records.list("logs")[0] as any).text, "Tested streaming");
   } finally { llm.server.close(); }
 });

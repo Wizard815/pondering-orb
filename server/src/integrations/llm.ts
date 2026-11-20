@@ -17,25 +17,44 @@ async function runTool(t: Tool | undefined, raw: string | undefined, who: string
   return out;
 }
 
+/** A short digest of what Orb's own tools returned this turn, sent back with the next question so follow-ups ("the first
+ *  one") can use the ids and names. Only tools that aren't external: money, news, web and other apps' text never carries
+ *  over, so nothing planted there can steer a later turn. */
+function noteFor(t: Tool | undefined, raw: string | undefined, out: unknown) {
+  if (!t || t.external) return "";
+  const res = JSON.stringify(out) ?? "";
+  return `${t.name}(${(raw || "").slice(0, 160)}) -> ${res.length > 700 ? res.slice(0, 700) + "…" : res}`;
+}
+const MAX_NOTES = 2500;
+/** Model servers (OpenRouter's providers especially) sometimes answer 429 or 5xx for a moment: try twice more before failing the turn. */
+const RETRY = [1500, 4000];
+const retryable = (status: number) => status === 429 || status >= 500;
+const pause = (ms: number, signal?: AbortSignal) => new Promise<void>((ok, no) => { const t = setTimeout(ok, ms); signal?.addEventListener("abort", () => { clearTimeout(t); no(new HttpError(499, "Stopped.")); }, { once: true }); });
+
 /** One OpenAI-compatible chat API covers Golem's brains: Argos or any local
  *  /v1 server, OpenRouter, and the Claude API's OpenAI-compatible endpoint.
  *  Runs the tool loop here, so tools act with Orb's own rules. */
 export async function chat(opts: { baseUrl: string; model: string; key?: string; messages: Msg[]; tools: Tool[]; who: string; maxRounds?: number }) {
   const base = trimSlash(opts.baseUrl);
   if (!base) throw new HttpError(503, "Golem has no model endpoint. Set one in Settings → Golem.");
-  const msgs = [...opts.messages], did: string[] = [], st = { tainted: false };
+  const msgs = [...opts.messages], did: string[] = [], st = { tainted: false }, notes: string[] = [];
+  const noted = () => notes.join("\n").slice(0, MAX_NOTES);
   const tools = opts.tools.map(t => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.parameters } }));
   for (let round = 0; round < (opts.maxRounds ?? 6); round++) {
-    const r = await call(`${base}/chat/completions`, {
+    const send = () => call(`${base}/chat/completions`, {
       method: "POST", timeoutMs: 180000,
       headers: { "Content-Type": "application/json", ...(opts.key ? { Authorization: `Bearer ${opts.key}` } : {}) },
       body: JSON.stringify({ model: opts.model || undefined, messages: msgs, tools: tools.length ? tools : undefined }),
     });
+    // A dropped connection is retried like a 5xx; a timeout isn't (it already waited 3 minutes).
+    const attempt = async () => { try { return await send(); } catch (e: any) { if (/timed out/.test(e?.message || "")) throw e; return { status: 599, ok: false, body: e?.message || "unreachable", headers: new Headers() }; } };
+    let r = await attempt();
+    for (const wait of RETRY) { if (r.ok || !retryable(r.status)) break; await pause(wait); r = await attempt(); }
     if (!r.ok) throw new HttpError(502, `The model answered ${r.status}: ${typeof r.body === "string" ? r.body.slice(0, 200) : r.body?.error?.message || "error"}`);
     const m = r.body?.choices?.[0]?.message;
     if (!m) throw new HttpError(502, "The model sent an empty reply.");
     const calls = m.tool_calls || [];
-    if (!calls.length) return { text: String(m.content || "").trim(), did };
+    if (!calls.length) return { text: String(m.content || "").trim(), did, notes: noted() };
     msgs.push({ role: "assistant", content: m.content ?? null, tool_calls: calls });
     for (const c of calls) {
       const t = opts.tools.find(x => x.name === c.function?.name);
@@ -43,9 +62,10 @@ export async function chat(opts: { baseUrl: string; model: string; key?: string;
       try { out = await runTool(t, c.function?.arguments, opts.who, st, did); }
       catch (e: any) { out = { error: e?.message || String(e) }; if (t?.external) st.tainted = true; }
       msgs.push({ role: "tool", tool_call_id: c.id, content: JSON.stringify(out).slice(0, 30000) });
+      const n = noteFor(t, c.function?.arguments, out); if (n) notes.push(n);
     }
   }
-  return { text: "I ran out of steps before finishing. Try a narrower question.", did };
+  return { text: "I ran out of steps before finishing. Try a narrower question.", did, notes: noted() };
 }
 
 /** Like chat(), but streams the model's text as it arrives. Tool rounds run
@@ -54,15 +74,24 @@ export async function chat(opts: { baseUrl: string; model: string; key?: string;
 export async function chatStream(opts: Parameters<typeof chat>[0] & { onEvent: (e: { type: "text"; delta: string } | { type: "tool"; name: string }) => void; signal?: AbortSignal }) {
   const base = trimSlash(opts.baseUrl);
   if (!base) throw new HttpError(503, "Golem has no model endpoint. Set one in Settings → Golem.");
-  const msgs = [...opts.messages], did: string[] = [], st = { tainted: false }; let full = "";
+  const msgs = [...opts.messages], did: string[] = [], st = { tainted: false }, notes: string[] = []; let full = "";
+  const noted = () => notes.join("\n").slice(0, MAX_NOTES);
   const tools = opts.tools.map(t => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.parameters } }));
   for (let round = 0; round < (opts.maxRounds ?? 6); round++) {
-    let res: Response;
-    try {
-      res = await fetch(`${base}/chat/completions`, { method: "POST", signal: opts.signal,
-        headers: { "Content-Type": "application/json", ...(opts.key ? { Authorization: `Bearer ${opts.key}` } : {}) },
-        body: JSON.stringify({ model: opts.model || undefined, messages: msgs, tools: tools.length ? tools : undefined, stream: true }) });
-    } catch (e: any) { throw new HttpError(502, `Couldn't reach the model (${e?.cause?.code || e?.message}).`); }
+    let res!: Response;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        res = await fetch(`${base}/chat/completions`, { method: "POST", signal: opts.signal,
+          headers: { "Content-Type": "application/json", ...(opts.key ? { Authorization: `Bearer ${opts.key}` } : {}) },
+          body: JSON.stringify({ model: opts.model || undefined, messages: msgs, tools: tools.length ? tools : undefined, stream: true }) });
+      } catch (e: any) {
+        if (opts.signal?.aborted) throw new HttpError(499, "Stopped.");
+        if (attempt >= RETRY.length) throw new HttpError(502, `Couldn't reach the model (${e?.cause?.code || e?.message}).`);
+        await pause(RETRY[attempt], opts.signal); continue;
+      }
+      if (res.ok || !retryable(res.status) || attempt >= RETRY.length) break;
+      await res.body?.cancel().catch(() => {}); await pause(RETRY[attempt], opts.signal);
+    }
     if (!res.ok) throw new HttpError(502, `The model answered ${res.status}: ${(await res.text()).slice(0, 200)}`);
     let text = ""; const calls: { id: string; name: string; args: string }[] = [];
     if (!(res.headers.get("content-type") || "").includes("text/event-stream")) {
@@ -97,7 +126,7 @@ export async function chatStream(opts: Parameters<typeof chat>[0] & { onEvent: (
     }
     full += text;
     const real = calls.filter(Boolean);
-    if (!real.length) return { text: full.trim(), did };
+    if (!real.length) return { text: full.trim(), did, notes: noted() };
     msgs.push({ role: "assistant", content: text || null, tool_calls: real.map(c => ({ id: c.id, type: "function", function: { name: c.name, arguments: c.args } })) });
     for (const c of real) {
       if (opts.signal?.aborted) throw new HttpError(499, "Stopped.");
@@ -106,8 +135,9 @@ export async function chatStream(opts: Parameters<typeof chat>[0] & { onEvent: (
       try { out = await runTool(t, c.args, opts.who, st, did); }
       catch (e: any) { out = { error: e?.message || String(e) }; if (t?.external) st.tainted = true; }
       msgs.push({ role: "tool", tool_call_id: c.id, content: JSON.stringify(out).slice(0, 30000) });
+      const n = noteFor(t, c.args, out); if (n) notes.push(n);
     }
     if (text) { full += "\n\n"; opts.onEvent({ type: "text", delta: "\n\n" }); }
   }
-  return { text: (full + "\n\nI ran out of steps before finishing.").trim(), did };
+  return { text: (full + "\n\nI ran out of steps before finishing.").trim(), did, notes: noted() };
 }

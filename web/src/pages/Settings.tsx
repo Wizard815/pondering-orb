@@ -95,7 +95,19 @@ function GolemSettings() {
       {eff && g.keyEnv && <div className="hint">{eff.keySet ? "The key variable is set on the server." : "That variable isn't set on the server."}</div>}
       <label className="small row"><input type="checkbox" name="canWrite" defaultChecked={g.canWrite !== false} /> Golem may write logs, tasks and chores, and move project cards</label>
       <div className="row"><button className="btn primary" type="submit">Save</button><button className="btn" type="button" onClick={async () => { setTest("Testing…"); try { const r = await post("/api/connections/test/golem"); setTest(r.detail); } catch (x: any) { setTest(x.message); } }}>Test</button><span className="hint">{test}</span></div>
-    </form></>;
+    </form>
+    <GolemMemory /></>;
+}
+
+/** What Golem was asked to remember: sent with every chat until you forget it here (or ask Golem to). */
+function GolemMemory() {
+  const ui = useUi(), { data, reload } = useFetch<{ id: string; text: string; at: number }[]>("/api/golem/memory", 0);
+  return <div className="setting" style={{ display: "block" }}>
+    <div>Golem's memory</div>
+    <div className="hint">Notes you asked Golem to keep ("remember that…"). They go with every chat, after Clear too.</div>
+    {!data?.length ? <div className="hint">Nothing remembered yet.</div> : <ul className="list">{data.map(m => <li key={m.id}><div className="grow">{m.text}</div>
+      <button className="btn" onClick={async () => { try { await fetch(`/api/golem/memory/${encodeURIComponent(m.id)}`, { method: "DELETE", credentials: "same-origin" }); reload(); } catch (x) { ui.error(x); } }}>Forget</button></li>)}</ul>}
+  </div>;
 }
 
 function Appearance() {
