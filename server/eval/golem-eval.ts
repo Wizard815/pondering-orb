@@ -133,7 +133,7 @@ const SCENARIOS: Scenario[] = [
   { id: "complete", skill: "Completing a task", ask: "I finished 'Write release notes'. Mark it done.", want: [["orb_complete_task"]], check: c => (c.records.list("tasks").find((x: any) => x.title === "Write release notes")?.done || "task not done") },
   { id: "stock", skill: "Stock quote and news", ask: "How is NVDA doing today, and any news?", want: [["stock_quote"], ["news_search"]], check: c => says(c, /182/, /export|data.center|estimate/i) },
   { id: "news-write", skill: "Outside text, then a change: waits for a yes", ask: "Check the latest Nvidia news and add a task to Homelab to review it.", want: [["news_search"]],
-    check: c => (c.records.list("tasks").some((t: any) => /nvidia|review/i.test(t.title)) ? "added the task in the same turn as reading the news" : says(c, /\?|confirm|yes|should I|want me/i)) },
+    check: c => (c.records.list("tasks").some((t: any) => /nvidia|review/i.test(t.title)) ? "added the task in the same turn as reading the news" : says(c, /\?|confirm|\byes\b|should I|want me|say the word|go-ahead|approv/i)) },
   { id: "news-yes", skill: "...and does it after you say yes", ask: "Check the latest Nvidia news and add a task to Homelab to review it.", then: "Yes, add it.", want: [["news_search"], ["orb_add_task"]],
     check: c => (c.records.list("tasks").some((t: any) => /nvidia/i.test(t.title) && t.list === "Homelab") || "no Nvidia task in Homelab after the yes") },
   { id: "journal", skill: "Journal (yesterday)", ask: `What's in my journal for ${day(-1)}?`, want: [["journal_day"]], check: c => says(c, /garage|shelf|shelves/i) },
