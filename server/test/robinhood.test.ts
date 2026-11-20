@@ -6,6 +6,10 @@ import { buildApp } from "../src/app.js";
 import { loadConfig } from "../src/config.js";
 import { sources, clearDailyCache } from "../src/integrations/daily.js";
 import { buildOrder, orderDollars } from "../src/robinhood.js";
+import { clearCoinpileCache } from "../src/integrations/coinpile.js";
+
+/** What Coinpile says about its auto wallet (Coinpile → Trading), for the one-trader-per-account check. */
+const coinpileWallet = { live: false };
 
 const cfg = () => loadConfig("/nonexistent.yaml", {});
 
@@ -37,6 +41,7 @@ function fakeRobinhood() {
         if (m.method === "tools/list") { res.writeHead(200, { "content-type": "text/event-stream" }); return res.end(`event: message\ndata: ${JSON.stringify({ jsonrpc: "2.0", id: m.id, result: { tools } })}\n\n`); }
         if (m.method === "tools/call") { calls.push(m.params); return J(200, { jsonrpc: "2.0", id: m.id, result: { content: [{ type: "text", text: m.params.name === "get_account" ? "Buying power: $1,000" : "Order queued: id abc" }] } }); }
       }
+      if (u.pathname === "/cp/api/v1/summary") return J(200, { goblins: { me: { trading: { enabled: true, wallet: coinpileWallet.live ? "live" : "paper" } } } });
       if (u.pathname.startsWith("/chart/")) { const ts = [1, 2, 3].map(i => 1.7e9 + i * 864e2); return J(200, { chart: { result: [{ meta: { regularMarketPrice: 50, chartPreviousClose: 49 }, timestamp: ts, indicators: { quote: [{ close: [48, 49, 50] }] } }] } }); }
       J(404, {});
     });
@@ -100,6 +105,14 @@ test("TestRobinhood_ConnectsAndPlacesGuardedOrders", async () => {
     assert.equal((await order({ ...good, dollar_amount: 500 })).statusCode, 422, "per-order cap");
     assert.equal((await order(good, { confirm: false })).statusCode, 400, "needs confirmation");
     assert.equal(rh.calls.filter(x => x.name === "place_equity_order").length, 0, "nothing sent so far");
+    // Coinpile's auto wallet trading this account live: Orb stays out of it (one account, one trader).
+    await app.inject({ method: "PUT", url: "/api/c/settings/apps", payload: { yaml: `groups:\n  - name: M\n    apps:\n      - name: Coinpile\n        url: ${rh.base}/cp\n        widget: { type: coinpile }\n` } });
+    coinpileWallet.live = true; clearCoinpileCache();
+    const busy = await order(good);
+    assert.equal(busy.statusCode, 409); assert.match(busy.json().error || busy.body, /Coinpile → Trading → Next session/);
+    const pv2 = (await app.inject({ method: "POST", url: "/api/robinhood/order/preview", payload: { pickId: pick.id } })).json();
+    assert.equal(pv2.tradingOn, false); assert.match(pv2.warnings[0], /auto wallet/);
+    coinpileWallet.live = false; clearCoinpileCache();                 // paper: the Agentic account is Orb's to use
     const ok = await order(good); assert.equal(ok.statusCode, 200, ok.body);
     assert.equal(ok.json().status, "sent"); assert.match(ok.json().result, /queued/);
     assert.equal((await order(good)).statusCode, 422, "the daily cap counts what was sent today");
@@ -110,5 +123,5 @@ test("TestRobinhood_ConnectsAndPlacesGuardedOrders", async () => {
     assert.equal((await app.inject({ method: "DELETE", url: `/api/c/orders/${oid}` })).statusCode, 403);
     assert.equal((await app.inject({ method: "PATCH", url: `/api/c/orders/${oid}`, payload: { status: "x" } })).statusCode, 403);
     assert.equal((await app.inject({ method: "DELETE", url: `/api/c/picks/${pick.id}`, headers: { authorization: "Bearer t" } })).statusCode, 403);
-  } finally { Object.assign(sources, was); clearDailyCache(); rh.close(); }
+  } finally { Object.assign(sources, was); clearDailyCache(); clearCoinpileCache(); rh.close(); }
 });
