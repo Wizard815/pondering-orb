@@ -454,6 +454,29 @@ its MCP endpoint), and the market tools `stock_quote`, `news_search` and
 web pages and money results are outside text: once a turn has read one,
 Orb's write tools refuse and Golem asks first; your next message can do it.
 
+### What Golem can reach
+
+Every connection that's set up gives Golem its tools (an unset one gives none).
+Changes are write tools: read-only Golem doesn't get them, and after outside
+text in a turn they wait for your yes. Agents on `/mcp` get only Orb's own
+`orb_*` tools.
+
+| Connection | Golem reads | Golem changes |
+|---|---|---|
+| Orb | projects, tasks, chores, logs, lists, journal | add/complete/start/prioritise tasks, chores done, logs, move projects, memory |
+| CalDAV | calendar events (every calendar and the family calendar) | tasks (synced to Vikunja), `caldav_sync` |
+| LLMWIKI | search, read | Current state / Next steps (`wiki_edit_section`), a line in today's daily note |
+| ALLGlance gateway | day plan, inbox, chores, milestones | add a family-calendar event |
+| UpstreamManager | repos, requests, commits | approve / deny (or part of) a request, fetch, run the daily check |
+| Uptime Kuma | every monitor, what's down | — (Settings → Scripts adds monitors) |
+| Nginx Proxy Manager, nginx/SWAG, Technitium | proxied sites, where they forward, DNS names | — |
+| Unraid agent, Docker, the host | containers (state, updates, link), load, memory, disks | — |
+| Milaclone | search, to-dos, the idea pipeline (`MILACLONE_API_URL` if the server reaches it at another address, key in `MILACLONE_API_KEY`) | — |
+| Hermes Studio | agents and their work, chat search, a project's chats, pending approvals | send work to an agent, approve / reject agent work |
+| Firefly III, Coinpile, Omi | everything their tools read | Coinpile changes only ask (approved in Coinpile) |
+| Apps YAML | `apps_list` (every app), `app_live` (what an app's panel shows: SABnzbd's queue and speed, Plex's streams, …) | — |
+| Markets | quotes, news, public pages | — |
+
 Hermes Studio's own reporting tools (`orb_studio_approval`,
 `orb_studio_activity`, `orb_set_agent_status`) are for Studio over `/mcp`;
 Golem gets `studio_pending_approvals` and `studio_decide` instead, which
