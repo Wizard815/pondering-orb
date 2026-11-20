@@ -10,7 +10,7 @@ export type Tool = { name: string; description: string; parameters: Record<strin
  *  payee or web page can't make Golem change things; the model is told to ask, and the next message can do it. */
 async function runTool(t: Tool | undefined, raw: string | undefined, who: string, st: { tainted: boolean }, did: string[]) {
   if (!t) return { error: "unknown tool" };
-  if (t.write && st.tainted) return { error: "Not done. This turn read outside text (money or web results), so changes wait: tell the user what you would do and do it only after they say yes in their next message." };
+  if (t.write && st.tainted) return { error: "Not done. This turn read outside text (money or web results), so changes wait: tell the user what you would do and do it only after they say yes in their next message. When they say yes, make the change first, before reading any money, news or web results again (those would hold it back once more)." };
   const out = await t.run(raw ? JSON.parse(raw) : {}, who);
   if (t.write) did.push(t.name);
   if (t.external) st.tainted = true;
