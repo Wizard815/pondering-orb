@@ -202,12 +202,13 @@ function DailySettingsForm() {
 function JournalSettingsForm() {
   const ui = useUi(), j = useSettings().journal || {}, o = j.ocr || {};
   return <form className="editor" key={JSON.stringify(j)} onSubmit={e => { e.preventDefault(); const f = new FormData(e.currentTarget);
-    saveSettings({ journal: { ...j, wiki: !!f.get("wiki"), ocr: { baseUrl: String(f.get("obase") || "").trim(), model: String(f.get("omodel") || "").trim(), keyEnv: String(f.get("okey") || "").trim() } } }).then(() => ui.status("Journal saved.")).catch(ui.error); }}>
+    saveSettings({ journal: { ...j, wiki: !!f.get("wiki"), wikiOmi: !!f.get("wikiOmi"), ocr: { baseUrl: String(f.get("obase") || "").trim(), model: String(f.get("omodel") || "").trim(), keyEnv: String(f.get("okey") || "").trim() } } }).then(() => ui.status("Journal saved.")).catch(ui.error); }}>
     <div className="row"><label className="small" style={{ flex: 1 }}>Vision model address (OpenAI-compatible /v1)<input type="url" name="obase" defaultValue={o.baseUrl || ""} placeholder="empty = Golem's endpoint · http://argos:8080/v1" /></label></div>
     <div className="row"><label className="small" style={{ flex: 1 }}>Model<input type="text" name="omodel" defaultValue={o.model || ""} placeholder="empty = Golem's model · e.g. qwen2.5-vl-7b" /></label>
       <label className="small" style={{ flex: 1 }}>Key variable (optional)<input type="text" name="okey" defaultValue={o.keyEnv || ""} /></label></div>
     <div className="hint">Reads handwritten pages (BOOX exports, photos of paper). It must accept images: Qwen2.5-VL, Llama 3.2 Vision or MiniCPM-V on llama-server, Ollama or Argos work. Pages you correct are kept in <code>data/handwriting/</code> (images and <code>manifest.jsonl</code>) to train a model on your handwriting later.</div>
     <label className="small row" style={{ gap: 4 }}><input type="checkbox" name="wiki" defaultChecked={j.wiki === true} /> Send each finished day to the wiki (the Journal section of daily/date.md)</label>
+    <label className="small row" style={{ gap: 4 }}><input type="checkbox" name="wikiOmi" defaultChecked={j.wikiOmi !== false} /> Include Omi's recap in it (turn off when Omi sends its approved days to the wiki itself, so they aren't filed twice)</label>
     <div className="row"><button className="btn primary" type="submit">Save</button></div>
   </form>;
 }

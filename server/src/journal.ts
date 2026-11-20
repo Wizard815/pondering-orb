@@ -41,6 +41,22 @@ export type AutoLog = {
 const dayOfIso = (s: string) => { if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; const t = Date.parse(s); return Number.isNaN(t) ? "" : localDay(t); };
 const clockOf = (ms: number) => localClock(new Date(ms).toISOString());
 
+/** The day as a wiki note: what you wrote (typed and handwritten), then Orb's log in short (without Omi's recap when opts.omi is false). */
+export function wikiBody(day: string, j: any, a: AutoLog, opts: { omi?: boolean } = {}) {
+  const L: string[] = [];
+  if (String(j?.text || "").trim()) L.push("## Notes", "", String(j.text).trim(), "");
+  const sec = (t: string, rows: string[]) => { if (rows.length) L.push(`## ${t}`, "", ...rows, ""); };
+  if (a.money) sec("Money", [`- Spent ${a.money.spent.toFixed(2)}, income ${a.money.income.toFixed(2)}${a.money.currency ? ` ${a.money.currency}` : ""}`]);
+  sec("Done", [...a.tasksDone.map(t => `- [x] ${t.title}${t.list ? ` (${t.list})` : ""}`), ...a.choresDone.map(c => `- [x] ${c.name} (chore)`)]);
+  sec("Log", a.logs.map(l => `- ${l.time ? `${l.time} ` : ""}[[${l.project}]]: ${l.text}`));
+  sec("Code", [...a.commits.map(c => `- ${c.repo}: ${c.subject}`), ...a.requests.map(r => `- ${r.repo}: ${r.type} request ${r.what}${r.what === "decided" ? `, ${r.status}` : ""}`)]);
+  sec("Agents", a.agents.map(g => `- ${g.title} (${g.agent}, ${String(g.status).replace(/_/g, " ")})${g.last ? `: ${g.last.replace(/\s+/g, " ").slice(0, 200)}` : ""}`));
+  // Omi files its own approved days in the wiki; "leave Omi out" keeps them from being filed twice.
+  if (a.omi && opts.omi !== false) sec("Omi", [`- ${a.omi.headline}`, ...a.omi.decisions.map(d => `- Decided: ${d}`), ...a.omi.questions.map(q => `- Open: ${q}`)]);
+  sec("Calendar", a.events.map(e => `- ${e.time} ${e.title}`));
+  return L.join("\n") || "_Nothing written or logged this day._";
+}
+
 export function journalApi(app: FastifyInstance, deps: {
   records: Records; cfg: () => OrbConfig; guard: any; who: (req: any) => string; 
   upstream: Upstream; hermes: Hermes; outbox: Outbox; appsYaml: () => string; wiki: Wiki;
@@ -149,24 +165,11 @@ export function journalApi(app: FastifyInstance, deps: {
   // Reading never writes. Refresh saves a past day's log again, and only you can ask for that.
   app.get("/api/journal/:day/auto", { preHandler: guard }, async (req: any) => { const refresh = req.query.refresh === "1"; if (refresh) you(req); return autoFor(dayParam(req.params.day), refresh); });
 
-  /** The day as a wiki note: what you wrote (typed and handwritten), then Orb's log in short. */
-  function wikiBody(day: string, j: any, a: AutoLog) {
-    const L: string[] = [];
-    if (String(j?.text || "").trim()) L.push("## Notes", "", String(j.text).trim(), "");
-    const sec = (t: string, rows: string[]) => { if (rows.length) L.push(`## ${t}`, "", ...rows, ""); };
-    if (a.money) sec("Money", [`- Spent ${a.money.spent.toFixed(2)}, income ${a.money.income.toFixed(2)}${a.money.currency ? ` ${a.money.currency}` : ""}`]);
-    sec("Done", [...a.tasksDone.map(t => `- [x] ${t.title}${t.list ? ` (${t.list})` : ""}`), ...a.choresDone.map(c => `- [x] ${c.name} (chore)`)]);
-    sec("Log", a.logs.map(l => `- ${l.time ? `${l.time} ` : ""}[[${l.project}]]: ${l.text}`));
-    sec("Code", [...a.commits.map(c => `- ${c.repo}: ${c.subject}`), ...a.requests.map(r => `- ${r.repo}: ${r.type} request ${r.what}${r.what === "decided" ? `, ${r.status}` : ""}`)]);
-    sec("Agents", a.agents.map(g => `- ${g.title} (${g.agent}, ${String(g.status).replace(/_/g, " ")})${g.last ? `: ${g.last.replace(/\s+/g, " ").slice(0, 200)}` : ""}`));
-    if (a.omi) sec("Omi", [`- ${a.omi.headline}`, ...a.omi.decisions.map(d => `- Decided: ${d}`), ...a.omi.questions.map(q => `- Open: ${q}`)]);
-    sec("Calendar", a.events.map(e => `- ${e.time} ${e.title}`));
-    return L.join("\n") || "_Nothing written or logged this day._";
-  }
   /** Write a day's journal to LLMWIKI: the Journal section of daily/YYYY-MM-DD.md. */
   async function toWiki(day: string) {
     if (!cfg().wiki.baseUrl) throw new HttpError(503, "The wiki isn't set up (Settings → Connections → LLMWIKI).");
-    return deps.wiki.writeJournal(day, wikiBody(day, records.get("journal", day), await autoFor(day)));
+    const omi = ((records.get("settings", "app") as any)?.journal || {}).wikiOmi !== false;
+    return deps.wiki.writeJournal(day, wikiBody(day, records.get("journal", day), await autoFor(day), { omi }));
   }
   app.post("/api/journal/:day/wiki", { preHandler: guard }, async (req: any) => { you(req); return toWiki(dayParam(req.params.day)); });
 
