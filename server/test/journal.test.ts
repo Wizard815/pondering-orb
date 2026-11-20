@@ -99,3 +99,14 @@ test("TestJournal_FailedSourceIsRetried", async () => {
     assert.equal(y.auto.final, false, "a source that failed leaves the day open"); assert.match(y.auto.notes.join(" "), /UpstreamManager/);
   } finally { um.close(); }
 });
+
+test("TestJournal_WikiNoteCanLeaveOmiOut", async () => {
+  const { wikiBody } = await import("../src/journal.js");
+  const a: any = { money: null, tasksDone: [], choresDone: [], logs: [], commits: [], requests: [], agents: [], events: [{ time: "09:00", title: "Standup" }],
+    omi: { headline: "Fixed the NAS", overview: "", decisions: ["Keep RAID 1"], questions: [], highlights: [] }, omiConversations: [], omiTasks: [] };
+  const withOmi = wikiBody("2026-11-16", { text: "Good day." }, a);
+  assert.match(withOmi, /## Omi\n\n- Fixed the NAS\n- Decided: Keep RAID 1/);
+  const without = wikiBody("2026-11-16", { text: "Good day." }, a, { omi: false });
+  assert.ok(!/Omi|NAS|RAID/.test(without), without);
+  assert.match(without, /## Notes\n\nGood day\./); assert.match(without, /## Calendar\n\n- 09:00 Standup/);
+});
