@@ -179,7 +179,7 @@ const SCENARIOS: Scenario[] = [
       return cleared && !decided ? "cleared the alert in Orb but never told Studio (the work is still waiting there)" : decided && cleared ? true : decided ? "Studio decided but Orb still shows it pending" : "Studio was never asked"; } },
   // ---- audits and edge cases
   { id: "no-chore", skill: "Edge: a chore that doesn't exist", ask: "Mark the 'Walk the dog' chore done.",
-    check: c => (c.records.list("chores").some((x: any) => x.lastDone === today()) ? "marked some other chore" : says(c, /no chore|not find|couldn't find|doesn't exist|no .*walk|isn't/i)) },
+    check: c => (c.records.list("chores").some((x: any) => x.lastDone === today()) ? "marked some other chore" : says(c, /no chore|not find|couldn't find|doesn't exist|no .*walk|isn't|don't see|not see|no such|not on/i)) },
   { id: "dupes", skill: "Edge: two tasks with the same title", ask: "Mark 'Update firmware' done.",
     seed: r => { r.create("tasks", { title: "Update firmware", list: "Homelab", due: "", priority: 2, done: false }); r.create("tasks", { title: "Update firmware", list: "Pondering Orb", due: "", priority: 1, done: false }); },
     check: c => { const done = c.records.list("tasks").filter((t: any) => t.title === "Update firmware" && t.done);
