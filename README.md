@@ -113,7 +113,7 @@ Start from [`.env.example`](.env.example). Values here never reach the browser.
 | `MILACLONE_URL` | Milaclone's address as your browser reaches it, for the Ideas tab |
 | `UNRAID_URL`, `UNRAID_TOKEN`, `UNRAID_LINK_HOST` | The Unraid Management Agent (`http://tower:8043`), its API token, and optionally the address app links use |
 | `ALLGLANCE_URL`, `UPSTREAM_URL`, `UPTIME_URL`, `HERMES_URL`, `HERMES_PUBLIC_URL`, `ARGOS_URL`, `WIKI_URL` | Addresses of your apps. Empty means not used. Use a container name if Orb shares the app's network, else `http://<host>:<port>`. |
-| `UPTIME_KUMA_USER`, `UPTIME_KUMA_PASSWORD`, `UPTIME_PORT` | An Uptime Kuma admin login, used only by Settings → Scripts → *Watch new sites in Uptime Kuma*, and the bundled Uptime Kuma's host port (default 3001) |
+| `UPTIME_KUMA_USER`, `UPTIME_KUMA_PASSWORD`, `UPTIME_PORT` | An Uptime Kuma admin login, used only by Settings → Scripts → *Watch sites and apps in Uptime Kuma*, and the bundled Uptime Kuma's host port (default 3001) |
 | `LLMWIKI_VAULT` | The vault folder on this host, mounted read only |
 | `CALDAV_USER`, `CALDAV_PASSWORD` | Your CalDAV login; with ALLGlance, your vikunja login |
 | `ALLGLANCE_TOKEN` | The gateway's `GATEWAY_TOKEN` |
@@ -191,6 +191,7 @@ npm run build   # server/dist and web/dist
 
 ## Docs
 
+- [docs/nginx-and-docker.md](docs/nginx-and-docker.md): which nginx folder to mount and how the paths line up, `docker-compose.override.yml`, and the Uptime Kuma script (sites, Orb's apps, containers).
 - [docs/backend.md](docs/backend.md): what Orb owns and what it reads, the
   REST API, MCP tools, CalDAV, the wiki rules
 - [docs/allglance.md](docs/allglance.md): the ALLGlance stack, priorities,

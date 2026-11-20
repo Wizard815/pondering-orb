@@ -1,0 +1,58 @@
+# Your own changes on top of docker-compose.yml. Docker Compose reads
+# docker-compose.override.yml automatically, so keep your paths, networks and
+# extras here and docker-compose.yml can be replaced by a new example any time.
+#
+#   cp docker-compose.override.example.yml docker-compose.override.yml
+#   # edit the paths and names below, then:
+#   docker compose config        # shows the merged result; check the volumes and networks
+#   docker compose up -d
+#
+# Lists (volumes, networks, ports) are ADDED to docker-compose.yml's; single
+# values (environment entries, image) REPLACE them. See docs/nginx-and-docker.md.
+
+services:
+  orb:
+    environment:
+      # The Unraid server's LAN address: app links and Uptime Kuma's "Server apps" use it.
+      UNRAID_LINK_HOST: 192.168.20.5
+      # Where the nginx files are INSIDE the Orb container (the right-hand side of the mount below).
+      NGINX_CONF_DIR: /nginx
+      # SWAG's "server_name app.*;" needs your domain; Nginx Proxy Manager's files have full names.
+      NGINX_DOMAIN: thefellashub.com
+      # Orb's apps by container name, once Orb is on their networks (below).
+      MILACLONE_URL: http://192.168.20.5:4321        # the Ideas tab opens this in YOUR browser, so a LAN or proxied address
+      UPTIME_URL: http://uptime-kuma:3001            # the bundled Uptime Kuma (COMPOSE_PROFILES=uptime in .env)
+      # HERMES_URL: http://hermes-studio:3000
+      # ARGOS_URL: http://argos:8080/v1
+    volumes:
+      # ---- the reverse proxy's files, read only: ONE of these ----
+      # Nginx Proxy Manager: only its proxy host files (not the whole data folder: that has its database and certificate keys).
+      #   Official image (jc21/nginx-proxy-manager) on Unraid:
+      - /mnt/user/appdata/nginx-proxy-manager/data/nginx/proxy_host:/nginx:ro
+      #   jlesage/nginx-proxy-manager (Unraid Community Apps):
+      # - /mnt/user/appdata/NginxProxyManager/nginx/proxy_host:/nginx:ro
+      # SWAG (linuxserver): the whole nginx folder (proxy-confs and site-confs):
+      # - /mnt/user/appdata/swag/nginx:/nginx:ro
+      # Plain nginx on the host: the whole folder, so sites-enabled's links into sites-available resolve:
+      # - /etc/nginx:/nginx:ro
+    networks: [proxynat, ai_net]                     # added to docker-compose.yml's [orb, dockerapi]
+    labels:
+      # Unraid's Docker tab: a WebUI link for Orb itself (add net.unraid.docker.icon with an image URL for an icon).
+      net.unraid.docker.webui: "http://[IP]:[PORT:8095]/"
+
+  # The bundled Uptime Kuma (start it with COMPOSE_PROFILES=uptime in .env, or --profile uptime).
+  uptime-kuma:
+    volumes:
+      - /mnt/user/appdata/uptime-kuma:/app/data      # instead of ./uptime-kuma, so it's in appdata and backed up
+    networks: [proxynat]                             # so it can check apps on that network by container name too
+    labels:
+      net.unraid.docker.webui: "http://[IP]:[PORT:3001]/"
+      net.unraid.docker.icon: "https://raw.githubusercontent.com/louislam/uptime-kuma/master/public/icon.svg"
+
+networks:
+  # Networks your other apps already use (made by their own compose projects or
+  # Unraid). Orb joins them; it doesn't create or own them.
+  proxynat:
+    external: true
+  ai_net:
+    external: true

@@ -395,22 +395,20 @@ UpstreamManager can track it).
 - The Uptime tab shows groups, heartbeat bars and 24-hour uptime; a compact
   version is a Main panel.
 
-### Watching new sites (Settings → Scripts)
+### Watching sites and apps (Settings → Scripts)
 
-The script *Watch new sites in Uptime Kuma* is the one place Orb writes to
+The script *Watch sites and apps in Uptime Kuma* is the one place Orb writes to
 Uptime Kuma. Run it from Settings → Scripts, or turn it on with a cron
-schedule (default `*/15 * * * *`, in the `TZ` time zone). Each run:
-
-- reads the reverse proxy's sites, the same ones the Links page uses (Nginx
-  Proxy Manager's proxy hosts and the nginx config folder);
-- signs in to Uptime Kuma's Socket.IO API with `UPTIME_KUMA_USER` and
-  `UPTIME_KUMA_PASSWORD` (Kuma 1.x has no REST API for monitors);
-- adds an HTTP monitor for every site no monitor already checks (matched by
-  URL; `https` when the proxy serves TLS; 2xx, 3xx, 401 and 403 count as up);
-- puts the new monitors on the status page Orb reads, making it if missing;
-- pauses monitors it added itself (their description says so) once their site
-  is gone, and resumes them if it comes back. Monitors you made are never
-  touched.
+schedule (default `*/15 * * * *`, in the `TZ` time zone). Each run adds a
+monitor for everything not watched yet, in three sections of Orb's status
+page: **Websites** (the reverse proxy's names), **Pondering apps** (every app
+Orb is connected to, on its own address and health path) and, when its
+option says yes, **Server apps** (containers the proxy doesn't serve). It signs in to
+Uptime Kuma's Socket.IO API with `UPTIME_KUMA_USER` and `UPTIME_KUMA_PASSWORD`
+(Kuma 1.x has no REST API for monitors), pauses monitors it added once their
+target is gone and resumes them when it's back; monitors and sections you made
+are never touched. The details, and how to mount the nginx files, are in
+[nginx-and-docker.md](nginx-and-docker.md).
 
 Names in the script's *Never watch* box are skipped. The last 20 runs, with
 what each one changed, are kept and shown under the script. Scripts are

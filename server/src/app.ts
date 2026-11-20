@@ -11,7 +11,7 @@ import { Auth } from "./auth.js";
 import { OrbConfig, loadConfig, secret, envSafe } from "./config.js";
 import { Upstream } from "./integrations/upstream.js";
 import { uptime } from "./integrations/uptime.js";
-import { syncKuma, sitesFrom } from "./integrations/kumasync.js";
+import { syncKuma, sitesFrom, appSites, serverSites, WEBSITES, APPS, SERVER } from "./integrations/kumasync.js";
 import { Scripts, type ScriptSetting } from "./scripts.js";
 import { hostStats, containers } from "./integrations/system.js";
 import { chat, chatStream, Msg, Tool } from "./integrations/llm.js";
@@ -347,20 +347,51 @@ export async function buildApp(o: AppOptions = {}) {
 
   app.get("/api/uptime", { preHandler: guard }, async () => uptime(cfg().uptime.baseUrl, cfg().uptime.statusPage, cfg().uptime.ignore));
 
+  /** The apps Orb is connected to, on the addresses Orb uses (server to server), with a health address where the app has one. */
+  const orbApps = () => {
+    const c = cfg(), y = appsYaml(), cp = companion(y, "coinpile"), ff = companion(y, "firefly"), om = companion(y, "omi");
+    return [
+      { name: "Hermes Studio", url: c.hermes.baseUrl },
+      { name: "UpstreamManager", url: c.upstream.baseUrl },
+      { name: "ALLGlance gateway", url: c.allglance.baseUrl },
+      { name: "LLMWIKI (Obsidian REST)", url: c.wiki.baseUrl },
+      { name: "Golem's model", url: c.golem.baseUrl ? c.golem.baseUrl.replace(/\/+$/, "") + "/models" : "" },
+      { name: "Milaclone", url: c.milaclone.url, path: "/api/health" },
+      { name: "Unraid Management Agent", url: c.unraid.baseUrl },
+      { name: "Nginx Proxy Manager", url: c.npm.baseUrl },
+      { name: "Technitium DNS", url: c.technitium.baseUrl },
+      { name: cp?.name || "Coinpile", url: cp?.url || "", path: "/health" },
+      { name: ff?.name || "Firefly III", url: ff?.url || "" },
+      { name: om?.name || "Omi", url: om?.url || "" },
+    ].filter(e => e.url);
+  };
+
   // ---- scripts (Settings → Scripts): built-in jobs, run by hand or on a cron ----
   const scripts = new Scripts(store, [{
-    id: "uptime-sync", name: "Watch new sites in Uptime Kuma",
-    description: "Adds an Uptime Kuma monitor for every site your reverse proxy serves (Nginx Proxy Manager or nginx files) that isn't watched yet, and puts it on Orb's status page. Monitors it added for sites that are gone get paused, not deleted.",
+    id: "uptime-sync", name: "Watch sites and apps in Uptime Kuma",
+    description: "Adds Uptime Kuma monitors for what isn't watched yet, each in its section of Orb's status page: Websites (every name your reverse proxy serves), Pondering apps (every app Orb is connected to, on its own address) and, if you want, Server apps (containers with a web port the proxy doesn't serve). Monitors it added for things that are gone get paused, not deleted; monitors you made are never touched.",
     defaultCron: "*/15 * * * *",
-    options: [{ key: "skip", label: "Never watch (names, comma separated)", placeholder: "e.g. guac, test.example.com" }],
+    options: [
+      { key: "skip", label: "Never watch (names, comma separated)", placeholder: "e.g. guac, test.example.com" },
+      { key: "apps", label: "Pondering apps (yes / no)", placeholder: "yes" },
+      { key: "containers", label: "Server apps: containers not behind the proxy (yes / no)", placeholder: "no" },
+    ],
     run: async opts => {
       ctxCache = null; // read the proxy fresh
-      const c = cfg(), ctx = await linkContext(), sites = sitesFrom(ctx.routes, String(opts.skip || "").split(/[\s,]+/));
-      if (!sites.length) throw new Error(`Found no proxied sites${ctx.notes.length ? ` (${ctx.notes.join("; ")})` : ". Connect Nginx Proxy Manager or the nginx configs in Connections"}.`);
+      const c = cfg(), ctx = await linkContext(), skip = String(opts.skip || "").split(/[\s,]+/);
+      const yes = (v: unknown, d: boolean) => (v == null || String(v).trim() === "" ? d : /^(y|yes|on|true|1)$/i.test(String(v).trim()));
+      const sites = [...sitesFrom(ctx.routes, skip)];
+      if (yes(opts.apps, true)) sites.push(...appSites(orbApps(), skip));
+      if (yes(opts.containers, false)) {
+        const { apps } = await linkApps();
+        sites.push(...serverSites(apps.map(a => ({ ...a, ...linkFor(a, ctx) })), skip));
+      }
+      if (!sites.length) throw new Error(`Found nothing to watch${ctx.notes.length ? ` (${ctx.notes.join("; ")})` : ". Connect Nginx Proxy Manager or the nginx configs, or Orb's apps, in Connections"}.`);
       const r = await syncKuma({ base: c.uptime.baseUrl, user: secret(c.uptime.userEnv), password: secret(c.uptime.passwordEnv), slug: c.uptime.statusPage || "orb", sites });
       const bits = [r.added.length && `added ${r.added.length}`, r.paused.length && `paused ${r.paused.length}`, r.resumed.length && `resumed ${r.resumed.length}`].filter(Boolean);
-      return { summary: `${bits.length ? bits.join(", ").replace(/^./, x => x.toUpperCase()) + "; " : "Nothing new; "}${r.kept} of ${sites.length} sites already watched.`,
-        details: [...r.added.map(n => `added ${n}`), ...r.paused.map(n => `paused ${n} (no longer proxied)`), ...r.resumed.map(n => `resumed ${n}`), ...ctx.notes] };
+      const count = (g: string) => sites.filter(x => x.group === g).length;
+      return { summary: `${bits.length ? bits.join(", ").replace(/^./, x => x.toUpperCase()) + "; " : "Nothing new; "}${r.kept} of ${sites.length} already watched (${count(WEBSITES)} sites, ${count(APPS)} apps, ${count(SERVER)} containers).`,
+        details: [...r.added.map(n => `added ${n}`), ...r.paused.map(n => `paused ${n} (gone)`), ...r.resumed.map(n => `resumed ${n}`), ...ctx.notes] };
     },
   }], () => ((store.get("settings", "app") as any)?.scripts || {}) as Record<string, ScriptSetting>, (msg, extra) => app.log.info(extra, msg));
   app.get("/api/scripts", { preHandler: guard }, async () => scripts.list());
