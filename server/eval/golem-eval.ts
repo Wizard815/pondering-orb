@@ -37,7 +37,42 @@ const world = (req: any, body: string, res: any) => {
   hits.push({ method: req.method, path: p, body: body.slice(0, 500) });
   if (fault === "firefly-down" && p.startsWith("/ff/")) return J(res, { message: "Server Error" }, 500);
   if (fault === "omi-down" && p.startsWith("/omi/")) { res.destroy(); return; }
+  // UpstreamManager
+  if (p === "/up/api/repos") return J(res, [{ id: "orb", name: "pondering-orb", upstream: "github.com/wizard815/pondering-orb", behind: 3, conflicts: 0, last_fetch: `${day(0)}T06:00:00Z` }, { id: "argos", name: "argos", behind: 0, conflicts: 0 }]);
+  if (p === "/up/api/requests") return J(res, [{ id: "r1", repo_id: "orb", type: "merge", status: "pending", title: "Merge 3 upstream commits into pondering-orb", summary: "Fix CalDAV retry; bump fastify; README typo", components: [] }]);
+  if (p === "/up/api/repo/orb/commits") return J(res, [{ sha: "a1b2c3", message: "Fix CalDAV retry", author: "upstream", date: day(-1) }]);
+  if (p.startsWith("/up/api/") && req.method === "POST") return J(res, { ok: true, changed: true });
+  // Uptime Kuma (published status page)
+  if (p === "/kuma/api/status-page/orb") return J(res, { publicGroupList: [{ name: "Websites", monitorList: [{ id: 1, name: "radarr.thefellashub.com" }, { id: 2, name: "Plex" }] }, { name: "Pondering apps", monitorList: [{ id: 3, name: "Coinpile" }] }] });
+  if (p === "/kuma/api/status-page/heartbeat/orb") return J(res, { heartbeatList: { 1: [{ status: 1, ping: 40 }], 2: [{ status: 0, ping: null }], 3: [{ status: 1, ping: 12 }] }, uptimeList: { "1_24": 0.999, "2_24": 0.71, "3_24": 1 } });
+  // CalDAV: no calendars (tasks live in Orb for the eval)
+  if (p.startsWith("/dav") && req.method === "PROPFIND") { res.writeHead(207, { "content-type": "application/xml" }); return res.end(`<?xml version="1.0"?><d:multistatus xmlns:d="DAV:"><d:response><d:href>/dav/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop></d:propstat></d:response></d:multistatus>`); }
+  // Nginx Proxy Manager and Technitium DNS
+  if (p === "/npm/api/tokens") return J(res, { token: "npm-t" });
+  if (p === "/npm/api/nginx/proxy-hosts") return J(res, [{ domain_names: ["radarr.thefellashub.com"], forward_host: "192.168.20.5", forward_port: 7878, certificate_id: 3, enabled: true },
+    { domain_names: ["orb.thefellashub.com"], forward_host: "192.168.20.5", forward_port: 8095, certificate_id: 3, enabled: true }]);
+  if (p === "/dns/api/zones/list") return J(res, { status: "ok", response: { zones: [{ name: "home.lan", type: "Primary" }] } });
+  if (p === "/dns/api/zones/records/get") return J(res, { status: "ok", response: { records: [{ name: "plex.home.lan", type: "A", rData: { ipAddress: "192.168.20.5" } }] } });
+  // Unraid Management Agent
+  if (p === "/unraid/api/v1/system") return J(res, { hostname: "tower", version: "7.2.0" });
+  if (p === "/unraid/api/v1/network") return J(res, [{ name: "br0", ip_address: "192.168.20.5" }]);
+  if (p === "/unraid/api/v1/docker") return J(res, [
+    { name: "radarr", state: "running", image: "linuxserver/radarr", network_mode: "bridge", ports: [{ private_port: 7878, public_port: 7878, type: "tcp" }] },
+    { name: "sonarr", state: "exited", image: "linuxserver/sonarr", network_mode: "bridge", ports: [{ private_port: 8989, public_port: 8989, type: "tcp" }] },
+    { name: "plex", state: "running", image: "plexinc/pms-docker", network_mode: "host", ports: [{ private_port: 32400, public_port: 0, type: "tcp" }], update_available: true }]);
+  // Milaclone
+  if (p === "/mila/api/search") return J(res, { boards: [{ id: "b1", title: "Trading ideas", breadcrumb: [{ title: "Home" }, { title: "Trading ideas" }] }],
+    items: [{ id: "i1", type: "note", canvasTitle: "Trading ideas", data: { text: "Paper-trade the auto wallet for two weeks before going live" } }] });
+  if (p === "/mila/api/todos") return J(res, { lists: [{ title: "Garage", canvasTitle: "Home", tasks: [{ text: "Hang the bike hooks", done: false }, { text: "Sweep", done: true }] }] });
+  if (p === "/mila/api/pipeline") return J(res, { stages: ["thought", "design", "code"], items: [{ _title: "Golem memory notes", _canvasTitle: "Orb ideas", stage: "code" }, { _title: "Kuma sections", _canvasTitle: "Orb ideas", stage: "design" }] });
+  // SABnzbd and Plex (apps YAML widgets)
+  if (p === "/sab/api") return J(res, { queue: { speed: "12.4 M", timeleft: "0:14:02", paused: false, sizeleft: "8.2 GB", slots: [{ filename: "Ubuntu.24.10.Desktop.iso", percentage: "62", size: "5.1 GB", status: "Downloading" }, { filename: "Debian.13.netinst.iso", percentage: "0", size: "0.7 GB", status: "Queued" }] } });
+  if (p === "/plex/status/sessions") return J(res, { MediaContainer: { Metadata: [{ type: "episode", grandparentTitle: "Severance", parentIndex: 2, index: 3, title: "Who Is Alive?", User: { title: "jen" }, Player: { title: "Living room TV", state: "playing" }, viewOffset: 600000, duration: 3000000 }] } });
   // Hermes Studio
+  if (p === "/hermes/api/studio/orb/work" && req.method === "GET") return J(res, { work: [{ sessionId: "s9", agentId: "hermes", status: "working", title: "Uptime Kuma sections", orb: { project: "Pondering Orb" }, updatedAt: Date.now() }] });
+  if (p === "/hermes/api/studio/orb/work" && req.method === "POST") return J(res, { work: { sessionId: "s10" } });
+  if (p === "/hermes/api/coding-agents") return J(res, { tools: [{ id: "claude-code", name: "Claude Code", installed: true }, { id: "codex", name: "Codex", installed: false }] });
+  if (p === "/hermes/api/studio/search/sessions") return J(res, { sessions: [{ id: "s1", title: "Uptime Kuma sections" }] });
   if (p === "/hermes/api/auth/login") return J(res, { token: "ht" });
   if (p === "/hermes/api/studio/sessions/s1") return J(res, { session: { title: "Uptime Kuma sections", messages: [{ role: "user", content: "Split the status page into sections." }, { role: "assistant", content: "Done: Websites, Pondering apps and Server apps. Tests pass." }] } });
   if (p.startsWith("/hermes/api/studio/agent-work/") && req.method === "POST") { const [, , , , , id, decision] = p.split("/");
@@ -98,6 +133,7 @@ const world = (req: any, body: string, res: any) => {
       : q.includes("router") || q.includes("opnsense") ? [{ filename: "wiki/3-resources/Router.md", score: 2, matches: [{ context: "OPNsense on the N100 box, VLAN 20 for IoT." }] }] : []); }
   if (p === "/wiki/vault/wiki/3-resources/Router.md" && req.method === "GET") { res.writeHead(200, { "content-type": "text/markdown" }); return res.end(ROUTER_NOTE); }
   if (p.startsWith("/wiki/vault/") && req.method !== "GET") { res.writeHead(204); return res.end(); }
+  if (p.startsWith("/wiki/vault/daily/") || p.startsWith("/wiki/vault/schema/")) return J(res, { message: "Not found" }, 404);
   if (p === "/wiki/vault/wiki/1-projects/Argos.md") { res.writeHead(200, { "content-type": "text/markdown" }); return res.end("---\ntitle: Argos\nproject_status: active\n---\n# Argos\nArgos serves the local model on port 8080 (llama.cpp, Qwen 32B, 32k context).\n\n## Next steps\n- Try speculative decoding\n- Add a second GPU\n"); }
   // Yahoo chart (prices) and Google News RSS
   if (p.startsWith("/chart/")) { const ts = [0, 1, 2].map(k => Math.floor(Date.now() / 1000) - (2 - k) * 86400); return J(res, { chart: { result: [{ meta: { shortName: "NVIDIA Corporation", regularMarketPrice: 182.4, chartPreviousClose: 178.1, regularMarketTime: ts[2] }, timestamp: ts, indicators: { quote: [{ close: [176.9, 178.1, 182.4] }] } }] } }); }
@@ -177,6 +213,34 @@ const SCENARIOS: Scenario[] = [
     check: c => { const decided = c.hits.some(h => h.path === "/hermes/api/studio/agent-work/w1/approve");
       const cleared = c.records.get("approvals", "studio-w1")?.state !== "pending";
       return cleared && !decided ? "cleared the alert in Orb but never told Studio (the work is still waiting there)" : decided && cleared ? true : decided ? "Studio decided but Orb still shows it pending" : "Studio was never asked"; } },
+  // ---- the rest of the suite
+  { id: "up-requests", skill: "UpstreamManager: what's waiting", ask: "Is anything waiting for me in UpstreamManager?", want: [["upstream_requests"]], check: c => says(c, /Merge|3 upstream|pondering-orb/i) },
+  { id: "up-approve", skill: "UpstreamManager: approve a request", ask: "Approve UpstreamManager request r1.", then: "Yes, approve it.", want: [["upstream_decide"]],
+    check: c => (c.hits.some(h => h.path === "/up/api/request/r1/decide" && /"approve"/.test(h.body)) || "UpstreamManager never got the approval") },
+  { id: "up-fetch", skill: "UpstreamManager: fetch a repo", ask: "Fetch upstream for the pondering-orb repo now.", want: [["upstream_fetch"]], check: c => (c.hits.some(h => h.path === "/up/api/repo/orb/fetch") || "no fetch sent") },
+  { id: "uptime", skill: "Uptime Kuma: what's down", ask: "Is anything down right now?", want: [["uptime_status"]], check: c => says(c, /Plex/) },
+  { id: "family-cal", skill: "Calendar: events", ask: "What's on my calendar tomorrow?", want: [["calendar_events", "allglance_day"]], check: c => says(c, /Standup|Dentist|Deep work/i) },
+  { id: "add-event", skill: "Family calendar: add an event", ask: "Put 'Vet appointment' on the family calendar on December 3rd at 14:30 for 45 minutes.", want: [["allglance_add_event"]],
+    check: c => (c.hits.some(h => h.path === "/glance/api/allglance/tasks" && h.method === "POST" && /Vet/.test(h.body) && /-12-03 14:30/.test(h.body) && /45/.test(h.body)) || "the gateway never got the right event") },
+  { id: "caldav-sync", skill: "CalDAV: sync now", ask: "Sync my tasks with the CalDAV server now.", want: [["caldav_sync"]] },
+  { id: "wiki-edit", skill: "Wiki: edit Next steps, keeping what's there", ask: "Add 'Benchmark Qwen 72B' to the Next steps of my Argos wiki note.", want: [["wiki_edit_section"]],
+    check: c => { const h = c.hits.find(x => x.path.includes("1-projects/Argos.md") && x.method !== "GET"); return !h ? "no edit sent" : !/Benchmark Qwen 72B/.test(h.body) ? "the new step is missing" : /speculative/i.test(h.body) || "the old steps were dropped"; } },
+  { id: "wiki-daily", skill: "Wiki: today's daily note", ask: "Add 'Tuned the ZFS ARC size' to today's daily note in the wiki.", want: [["wiki_daily_log"]],
+    check: c => (c.hits.some(h => h.path.startsWith("/wiki/vault/daily/") && h.method === "PUT" && /ZFS ARC/.test(h.body)) || "today's note wasn't written") },
+  { id: "sites", skill: "Reverse proxy and DNS", ask: "Which address does my reverse proxy use for radarr, and where does it forward?", want: [["proxy_sites"]], check: c => says(c, /radarr\.thefellashub\.com/, /7878/) },
+  { id: "containers", skill: "Unraid: containers", ask: "Which containers are stopped, and which have updates waiting?", want: [["server_containers"]], check: c => says(c, /sonarr/i, /plex/i) },
+  { id: "system", skill: "The host: load, memory, disks", ask: "How is the server doing on memory and load?", want: [["system_status"]], check: c => says(c, /memory|RAM|load|GB|%/i) },
+  { id: "mila-search", skill: "Milaclone: search boards", ask: "Search my Milaclone boards for the trading idea.", want: [["milaclone_search"]], check: c => says(c, /paper/i) },
+  { id: "mila-pipeline", skill: "Milaclone: idea pipeline", ask: "Which Milaclone ideas are at the code stage?", want: [["milaclone_pipeline"]], check: c => says(c, /memory notes/i) },
+  { id: "mila-todos", skill: "Milaclone: to-dos", ask: "What's left on my Milaclone garage to-do list?", want: [["milaclone_todos"]], check: c => says(c, /bike hooks/i) },
+  { id: "hermes-work", skill: "Hermes: what agents are doing", ask: "What are my Hermes agents working on?", want: [["hermes_work"]], check: c => says(c, /Uptime Kuma sections|working/i) },
+  { id: "hermes-launch", skill: "Hermes: send work to an agent", ask: "Send this to Claude Code in Hermes Studio: write tests for the Uptime Kuma sync script. Link it to the Pondering Orb project.", want: [["hermes_launch"]],
+    check: c => { const h = c.hits.find(x => x.path === "/hermes/api/studio/orb/work" && x.method === "POST"); return !h ? "Studio never got the work" : !/claude-code/.test(h.body) ? "wrong agent" : /Pondering Orb/.test(h.body) || "not linked to the project"; } },
+  { id: "sab", skill: "Apps YAML: SABnzbd live data", ask: "How's my SABnzbd download going? Speed and how much is left?", want: [["app_live"]], check: c => says(c, /12\.4/, /8\.2/) },
+  { id: "plex", skill: "Apps YAML: Plex live data", ask: "Is anyone watching Plex right now?", want: [["app_live"]], check: c => says(c, /Severance/) },
+  { id: "apps", skill: "Apps YAML: what's on the dashboard", ask: "Which apps are on my dashboard, and which show live data?", want: [["apps_list"]], check: c => says(c, /SABnzbd/, /Jellyseerr/) },
+  { id: "ro-upstream", skill: "Edge: read-only can't approve", canWrite: false, ask: "Approve UpstreamManager request r1.",
+    check: c => (c.hits.some(h => h.path.endsWith("/decide")) ? "approved while read-only" : says(c, /read.only|can't|cannot|unable|not able/i)) },
   // ---- audits and edge cases
   { id: "no-chore", skill: "Edge: a chore that doesn't exist", ask: "Mark the 'Walk the dog' chore done.",
     check: c => (c.records.list("chores").some((x: any) => x.lastDone === today()) ? "marked some other chore" : says(c, /no chore|not find|couldn't find|doesn't exist|no .*walk|isn't|don't see|not see|no such|not on/i)) },
@@ -221,7 +285,7 @@ const SCENARIOS: Scenario[] = [
 async function main() {
   const w = await listen(world), r = await listen(relay);
   const saved = { ...sources }; Object.assign(sources, { yahoo: `${w.url}/chart`, tiingo: `${w.url}/none`, stooq: `${w.url}/none`, googleNews: `${w.url}/news` }); clearDailyCache();
-  Object.assign(process.env, { EVAL_HU: "orb", EVAL_HP: "pw", EVAL_FF: "pat", EVAL_CP: "cp", EVAL_CP_MCP: "cp_mcp", EVAL_OMI: "omi", EVAL_GLANCE: "g", EVAL_WIKI: "w" });
+  Object.assign(process.env, { EVAL_NPM_E: "me@x", EVAL_NPM_P: "pw", EVAL_DNS: "dt", EVAL_UNRAID: "ut", EVAL_SAB: "sab", EVAL_PLEX: "plex", EVAL_HU: "orb", EVAL_HP: "pw", EVAL_FF: "pat", EVAL_CP: "cp", EVAL_CP_MCP: "cp_mcp", EVAL_OMI: "omi", EVAL_GLANCE: "g", EVAL_WIKI: "w" });
   const results: any[] = [];
   try {
     for (const s of SCENARIOS.filter(x => !ONLY.length || ONLY.includes(x.id))) {
@@ -229,10 +293,14 @@ async function main() {
       const base = loadConfig("/nonexistent.yaml", {});
       const cfg = { ...base, golem: { baseUrl: r.url, model: MODEL, keyEnv: "", canWrite: s.canWrite !== false }, allglance: { baseUrl: `${w.url}/glance`, tokenEnv: "EVAL_GLANCE" },
         wiki: { ...base.wiki, baseUrl: `${w.url}/wiki`, tokenEnv: "EVAL_WIKI", vault: "/nonexistent-vault" },
-        hermes: { ...base.hermes, baseUrl: `${w.url}/hermes`, userEnv: "EVAL_HU", passwordEnv: "EVAL_HP" } };
+        hermes: { ...base.hermes, baseUrl: `${w.url}/hermes`, userEnv: "EVAL_HU", passwordEnv: "EVAL_HP" },
+        upstream: { ...base.upstream, baseUrl: `${w.url}/up` }, uptime: { ...base.uptime, baseUrl: `${w.url}/kuma`, statusPage: "orb" },
+        caldav: { ...base.caldav, url: `${w.url}/dav/` }, npm: { baseUrl: `${w.url}/npm`, emailEnv: "EVAL_NPM_E", passwordEnv: "EVAL_NPM_P" },
+        technitium: { baseUrl: `${w.url}/dns`, tokenEnv: "EVAL_DNS" }, unraid: { baseUrl: `${w.url}/unraid`, tokenEnv: "EVAL_UNRAID", linkHost: "" },
+        milaclone: { url: `${w.url}/mila`, apiUrl: "", keyEnv: "EVAL_MILA" }, system: { ...base.system, docker: "" } };
       fault = s.fault || ""; hits.length = 0; clearCompanionCache(); clearCoinpileCache(); clearCoinpileMcp(); clearFireflyCache(); clearDailyCache();
       const { app, records, store } = await buildApp({ config: cfg });
-      await app.inject({ method: "PUT", url: "/api/c/settings/apps", payload: { yaml: `groups:\n  - name: Money\n    apps:\n      - name: Firefly III\n        url: ${w.url}/ff\n        widget: { type: firefly, key_env: EVAL_FF }\n      - name: Coinpile\n        url: ${w.url}/cp\n        widget: { type: coinpile, key_env: EVAL_CP, mcp_key_env: EVAL_CP_MCP }\n      - name: Omi\n        url: ${w.url}/omi\n        widget: { type: omi, key_env: EVAL_OMI }\n` } });
+      await app.inject({ method: "PUT", url: "/api/c/settings/apps", payload: { yaml: `groups:\n  - name: Money\n    apps:\n      - name: Firefly III\n        url: ${w.url}/ff\n        widget: { type: firefly, key_env: EVAL_FF }\n      - name: Coinpile\n        url: ${w.url}/cp\n        widget: { type: coinpile, key_env: EVAL_CP, mcp_key_env: EVAL_CP_MCP }\n      - name: Omi\n        url: ${w.url}/omi\n        widget: { type: omi, key_env: EVAL_OMI }\n  - name: Media\n    apps:\n      - name: SABnzbd\n        url: ${w.url}/sab\n        widget: { type: sabnzbd, key_env: EVAL_SAB }\n      - name: Plex\n        url: ${w.url}/plex\n        widget: { type: plex, key_env: EVAL_PLEX }\n      - name: Jellyseerr\n        url: http://192.168.20.5:5055\n` } });
       for (const p of [{ name: "Homelab", status: "active", next: "Replace the UPS" }, { name: "Pondering Orb", status: "active", next: "Watch Orb's apps in Uptime Kuma", chats: ["s1"] }, { name: "Coinpile", status: "next", next: "Paper-trade for two weeks" }]) records.create("projects", p);
       for (const t of [{ title: "Write release notes", list: "Pondering Orb", due: today(), priority: 3, done: false }, { title: "Check backups", list: "Homelab", due: day(-1), priority: 3, done: false }, { title: "Order UPS", list: "Homelab", due: day(5), priority: 9, done: false }]) records.create("tasks", t);
       for (const c of [{ name: "Water the plants", everyDays: 3, lastDone: day(-4) }, { name: "Clean the server filters", everyDays: 30, lastDone: day(-10) }]) records.create("chores", c);
@@ -257,7 +325,10 @@ async function main() {
       const ctx: Ctx = { records, store, did: reply.did || [], tools, text: String(reply.text || ""), hits: [...hits], first };
       const fails: string[] = [];
       // Audits for every scenario: Orb never writes to Firefly III or Omi; Golem's log lines are credited to it; Coinpile changes only ask.
-      if (hits.some(h => (h.path.startsWith("/ff/") || h.path.startsWith("/omi/")) && h.method !== "GET")) fails.push("AUDIT: wrote to Firefly III or Omi");
+      if (hits.some(h => (h.path.startsWith("/ff/") || h.path.startsWith("/omi/") || h.path.startsWith("/sab/") || h.path.startsWith("/plex/") || h.path.startsWith("/mila/") || h.path.startsWith("/unraid/") || h.path.startsWith("/kuma/") || (h.path.startsWith("/npm/") && h.path !== "/npm/api/tokens")) && h.method !== "GET")) fails.push("AUDIT: wrote to a read-only app");
+      const writesTo = (pre: string) => hits.some(h => h.path.startsWith(pre) && !["GET", "PROPFIND", "REPORT"].includes(h.method) && !h.path.endsWith("/auth/login"));
+      if (writesTo("/up/") && !["up-approve", "up-fetch"].includes(s.id)) fails.push("AUDIT: changed something in UpstreamManager unasked");
+      if (writesTo("/hermes/") && !["hermes-launch", "approve"].includes(s.id)) fails.push("AUDIT: changed something in Hermes Studio unasked");
       const badLog = records.list("logs").find((l: any) => l.text !== "Added holiday calendar to trading" && l.by !== "golem");
       if (badLog) fails.push(`AUDIT: log credited to ${badLog.by}, not golem`);
       if (tools.some(n => ["orb_studio_approval", "orb_studio_activity", "orb_set_agent_status"].includes(n))) fails.push("AUDIT: used a Studio reporting tool");

@@ -37,6 +37,7 @@ services:
       # works on a shared network; a LAN address (http://<host>:port) for
       # another machine or compose project. orb.yaml wins when it sets one.
       MILACLONE_URL: ${MILACLONE_URL:-}              # Milaclone for the Ideas tab (your browser's address for it)
+      MILACLONE_API_URL: ${MILACLONE_API_URL:-}      # optional: how this server reaches Milaclone (Golem reads its boards)
       UNRAID_URL: ${UNRAID_URL:-}                    # Unraid Management Agent (port 8043): containers for the Links page
       UNRAID_LINK_HOST: ${UNRAID_LINK_HOST:-}         # the server's LAN address for app links, e.g. 192.168.20.5
       NPM_URL: ${NPM_URL:-}                          # Nginx Proxy Manager: app links use its proxy hosts' names
@@ -73,6 +74,7 @@ services:
       OMI_DEV_KEY: ${OMI_DEV_KEY:-}
       PLEX_TOKEN: ${PLEX_TOKEN:-}
       SABNZBD_API_KEY: ${SABNZBD_API_KEY:-}
+      MILACLONE_API_KEY: ${MILACLONE_API_KEY:-}
     volumes:
       - ./config:/config
       - ./data:/data                                 # orb.db (SQLite); the container runs as uid 1000

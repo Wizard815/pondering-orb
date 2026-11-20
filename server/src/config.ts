@@ -15,8 +15,9 @@ export interface OrbConfig {
   hermes: { baseUrl: string; userEnv: string; passwordEnv: string; publicUrl?: string };
   allglance: { baseUrl: string; tokenEnv: string };
   unraid: { baseUrl: string; tokenEnv: string; linkHost: string };
-  /** Milaclone (Miladash): its address as your browser reaches it, shown in the Ideas tab. */
-  milaclone: { url: string };
+  /** Milaclone (Miladash): its address as your browser reaches it, shown in the Ideas tab. Golem reads its boards at apiUrl
+   *  (default: url) with the key in keyEnv when Milaclone has API_KEY set. */
+  milaclone: { url: string; apiUrl?: string; keyEnv?: string };
   /** Reverse proxy and DNS, read only, so app links use names that work (see integrations/proxies.ts). */
   npm: { baseUrl: string; emailEnv: string; passwordEnv: string };
   nginx: { confDir: string; domain: string };
@@ -36,7 +37,7 @@ const DEFAULTS: OrbConfig = {
   hermes: { baseUrl: "", userEnv: "HERMES_USER", passwordEnv: "HERMES_PASSWORD", publicUrl: "" },
   allglance: { baseUrl: "", tokenEnv: "ALLGLANCE_TOKEN" },
   unraid: { baseUrl: "", tokenEnv: "UNRAID_TOKEN", linkHost: "" },
-  milaclone: { url: "" },
+  milaclone: { url: "", apiUrl: "", keyEnv: "MILACLONE_API_KEY" },
   npm: { baseUrl: "", emailEnv: "NPM_EMAIL", passwordEnv: "NPM_PASSWORD" },
   nginx: { confDir: "", domain: "" },
   technitium: { baseUrl: "", tokenEnv: "TECHNITIUM_TOKEN" },
@@ -96,6 +97,7 @@ export function loadConfig(path = process.env.ORB_CONFIG || "/config/orb.yaml", 
   if (env.NGINX_DOMAIN && !has("nginx", "domain")) c.nginx.domain = env.NGINX_DOMAIN;
   if (env.TECHNITIUM_URL && !has("technitium", "baseUrl")) c.technitium.baseUrl = env.TECHNITIUM_URL;
   if (env.MILACLONE_URL && !has("milaclone", "url")) c.milaclone.url = env.MILACLONE_URL;
+  if (env.MILACLONE_API_URL && !has("milaclone", "apiUrl")) c.milaclone.apiUrl = env.MILACLONE_API_URL;
   if (env.UNRAID_URL && !has("unraid", "baseUrl")) c.unraid.baseUrl = env.UNRAID_URL;
   if (env.UNRAID_LINK_HOST && !has("unraid", "linkHost")) c.unraid.linkHost = env.UNRAID_LINK_HOST;
   if (env.DOCKER_HOST && !has("system", "docker")) c.system.docker = env.DOCKER_HOST;
