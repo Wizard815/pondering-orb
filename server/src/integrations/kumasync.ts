@@ -5,7 +5,15 @@ import { trimSlash } from "./http.js";
  *  uses (Kuma 1.23 has no REST API for monitors). Needs an admin login. */
 
 export const ORB_MARK = "Added by Pondering Orb (Settings → Scripts).";
-export type Site = { name: string; url: string };
+/** A group is a section on Orb's status page. `accept`: the status codes that count as up. */
+export type Site = { name: string; url: string; group?: string; accept?: string[] };
+export const WEBSITES = "Websites", APPS = "Pondering apps", SERVER = "Server apps";
+/** For a site behind the proxy: the page loads, or asks you to sign in. */
+const SITE_OK = ["200-299", "300-399", "401", "403"];
+/** For an app's own address: it answers at all (an API without a page answers 404, one that wants a key 401). */
+export const APP_OK = ["200-299", "300-399", "400-499"];
+const ours = (m: { description?: string | null }) => typeof m.description === "string" && m.description.startsWith(ORB_MARK);
+const groupOf = (m: { description?: string | null }) => /Group: ([^.]+)\./.exec(m.description || "")?.[1] || WEBSITES;
 export type KumaSyncResult = { added: string[]; paused: string[]; resumed: string[]; kept: number; onPage: number };
 
 const norm = (u: string) => u.trim().toLowerCase().replace(/\/+$/, "");
@@ -17,19 +25,40 @@ export function sitesFrom(routes: { names: string[]; https: boolean }[], skip: s
     const host = n.toLowerCase();
     if (host.startsWith("*") || bad.some(b => host === b || host.includes(b))) continue;
     const url = `${r.https ? "https" : "http"}://${host}/`;
-    if (!out.has(norm(url))) out.set(norm(url), { name: host, url });
+    if (!out.has(norm(url))) out.set(norm(url), { name: host, url, group: WEBSITES });
   }
   return [...out.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Monitors for apps Orb is connected to, on their own (LAN) addresses: `path` is the app's health address where it has one.
+ *  Entries without an http(s) address are left out; the same address twice is watched once. */
+export function appSites(entries: { name: string; url: string; path?: string }[], skip: string[] = []): Site[] {
+  const out = new Map<string, Site>(), bad = skip.map(x => x.trim().toLowerCase()).filter(Boolean);
+  for (const e of entries) {
+    let u: URL; try { u = new URL(e.url.trim()); } catch { continue; }
+    if (!/^https?:$/.test(u.protocol) || !u.hostname) continue;
+    if (bad.some(b => e.name.toLowerCase().includes(b) || u.hostname.toLowerCase().includes(b))) continue;
+    const url = u.origin + ((e.path ?? u.pathname.replace(/\/+$/, "")) || "/");
+    if (!out.has(norm(url))) out.set(norm(url), { name: e.name, url, group: APPS, accept: APP_OK });
+  }
+  return [...out.values()];
+}
+
+/** Containers with a web port that the proxy doesn't serve, on the server's LAN address. */
+export function serverSites(apps: { name: string; url: string; via: string; state: string }[], skip: string[] = []): Site[] {
+  const bad = skip.map(x => x.trim().toLowerCase()).filter(Boolean);
+  return apps.filter(a => a.via === "lan" && a.url && a.state === "running" && !bad.some(b => a.name.toLowerCase().includes(b)))
+    .map(a => ({ name: a.name, url: a.url, group: SERVER, accept: APP_OK }));
 }
 
 /** What a sync would do, without Kuma: which sites need a monitor, which Orb-made monitors are gone or back. */
 export function plan(sites: Site[], monitors: { id: number; name?: string; url?: string; description?: string | null; active: boolean | number }[]) {
   const want = new Set(sites.map(s => norm(s.url))), have = new Set(monitors.map(m => norm(m.url || "")));
-  const ours = monitors.filter(m => m.description === ORB_MARK);
+  const mine = monitors.filter(ours);
   return {
     add: sites.filter(s => !have.has(norm(s.url))),
-    pause: ours.filter(m => !!m.active && !want.has(norm(m.url || ""))),
-    resume: ours.filter(m => !m.active && want.has(norm(m.url || ""))),
+    pause: mine.filter(m => !!m.active && !want.has(norm(m.url || ""))),
+    resume: mine.filter(m => !m.active && want.has(norm(m.url || ""))),
     kept: monitors.filter(m => want.has(norm(m.url || ""))).length,
   };
 }
@@ -56,30 +85,34 @@ export async function syncKuma(o: { base: string; user: string; password: string
     const login = await ask(s, "login", { username: o.user, password: o.password, token: "" });
     if (!login?.ok) throw new Error(login?.msg === "authIncorrectCreds" || /incorrect/i.test(login?.msg || "") ? "Uptime Kuma refused the login in UPTIME_KUMA_USER / UPTIME_KUMA_PASSWORD." : `Uptime Kuma login failed: ${login?.msg || "no answer"}.`);
     const monitors = Object.values(await list).map((m: any) => ({ ...m, id: Number(m.id) }));
-    const p = plan(o.sites, monitors), added: { id: number; name: string }[] = [];
+    const p = plan(o.sites, monitors), added: { id: number; name: string; group: string }[] = [];
     for (const site of p.add) {
+      const group = site.group || WEBSITES;
       const r = await ask(s, "add", {
-        type: "http", name: site.name, url: site.url, method: "GET", description: ORB_MARK,
+        type: "http", name: site.name, url: site.url, method: "GET", description: `${ORB_MARK} Group: ${group}.`,
         interval: o.interval || 60, retryInterval: o.interval || 60, resendInterval: 0, maxretries: 2, timeout: 48,
-        accepted_statuscodes: ["200-299", "300-399", "401", "403"], maxredirects: 10, ignoreTls: false, upsideDown: false, expiryNotification: false,
+        accepted_statuscodes: site.accept || SITE_OK, maxredirects: 10, ignoreTls: false, upsideDown: false, expiryNotification: false,
         notificationIDList: {}, kafkaProducerBrokers: [], kafkaProducerSaslOptions: { mechanism: "None" }, httpBodyEncoding: "json", active: true,
       });
       if (!r?.ok) throw new Error(`Uptime Kuma wouldn't add ${site.name}: ${r?.msg || "no answer"}.`);
-      added.push({ id: Number(r.monitorID), name: site.name });
+      added.push({ id: Number(r.monitorID), name: site.name, group });
     }
     for (const m of p.pause) await ask(s, "pauseMonitor", m.id);
     for (const m of p.resume) await ask(s, "resumeMonitor", m.id);
-    // Put new monitors on Orb's status page (made if missing), keeping its other groups and settings.
+    // Put new monitors on Orb's status page (made if missing), each in its group's section, keeping the other sections and settings.
     let onPage = 0;
     let page = await ask(s, "getStatusPage", o.slug);
     if (!page?.ok) { const r = await ask(s, "addStatusPage", "Orb", o.slug); if (!r?.ok) throw new Error(`Couldn't make status page "${o.slug}": ${r?.msg}`); page = await ask(s, "getStatusPage", o.slug); }
     const pub = await fetch(`${trimSlash(o.base)}/api/status-page/${encodeURIComponent(o.slug)}`, { signal: AbortSignal.timeout(15000) }).then(r => (r.ok ? r.json() : null)).catch(() => null) as any;
     const groups: any[] = (pub?.publicGroupList || []).map((g: any) => ({ ...g, monitorList: (g.monitorList || []).map((m: any) => ({ id: m.id })) }));
     const shown = new Set(groups.flatMap(g => g.monitorList.map((m: any) => Number(m.id))));
-    const missing = [...added.map(a => a.id), ...monitors.filter(m => m.description === ORB_MARK).map(m => m.id)].filter(id => !shown.has(id));
+    const missing = [...added, ...monitors.filter(ours).map(m => ({ id: m.id, group: groupOf(m) }))].filter((x, i, a) => !shown.has(x.id) && a.findIndex(y => y.id === x.id) === i);
     if (missing.length) {
-      if (!groups.length) groups.push({ name: "Sites", monitorList: [] });
-      groups[0].monitorList.push(...missing.map(id => ({ id })));
+      for (const m of missing) {
+        let g = groups.find(x => String(x.name).toLowerCase() === m.group.toLowerCase());
+        if (!g) groups.push(g = { name: m.group, monitorList: [] });
+        g.monitorList.push({ id: m.id });
+      }
       const cfg = { domainNameList: [], ...page.config, slug: o.slug };
       const r = await ask(s, "saveStatusPage", o.slug, cfg, cfg.icon || "/icon.svg", groups);
       if (!r?.ok) throw new Error(`Couldn't update status page "${o.slug}": ${r?.msg}`);

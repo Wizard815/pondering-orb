@@ -7,6 +7,8 @@
 #   mkdir -p data && sudo chown 1000:1000 data
 #   docker compose up -d                  # pulls the image (or: docker compose up -d --build)
 #
+# Your own paths and networks: docker-compose.override.example.yml (see docs/nginx-and-docker.md).
+#
 # This starts Orb and a read-only proxy for the Docker socket, nothing else.
 # Apps you already run (Hermes Studio, Argos, LLMWIKI, UpstreamManager, the
 # ALLGlance gateway, Firefly III, Coinpile, Omi, Uptime Kuma) stay where they are; Orb
@@ -44,7 +46,7 @@ services:
       ALLGLANCE_URL: ${ALLGLANCE_URL:-}              # the gateway; also serves vikunja's CalDAV at /dav
       UPSTREAM_URL: ${UPSTREAM_URL:-}
       UPTIME_URL: ${UPTIME_URL:-}
-      UPTIME_KUMA_USER: ${UPTIME_KUMA_USER:-}        # an Uptime Kuma admin, only for Settings → Scripts → Watch new sites
+      UPTIME_KUMA_USER: ${UPTIME_KUMA_USER:-}        # an Uptime Kuma admin, only for Settings → Scripts → Watch sites and apps
       UPTIME_KUMA_PASSWORD: ${UPTIME_KUMA_PASSWORD:-}
       HERMES_URL: ${HERMES_URL:-}
       HERMES_PUBLIC_URL: ${HERMES_PUBLIC_URL:-}      # Studio in your browser (Agents tab links); defaults to HERMES_URL
