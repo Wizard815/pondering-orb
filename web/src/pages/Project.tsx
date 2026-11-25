@@ -6,7 +6,8 @@ import { create, patch, useColl, useReady } from "../lib/store";
 import { useUi } from "../lib/ui";
 import { useFetch } from "../lib/useFetch";
 import { post } from "../lib/api";
-import { ago, listOf, logSorted, sortTasks, todayISO } from "../lib/util";
+import { ago, clip, listOf, logSorted, sortTasks, todayISO } from "../lib/util";
+import { openBoard } from "./Ideas";
 import { Commit, StatusSelect, projById, projectList, projectMenu, useRepos } from "./projects/shared";
 import "./projects.css";
 
@@ -176,6 +177,7 @@ export function ProjectPage({ id, editing, setEditing }: { id: string; editing: 
     <div className="room-head"><div className="titles"><h2>{p.name}</h2><span className="flavor">{p.next || "No next step set."}</span></div>
       <div className="proj-head"><StatusSelect p={p} /><Star p={p} />{p.repo && <span className="mono small muted">{p.repo}</span>}
         {p.archived && <span className="pill warn"><i />Archived</span>}
+        {p.board?.id && <a className="btn" href="#ideas" onClick={e => { e.preventDefault(); openBoard(p.board.id); }} title="Open the board linked to this project on the Ideas tab">Board: {clip(p.board.title || "Ideas", 30)}</a>}
         <button className="btn" onClick={e => { const r = e.currentTarget.getBoundingClientRect(); projectMenu(ui, p, r.left, r.bottom + 4, true); }}>More…</button>
         <EditButton editing={editing} setEditing={setEditing} /></div></div>
     <PanelGrid key="project" page="project" panels={panels} editing={editing} />

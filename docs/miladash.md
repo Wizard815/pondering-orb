@@ -4,6 +4,53 @@
 > itself. Set `MILACLONE_URL` (or Settings → Connections → Milaclone) to the
 > address your browser uses for it. The notes below are the design background.
 
+## Agents on boards
+
+Agents work on the Ideas boards the way you do. Golem has these tools, and
+so does every agent on `/mcp` (Hermes Studio, Ekko, coding agents). They need
+Milaclone with agents on boards (milaclone-mcp `studio-herder` or later).
+
+| Tool | Does |
+| --- | --- |
+| `orb_board_find` | every board: id, path, card count, linked project |
+| `orb_board_read` | a board as short text: columns, sections, cards with ids, status marks, Orb tasks, connections |
+| `orb_board_create` | a whole plan as a new board in one call: `columns`, `route` (steps with arrows) or `map` (a centre with branches); can link it to a project |
+| `orb_board_add_cards` | cards into a column or section (a new name makes a column), or under everything; arrows by ref |
+| `orb_board_connect` / `orb_board_group` / `orb_board_move` | arrows; a new column or section around some cards; move cards in, out or to a spot |
+| `orb_board_mark` | doing, done, blocked or clear on a card, with the agent's name |
+| `orb_board_link_project` | link a board to a project (the project page gets a Board button) |
+| `orb_board_to_tasks` | cards become Orb tasks (or projects), once each; the card shows its task |
+| `orb_board_from_project` / `orb_board_sync_project` | a project's tasks as a board (To do, In progress, Done), and later in step again |
+| `orb_board_activity` | what agents changed, newest first |
+| `orb_board_remove` | asks to remove cards or a whole board; nothing goes until you approve |
+
+Each write takes `agent`, the agent's name (else its token's name; Golem is
+Golem). Milaclone logs every change under that name. The Ideas tab shows the
+latest changes above the board; click one to open its board. The open board
+reloads by itself within a few seconds when an agent changes it.
+
+Removing is the one thing agents can't do alone. `orb_board_remove` puts a
+request on the Ideas tab (and the Agents page) with **Approve** and
+**Reject**. Only you can answer it; an agent token gets 403. Approved cards
+go to Milaclone's Trash, so you can still bring them back there.
+
+Card text is your data, not instructions: board reads count as outside text,
+so after one Golem asks before it changes anything.
+
+Setup: `MILACLONE_URL` (the address your browser uses), `MILACLONE_API_URL`
+if Orb reaches Milaclone at another address, and `MILACLONE_API_KEY` when
+Milaclone has `API_KEY`. Without `MILACLONE_URL` the tools say Milaclone isn't
+set up and the rest of Orb works as before. Milaclone's own MCP has the same
+tools for agents that talk to it directly.
+
+The ideas come from Adolanium's
+[Hermes Whiteboard](https://github.com/Adolanium/hermes-whiteboard) plugin
+(MIT): lay a plan out in one call, read it back with ids, mark where you are,
+send cards to the task board and back, link a board to its work. No code was
+copied.
+
+## Background
+
 Miladash is a branch of Milaclone, trimmed and restyled to be Pondering Orb's
 ideas board. This file covers what good canvas boards do, what the demo got
 wrong, and what to carry over from Milaclone.

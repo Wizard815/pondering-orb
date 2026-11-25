@@ -20,7 +20,7 @@ layout**. Drag a tab onto another to show two pages side by side.
 | **Journal** | One page per day: Orb's log of the day (money spent and earned, tasks and chores done, commits, UpstreamManager requests, Hermes Studio agent work, Omi's recap, alerts), your notes, and handwritten pages (BOOX exports or photos of paper) read by your vision model; each day can go to the wiki |
 | **Projects** | Kanban board (next, active, blocked, paused, shipped) and the log; each project has a page with its tasks, log, wiki note, repository and linked chats |
 | **Agents** | Hermes Studio chats working on your plans: watch them, or send a project or task to a new one (Ekko, Hermes or a coding agent) |
-| **Ideas** | Milaclone (Miladash) in place: boards, mind maps and drawings (`MILACLONE_URL`) |
+| **Ideas** | Milaclone (Miladash) in place: boards, mind maps and drawings (`MILACLONE_URL`). Agents lay plans out, add and move cards and turn them into tasks; a strip shows who changed what, and removals wait for your approval ([docs/miladash.md](docs/miladash.md#agents-on-boards)) |
 | **To-do** | CalDAV task lists with priorities, plus dayGLANCE's tasks |
 | **Wiki** | The LLMWIKI vault: tree, notes, search, section edits, related links |
 | **Calendar** | Month and next two weeks: your events, the family calendar, CalDAV calendars, task due dates and chores |
@@ -63,7 +63,7 @@ Each one is optional; leave its address empty and its panels say so.
 | **Omi** (omi-local) | Read only: daily recaps, conversations, memory search; its action items come through CalDAV, once | [docs/companions.md](docs/companions.md) |
 | **Robinhood** | Its Trading MCP (OAuth): the agentic account, and orders for picks you approve, within caps you set | [docs/picks.md](docs/picks.md) |
 | **Plex**, **SABnzbd** | Live panels | |
-| Agents (MCP) | `POST /mcp` with a token: projects, logs, tasks, chores. An agent token can also read the money panels (Coinpile, Firefly III) and ask Golem, so give one only to agents you trust with that | [docs/backend.md](docs/backend.md) |
+| Agents (MCP) | `POST /mcp` with a token: projects, logs, tasks, chores, and Milaclone boards (`orb_board_*`). An agent token can also read the money panels (Coinpile, Firefly III) and ask Golem, so give one only to agents you trust with that | [docs/backend.md](docs/backend.md) |
 
 Every key stays on the server. Settings and the apps YAML only name the
 environment variable that holds it.
@@ -110,7 +110,7 @@ Start from [`.env.example`](.env.example). Values here never reach the browser.
 | `ORB_PASSWORD` | Sign-in for the web app (required) |
 | `ORB_API_TOKENS` | `name:token` pairs for agents and `/mcp`, e.g. `hermes:abc,claude:def`; the name is recorded on what each one writes |
 | `ORB_PORT`, `ORB_HOSTNAME` | The host port (default 8095) and the name the System tab shows |
-| `MILACLONE_URL` | Milaclone's address as your browser reaches it, for the Ideas tab |
+| `MILACLONE_URL`, `MILACLONE_API_URL`, `MILACLONE_API_KEY` | Milaclone's address as your browser reaches it, for the Ideas tab; the address Orb's server uses, if different; and Milaclone's `API_KEY` if it has one (for the board tools and the activity strip) |
 | `UNRAID_URL`, `UNRAID_TOKEN`, `UNRAID_LINK_HOST` | The Unraid Management Agent (`http://tower:8043`), its API token, and optionally the address app links use |
 | `ALLGLANCE_URL`, `UPSTREAM_URL`, `UPTIME_URL`, `HERMES_URL`, `HERMES_PUBLIC_URL`, `ARGOS_URL`, `WIKI_URL` | Addresses of your apps. Empty means not used. Use a container name if Orb shares the app's network, else `http://<host>:<port>`. |
 | `UPTIME_KUMA_USER`, `UPTIME_KUMA_PASSWORD`, `UPTIME_PORT` | An Uptime Kuma admin login, used only by Settings → Scripts → *Watch sites and apps in Uptime Kuma*, and the bundled Uptime Kuma's host port (default 3001) |

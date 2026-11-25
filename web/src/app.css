@@ -95,6 +95,11 @@ div:not(.editing) > .react-grid-layout .react-resizable-handle { display: none; 
 
 /* Ideas: Milaclone in place */
 .mila { height: 100%; min-height: 70vh; display: flex; flex-direction: column; gap: 6px; background: var(--panel); } .mila-bar { gap: 6px; flex-wrap: wrap; } .mila-frame { flex: 1; width: 100%; min-height: 70vh; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.mila-activity { display: flex; flex-direction: column; gap: 6px; } .mila-ask { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 10px; border: 1px solid var(--line); border-left: 3px solid var(--warn); background: var(--warn-bg); border-radius: 8px; }
+.mila-feed { list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: thin; } .mila-feed li { flex: 0 0 auto; }
+.mila-change { font: inherit; font-size: .82rem; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; min-height: 32px; cursor: pointer; max-width: 340px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+.mila-change:disabled { cursor: default; } .mila-who { font-weight: 700; }
 .mila:fullscreen { padding: 6px; } .mila:fullscreen .mila-frame { min-height: 0; }
 
 /* Daily: places, feeds, watchlist, ticker news */

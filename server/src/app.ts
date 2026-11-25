@@ -22,6 +22,7 @@ import { cpSummary, cpMcpTools } from "./integrations/coinpile.js";
 import { call, trimSlash } from "./integrations/http.js";
 import { orbTools } from "./tools.js";
 import { mountMcp } from "./mcp.js";
+import { boardTools, decideBoardApproval, milaApi } from "./boards.js";
 import { logCommits } from "./pollers.js";
 import { CalDav } from "./integrations/caldav.js";
 import { TaskSync } from "./sync.js";
@@ -157,7 +158,8 @@ export async function buildApp(o: AppOptions = {}) {
           return Promise.all((p.chats || []).slice(0, 5).map((id: string) => hermes.session(id, 12).catch(e => ({ id, error: e.message })))); } },
     ] : []),
   ];
-  const tools = () => { const all = [...orbTools(records, () => sync.lists.map(l => l.name)), ...glanceTools(), ...readTools()]; return cfg().golem.canWrite ? all : all.filter(t => !(t as any).write); };
+  const boardDeps = { records, cfg, secret };
+  const tools = () => { const all = [...orbTools(records, () => sync.lists.map(l => l.name)), ...boardTools(boardDeps), ...glanceTools(), ...readTools()]; return cfg().golem.canWrite ? all : all.filter(t => !(t as any).write); };
   /** Golem's chat also gets Coinpile's own tools over MCP when the coinpile widget has mcp_key_env (none of them change anything without the user's Yes in Coinpile). */
   // Money tools carry payee, bill and web page text from outside: they count as external, so Orb's write tools wait for a yes.
   /** Studio's own reporting tools (approval alerts, activity, agent status) are for Hermes Studio over /mcp, not for Golem: clearing an
@@ -273,6 +275,8 @@ export async function buildApp(o: AppOptions = {}) {
     // The journal's day log is Orb's to write; a save from the page keeps it.
     if (c === "journal") { delete body.auto; const cur: any = id && records.get("journal", id); if (cur?.auto && req.method === "PUT") body.auto = cur.auto; }
     if (c === "logs" && who(req) !== "you" && (req.method === "POST" || "by" in body)) body.by = who(req);
+    // A board removal request is Orb's own (orb_board_remove), and only you answer it: an agent can't forge or approve one.
+    if (c === "approvals" && who(req) !== "you" && (body.source === "orb-board" || (id && (records.get("approvals", id) as any)?.source === "orb-board"))) throw new HttpError(403, "Board requests are made by orb_board_remove and answered by you.");
     return body;
   };
   app.post("/api/c/:coll", { preHandler: guard }, async (req: any, reply) => {
@@ -616,12 +620,28 @@ export async function buildApp(o: AppOptions = {}) {
     const decision = req.body?.decision === "reject" ? "reject" : req.body?.decision === "approve" ? "approve" : null;
     if (!decision) throw new HttpError(400, "decision must be approve or reject.");
     const a: any = records.get("approvals", String(req.params.id));
+    // The Agents page lists board requests too; those are Orb's own to decide.
+    if (a?.source === "orb-board") { if ((req as any).who !== "you") throw new HttpError(403, "Only you can answer a board request."); return decideBoardApproval(boardDeps, a.id, decision); }
     if (!a?.workId) throw new HttpError(404, "No such approval.");
     const who = (req as any).who;
     const out = await hermes.decide(a.workId, decision, who === "you" ? "orb" : String(who || "orb"));
     // Whatever Studio decided (here or first somewhere else) clears the alert.
     if (out.decision) records.patch("approvals", a.id, { state: out.decision, via: out.via, by: out.by, resolvedAt: Date.now() });
     return out;
+  });
+
+  // ---- Ideas: what agents changed on Milaclone boards, and their removal requests ----
+  app.get("/api/ideas/activity", { preHandler: guard }, async () => {
+    const m = milaApi(boardDeps);
+    if (!m.ready) return { configured: false, items: [] };
+    try { return { configured: true, items: ((await m.req("GET", "/api/activity?limit=20")).items || []).slice(0, 20) }; }
+    catch (e: any) { return { configured: true, items: [], error: `Orb couldn't read Milaclone's activity: ${e?.message || e} The board itself may still show; set MILACLONE_API_URL if Orb reaches Milaclone at another address.` }; }
+  });
+  app.post("/api/ideas/approvals/:id/decide", { preHandler: guard }, async (req: any) => {
+    if (who(req) !== "you") throw new HttpError(403, "Only you can answer a board request.");
+    const decision = req.body?.decision === "reject" ? "reject" : req.body?.decision === "approve" ? "approve" : null;
+    if (!decision) throw new HttpError(400, "decision must be approve or reject.");
+    return decideBoardApproval(boardDeps, String(req.params.id), decision);
   });
 
   // ---- writes waiting to reach another app ----

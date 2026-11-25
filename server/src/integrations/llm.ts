@@ -4,7 +4,9 @@ import { HttpError } from "../records.js";
 export type Msg = { role: "system" | "user" | "assistant" | "tool"; content: string | null; tool_calls?: any[]; tool_call_id?: string };
 export type Tool = { name: string; description: string; parameters: Record<string, unknown>; run: (args: any, who: string) => Promise<unknown> | unknown; write?: boolean;
   /** Its result holds text from outside (bank payees, web pages): after one runs, write tools wait for the person's say-so. */
-  external?: boolean };
+  external?: boolean;
+  /** It can remove something (orb_board_remove only asks first): MCP clients see destructiveHint. */
+  destructive?: boolean };
 
 /** Runs one tool call. Once a turn has read an external result, Orb's write tools refuse instead of running, so text in a
  *  payee or web page can't make Golem change things; the model is told to ask, and the next message can do it. */

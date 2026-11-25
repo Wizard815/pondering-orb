@@ -95,7 +95,7 @@ function Approvals() {
     setBusy(a.id);
     try {
       const out = await post<{ changed: boolean; message: string }>(`/api/hermes/approvals/${encodeURIComponent(a.id)}/decide`, { decision });
-      ui.status(out.changed ? `${decision === "approve" ? "Approved" : "Rejected"} “${clip(a.title, 40)}” in Hermes Studio.` : out.message || "Already decided.");
+      ui.status(a.source === "orb-board" ? out.message : out.changed ? `${decision === "approve" ? "Approved" : "Rejected"} “${clip(a.title, 40)}” in Hermes Studio.` : out.message || "Already decided.");
     } catch (e) { ui.error(e); } finally { setBusy(""); }
   };
   const where: Record<string, string> = { studio: "Studio", mattermost: "Mattermost", orb: "the Orb" };

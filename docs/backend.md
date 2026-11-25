@@ -576,6 +576,7 @@ task's `caldav` sync fields, and their logs always carry their own name in
 | `orb_set_task_priority` / `orb_start_task` / `orb_complete_task` | change priority; mark started; close a task (also logs it). Find a task by `id` or exact title |
 | `orb_set_agent_status` | an agent's live state on a task or project (Hermes Studio) |
 | `orb_list_chores` / `orb_chore_done` | chores and when they are due |
+| `orb_board_*` | agents on Milaclone boards (the Ideas tab); see [miladash.md](miladash.md#agents-on-boards) |
 
 Every parameter has a description, read-only tools carry `readOnlyHint`, and
 bad input (a due date that isn't `YYYY-MM-DD`, an unknown list or priority)
