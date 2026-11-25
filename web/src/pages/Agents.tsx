@@ -13,6 +13,13 @@ import { AgentBadge } from "../components/Common";
  *  Hermes or a coding agent). Studio runs it with its models, MCP and skills,
  *  reports how it goes back to Orb, and the agent reads Orb through Studio's
  *  MCP tools. */
+
+/** How every Studio agent reaches those tools. Ekko and coding agents see them by name
+ *  (a coding agent with its MCP prefix). Hermes only sees Studio's "use" toolset tool,
+ *  mcp__ekko_studio_use__ekko_studio_use_toolset, which runs them with action "call":
+ *  a prompt naming only ekko_studio_use_orb_read sent weaker models after a tool Hermes
+ *  does not have. */
+const ORB_TOOLS_NOTE = 'These are Studio\'s Pondering Orb tools. If you do not have them by name (in Hermes you only have the toolset tool mcp__ekko_studio_use__ekko_studio_use_toolset), call the toolset tool with {"action": "call", "tool": "<the tool name above>", "arguments": <the arguments above>}.';
 type Agent = { chatId: string; agent: string; status: string; title: string; task: { title: string; list: string } | null; project: string | null; updatedAt: number };
 type Agents = { connected: boolean; studioUrl: string; agents: Agent[] };
 type Kind = { id: string; name: string };
@@ -57,8 +64,8 @@ function SendPlan({ kinds, agents, onSent }: { kinds: Kind[]; agents: Agents | n
     return <button className="btn" disabled={!!busy} onClick={start}>{busy === key ? "Starting…" : "Send to Studio"}</button>;
   };
   if (!kinds.length) return <div className="empty">Hermes Studio is not reachable.</div>;
-  const taskPrompt = (t: any) => `Task from my Pondering Orb plans (list: ${listOf(t)}): ${t.title}${t.due ? `\nDue: ${t.due}.` : ""}\nWhen it is done, mark it complete with the ekko_studio_use_orb_update tool (action complete_task).`;
-  const projectPrompt = (p: any) => `Work on my project "${p.name}" from Pondering Orb.${p.next ? `\nNext step: ${p.next}` : ""}\nRead its open tasks with the ekko_studio_use_orb_read tool (kind tasks, list set to the project name), and log progress with ekko_studio_use_orb_update (action add_log).`;
+  const taskPrompt = (t: any) => `Task from my Pondering Orb plans (list: ${listOf(t)}): ${t.title}${t.due ? `\nDue: ${t.due}.` : ""}\nWhen it is done, mark it complete: ekko_studio_use_orb_update with ${JSON.stringify({ action: "complete_task", arguments: { title: t.title, list: listOf(t) } })}.\n${ORB_TOOLS_NOTE}`;
+  const projectPrompt = (p: any) => `Work on my project "${p.name}" from Pondering Orb.${p.next ? `\nNext step: ${p.next}` : ""}\nRead its open tasks: ekko_studio_use_orb_read with ${JSON.stringify({ kind: "tasks", list: p.name })}. Log progress: ekko_studio_use_orb_update with ${JSON.stringify({ action: "add_log", arguments: { text: "what you did", project: p.name } })}.\n${ORB_TOOLS_NOTE}`;
   return <>
     <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
       <label className="small">Agent <select value={agent} onChange={e => setAgentId(e.target.value)}>{kinds.map(k => <option key={k.id} value={k.id}>{k.name}</option>)}</select></label>
