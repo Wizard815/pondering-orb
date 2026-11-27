@@ -167,3 +167,23 @@ test("TestMcp_AgentStatusFollowsHerdr", async () => {
   assert.equal(cur.status, "active"); assert.equal(cur.agent.status, "working");
   assert.equal((await call({ task: t, status: "sleeping" })).isError, true);
 });
+
+test("TestAuth_WrongPasswordsLockTheAddress", async () => {
+  const { app } = await buildApp({ config: cfg(), password: "pw" });
+  const tryIt = (password: string, remoteAddress = "10.0.0.9") => app.inject({ method: "POST", url: "/api/login", payload: { password }, remoteAddress });
+  for (let i = 0; i < 10; i++) assert.equal((await tryIt("guess" + i)).statusCode, 401);
+  const locked = await tryIt("pw");
+  assert.equal(locked.statusCode, 429, "the right password is refused too while the address waits");
+  assert.match(locked.json().error, /Try again in \d+ min/);
+  assert.equal(locked.headers["set-cookie"], undefined);
+  assert.equal((await tryIt("pw", "10.0.0.10")).statusCode, 200, "another address is not held up");
+});
+
+test("TestAuth_ARightPasswordClearsTheCount", async () => {
+  const { app } = await buildApp({ config: cfg(), password: "pw" });
+  const tryIt = (password: string) => app.inject({ method: "POST", url: "/api/login", payload: { password }, remoteAddress: "10.0.0.9" });
+  for (let i = 0; i < 9; i++) assert.equal((await tryIt("guess")).statusCode, 401);
+  assert.equal((await tryIt("pw")).statusCode, 200);
+  for (let i = 0; i < 9; i++) assert.equal((await tryIt("guess")).statusCode, 401);
+  assert.equal((await tryIt("pw")).statusCode, 200);
+});

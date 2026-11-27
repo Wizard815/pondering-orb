@@ -24,6 +24,22 @@ export class Auth {
     // Hash both sides so the compare takes the same time whatever the length.
     return timingSafeEqual(hashBuf(String(p ?? "")), hashBuf(this.password));
   }
+  /** Wrong passwords per address: 10 in 10 minutes, then that address waits. Orb can
+   *  place trades, so its one password must not be guessable at full speed. */
+  static MAX_FAILS = 10;
+  static FAIL_WINDOW = 10 * 60_000;
+  private fails = new Map<string, number[]>();
+  private recent(addr: string, now: number) { return (this.fails.get(addr) ?? []).filter(t => now - t < Auth.FAIL_WINDOW); }
+  /** Minutes this address still has to wait, or 0 when it may try. */
+  lockedFor(addr: string, now = Date.now()) {
+    const r = this.recent(addr, now);
+    return r.length >= Auth.MAX_FAILS ? Math.max(1, Math.ceil((r[0] + Auth.FAIL_WINDOW - now) / 60_000)) : 0;
+  }
+  noteFail(addr: string, now = Date.now()) {
+    for (const [k, v] of this.fails) if (!v.some(t => now - t < Auth.FAIL_WINDOW)) this.fails.delete(k);
+    this.fails.set(addr, [...this.recent(addr, now), now]);
+  }
+  clearFails(addr: string) { this.fails.delete(addr); }
   newSession() {
     this.prune();
     const t = randomBytes(32).toString("base64url");
