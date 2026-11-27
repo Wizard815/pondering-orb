@@ -240,7 +240,10 @@ export async function buildApp(o: AppOptions = {}) {
   app.get("/api/health", async () => ({ ok: true, version: VERSION, signIn: auth.open ? "open" : "password", timeZone: timeZone() }));
   app.post("/api/login", async (req, reply) => {
     const { password } = (req.body as any) || {};
-    if (!auth.checkPassword(String(password || ""))) return reply.code(401).send({ error: "That password isn't right." });
+    const wait = auth.lockedFor(req.ip);
+    if (wait) return reply.code(429).send({ error: `Too many wrong passwords. Try again in ${wait} min.` });
+    if (!auth.checkPassword(String(password || ""))) { auth.noteFail(req.ip); return reply.code(401).send({ error: "That password isn't right." }); }
+    auth.clearFails(req.ip);
     reply.setCookie("orb_session", auth.newSession(), { httpOnly: true, sameSite: "strict", path: "/", maxAge: 60 * 60 * 24 * 30, secure: req.protocol === "https" });
     return { ok: true };
   });

@@ -162,6 +162,9 @@ and `.env`. Stopping the container cleanly is enough for a consistent copy.
 
 - Sign in with `ORB_PASSWORD`. Agents use tokens from `ORB_API_TOKENS`, and
   they can't change settings, decide stock picks or place orders.
+- Ten wrong passwords from one address lock that address out for ten minutes.
+  Behind a reverse proxy every browser shares the proxy's address, so the wait
+  is shared too.
 - With neither set, Orb is open to anyone who can reach the port. That's only
   for a private LAN, and the server warns about it on start.
 - Requests from other websites are refused, and the Docker socket is only
