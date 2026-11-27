@@ -30,6 +30,8 @@ import { Wiki, notePath, isNoteName } from "./integrations/wiki.js";
 import { Hermes } from "./integrations/hermes.js";
 import { AllGlance } from "./integrations/allglance.js";
 import { Outbox } from "./outbox.js";
+import { Notifier } from "./notify.js";
+import { ntfyEvents } from "./integrations/ntfy.js";
 import { dailyApi } from "./daily.js";
 import { marketApi, marketTools } from "./market.js";
 import { suiteTools } from "./golemtools.js";
@@ -71,6 +73,7 @@ export async function buildApp(o: AppOptions = {}) {
       milaclone: { ...base.milaclone, ...envSafe(c.milaclone) },
       npm: { ...base.npm, ...envSafe(c.npm) },
       technitium: { ...base.technitium, ...envSafe(c.technitium) },
+      ntfy: { ...base.ntfy, ...envSafe(c.ntfy) },
       // The config folder is a mount, fixed by orb.yaml / .env; only the domain can be set in Settings.
       nginx: { ...base.nginx, domain: String(c.nginx?.domain ?? base.nginx.domain).trim(), confDir: base.nginx.confDir },
     };
@@ -81,6 +84,8 @@ export async function buildApp(o: AppOptions = {}) {
   };
   const records = new Records(store, cfg);
   const outbox = new Outbox(store, () => records.emit("outbox")); // browsers refresh the "waiting to sync" pill
+  const notifier = new Notifier(cfg, store, (msg, extra) => app.log.warn(extra, msg));
+  outbox.onStuck = it => { notifier.send("outbox", { title: "A write isn't getting through", message: `${it.label}: still failing after ${it.tries} tries (${it.lastError}). Orb keeps retrying; see Settings → Logs.`, tags: ["warning"] }); };
   const auth = new Auth(store, o.password ?? process.env.ORB_PASSWORD ?? "", o.tokens ?? process.env.ORB_API_TOKENS ?? "");
   const upstream = new Upstream(() => cfg().upstream.baseUrl, () => cfg().upstream.headerEnv);
   const dav = new CalDav(() => cfg().caldav.url, () => ({ user: secret(cfg().caldav.userEnv), pass: secret(cfg().caldav.passwordEnv) }));
@@ -313,7 +318,7 @@ export async function buildApp(o: AppOptions = {}) {
     return { project, logs, taskList: taskList || "" };
   });
 
-  const daily = dailyApi(app, { records, dav, cfg, guard, who, glance });
+  const daily = dailyApi(app, { records, dav, cfg, guard, who, glance, onBrief: day => { notifier.send("brief", { title: "Your morning brief is ready", message: `The brief for ${day} is on the Daily page.`, tags: ["crystal_ball"], priority: 2 }); } });
   const market = marketApi(app, { records, cfg, guard, who });
   robinhoodApi(app, { records, store, guard, who, autoWallet: async () => {
     const cp = companion(appsYaml(), "coinpile"); if (!cp) return null;
@@ -520,7 +525,8 @@ export async function buildApp(o: AppOptions = {}) {
       milaclone: { url: /^https?:\/\//i.test(c.milaclone.url) ? c.milaclone.url : "" },
       npm: { baseUrl: c.npm.baseUrl, emailEnv: c.npm.emailEnv, passwordEnv: c.npm.passwordEnv, keySet: !!(secret(c.npm.emailEnv) && secret(c.npm.passwordEnv)) },
       nginx: { confDir: c.nginx.confDir, domain: c.nginx.domain },
-      technitium: { baseUrl: c.technitium.baseUrl, tokenEnv: c.technitium.tokenEnv, keySet: !!secret(c.technitium.tokenEnv) } };
+      technitium: { baseUrl: c.technitium.baseUrl, tokenEnv: c.technitium.tokenEnv, keySet: !!secret(c.technitium.tokenEnv) },
+      ntfy: { url: c.ntfy.url, topic: c.ntfy.topic, tokenEnv: c.ntfy.tokenEnv, events: c.ntfy.events, tokenSet: !!secret(c.ntfy.tokenEnv), lastError: notifier.lastError } };
   });
   app.post("/api/connections/test/:id", { preHandler: guard }, async (req: any) => {
     const c = cfg(), id = req.params.id;
@@ -536,6 +542,8 @@ export async function buildApp(o: AppOptions = {}) {
         return { ok: true, detail: `Read Technitium DNS: ${r.length} A record${r.length === 1 ? "" : "s"}.` }; }
       if (id === "unraid") { const s = await unraidSystem(c.unraid.baseUrl, secret(c.unraid.tokenEnv)); const a = await unraidContainers(c.unraid.baseUrl, secret(c.unraid.tokenEnv));
         return { ok: true, detail: `Reached the Unraid Management Agent on ${s.hostname || "the server"}${s.version ? ` (Unraid ${s.version})` : ""}: ${a.length} container${a.length === 1 ? "" : "s"}.` }; }
+      if (id === "ntfy") { await notifier.sendNow({ title: "Test from the Pondering Orb", message: `Orb can send to topic ${c.ntfy.topic}. Alerts on: ${[...ntfyEvents(c.ntfy)].join(", ")}.`, tags: ["crystal_ball"] });
+        return { ok: true, detail: `Sent a test to "${c.ntfy.topic}"${secret(c.ntfy.tokenEnv) ? "" : `. ntfy took it without a token (${c.ntfy.tokenEnv || "tokenEnv"} is empty), so the topic isn't protected: anyone who guesses its name can read your alerts. Protect it in ntfy and add a token`}.` }; }
       if (id === "upstream") { const r = await upstream.repos(); return { ok: true, detail: `Reached UpstreamManager: ${r.length} repo${r.length === 1 ? "" : "s"}.` }; }
       if (id === "uptime") { const r = await uptime(c.uptime.baseUrl, c.uptime.statusPage); return { ok: true, detail: `Reached Uptime Kuma: ${r.monitors.length} monitors on "${c.uptime.statusPage}".` }; }
       if (id === "golem") { const r = await call(`${trimSlash(c.golem.baseUrl)}/models`, { headers: secret(c.golem.keyEnv) ? { Authorization: `Bearer ${secret(c.golem.keyEnv)}` } : {} });
@@ -703,5 +711,5 @@ export async function buildApp(o: AppOptions = {}) {
     app.setNotFoundHandler((req, reply) => req.url.startsWith("/api/") || req.url.startsWith("/mcp") ? reply.code(404).send({ error: "Not found." }) : reply.sendFile("index.html"));
   }
 
-  return { app, records, store, auth, upstream, cfg, sync, outbox, writeDigest, daily, market, journal, reviews, scripts };
+  return { app, records, store, auth, upstream, cfg, sync, outbox, notifier, writeDigest, daily, market, journal, reviews, scripts };
 }

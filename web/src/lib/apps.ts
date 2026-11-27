@@ -23,7 +23,8 @@ groups:
         rune: Up
         url: http://upstream-manager:5000
         description: Upstreams, branches, approval requests
-  # Live panels: give an app a widget (plex, sabnzbd, firefly, coinpile, omi or immich) and the name of the
+  # Live panels: give an app a widget (plex, sabnzbd, sonarr, radarr, tautulli, seerr, firefly, coinpile, omi
+  # or immich) and the name of the
   # environment variable that holds its key on the Orb server.
   # - name: Media
   #   apps:
@@ -33,6 +34,21 @@ groups:
   #     - name: SABnzbd
   #       url: http://sabnzbd:8085
   #       widget: { type: sabnzbd, url: http://sabnzbd:8085, key_env: SABNZBD_API_KEY }
+  # Sonarr and Radarr: the next 7 days and the queue. Tautulli: who's watching, recent plays.
+  # Seerr (Jellyseerr or Overseerr): requests waiting and the last five. Keys: each app's
+  # Settings → General → API Key (Tautulli: Settings → Web Interface → API Key).
+  #     - name: Sonarr
+  #       url: http://192.168.20.5:8200
+  #       widget: { type: sonarr, url: http://sonarr:8989, key_env: SONARR_API_KEY }
+  #     - name: Radarr
+  #       url: http://192.168.20.5:8201
+  #       widget: { type: radarr, url: http://radarr:7878, key_env: RADARR_API_KEY }
+  #     - name: Tautulli
+  #       url: http://192.168.20.5:8210
+  #       widget: { type: tautulli, url: http://tautulli:8181, key_env: TAUTULLI_API_KEY }
+  #     - name: Seerr
+  #       url: http://192.168.20.5:5055
+  #       widget: { type: seerr, url: http://seerr:5055, key_env: SEERR_API_KEY }
   # Photos: "on this day" from Immich, with your own Immich API key (memory.read, asset.view;
   # server.statistics too if you're Immich's admin, for the library size):
   # - name: Photos

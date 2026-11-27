@@ -60,6 +60,12 @@ technitium:          # Technitium DNS, read only: an app's A record pointing at 
   base_url: ""       # e.g. http://192.168.20.5:5380
   token_env: TECHNITIUM_TOKEN
 
+ntfy:                # push notifications: a service down or back up, a stuck write, the morning brief; "" = NTFY_URL
+  url: ""            # e.g. http://192.168.20.5:8091
+  topic: ""          # one protected topic, yours alone; "" = NTFY_TOPIC
+  token_env: NTFY_TOKEN   # an access token (tk_...) that may write to the topic
+  events: ""         # uptime, outbox, brief; "" = all
+
 hermes:              # Hermes Studio; "" = HERMES_URL
   base_url: ""       # e.g. http://hermes-studio:6060
   # public_url: https://studio.example.com   # Studio in your browser (Agents tab links); or HERMES_PUBLIC_URL

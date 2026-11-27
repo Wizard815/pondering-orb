@@ -21,6 +21,8 @@ const CONNS: { id: string; name: string; fields: [string, string][]; note?: stri
   { id: "technitium", name: "Technitium DNS", fields: [["baseUrl", "Address (e.g. http://192.168.20.5:5380)"], ["tokenEnv", "API token variable"]], note: "Read only: a record named after an app (plex.home.lan) that points at the server becomes that app's link." },
   { id: "milaclone", name: "Milaclone (Ideas)", fields: [["url", "Address in your browser (e.g. http://tower:4321)"]], note: "The Ideas tab shows Milaclone: boards, mind maps and drawings." },
   { id: "unraid", name: "Unraid Management Agent", fields: [["baseUrl", "Agent address (e.g. http://192.168.20.5:8043)"], ["tokenEnv", "Token variable (the agent's API token)"], ["linkHost", "Server's LAN address for app links (empty: found from the agent, e.g. 192.168.20.5)"]], note: "Lists every container with its ports for the Links page. Unraid's WebUI and icon for each container come from Docker labels, through the socket proxy." },
+  { id: "ntfy", name: "ntfy notifications", fields: [["url", "ntfy address (e.g. http://192.168.20.5:8091)"], ["topic", "Topic (yours alone, e.g. orb-wizard)"], ["tokenEnv", "Access token variable (Bearer tk_...)"], ["events", "Send (empty: all): uptime, outbox, brief"]],
+    note: "Test sends a test notification. Orb sends a monitor going down or back up, a write stuck in the outbox, and the morning brief being ready; never keys or money amounts. Protect the topic in ntfy (one per person) and give Orb a token that may write to it." },
   { id: "hermes", name: "Hermes Studio", fields: [["baseUrl", "Base URL"], ["userEnv", "User variable"], ["passwordEnv", "Password variable"]] },
 ];
 

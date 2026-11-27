@@ -11,6 +11,8 @@ type Handler = (payload: any) => Promise<void>;
 export class Outbox {
   private handlers = new Map<string, Handler>();
   private running = false;
+  /** Called once per item when its third retry fails (the ntfy alert). */
+  onStuck: (it: OutboxItem) => void = () => {};
   constructor(private store: Store, private onChange: () => void = () => {}) {}
   on(kind: string, h: Handler) { this.handlers.set(kind, h); }
   list(): OutboxItem[] { return this.store.list("outbox") as any; }
@@ -42,6 +44,7 @@ export class Outbox {
           const tries = it.tries + 1, wait = Math.min(60, 2 ** Math.min(tries, 6)) * 60000; // 2, 4, 8 ... 60 minutes
           const { id: _i, version: _v, ...rest } = it as any;
           this.store.set("outbox", it.id, { ...rest, tries, lastError: e?.message || String(e), next: Date.now() + wait });
+          if (tries === 3) { try { this.onStuck({ ...it, tries, lastError: e?.message || String(e) }); } catch { /* an alert never stops the retries */ } }
         }
       }
     } finally { this.running = false; if (done || failed) this.onChange(); }

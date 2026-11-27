@@ -274,6 +274,35 @@ that hold its secrets, and a **Test** button. Test runs from the server:
 | LLMWIKI | `GET /` with the key, and checks the vault mount has `.md` files |
 | CalDAV | `PROPFIND`, lists collections that hold VTODOs |
 | UpstreamManager | `GET /api/repos` and `/api/requests` |
+| ntfy | sends a test notification to the topic |
+
+**ntfy notifications.** With `ntfy.url` and `ntfy.topic` set (orb.yaml,
+`NTFY_URL`/`NTFY_TOPIC`, or Settings → Connections → ntfy), Orb sends what it
+already alerts on:
+
+| `events` | When |
+| --- | --- |
+| `uptime` | an Uptime Kuma monitor goes down or comes back (checked every 2 minutes; ignored monitors never), or Kuma can't be read |
+| `outbox` | a write to CalDAV or the wiki fails its third retry |
+| `brief` | the automatic morning brief is written (no content, just "ready") |
+
+```yaml
+ntfy:
+  url: http://192.168.20.5:8091
+  topic: orb-wizard
+  token_env: NTFY_TOKEN      # Bearer tk_... with write access to the topic
+  events: ""                 # "" = all; or e.g. "uptime, outbox"
+```
+
+- Protect the topic, one per person: in ntfy, `ntfy user add wizard`,
+  `ntfy access wizard orb-wizard rw`, `ntfy token add wizard`, and set
+  `auth-default-access: deny-all`. Put the token in `NTFY_TOKEN`.
+- Bodies are scrubbed before sending: no keys, tokens, passwords, URL query
+  strings or money amounts. The brief notification never carries the brief.
+- "ntfy refused the token": wrong token, or its user can't write the topic.
+- Test says "the topic isn't protected": ntfy took the message without a
+  token, so anyone who guesses the topic can read your alerts.
+- A failed send is logged and never stops the thing that triggered it.
 
 **Live app panels** come from small adapters in the server. Each adapter
 polls its app, keeps the last result in `cache`, and serves the browser a
@@ -283,9 +312,13 @@ small JSON shape. The browser never sees an app's key.
 | --- | --- | --- |
 | `plex` | `GET /status/sessions` with `X-Plex-Token` | who is watching what, progress |
 | `sabnzbd` | `GET /api?mode=queue&output=json&apikey=` | speed, time left, queue |
+| `sonarr`, `radarr` | `GET /api/v3/calendar`, `/api/v3/queue` with `X-Api-Key` | next 7 days, queue |
+| `tautulli` | `GET /api/v2?cmd=get_activity`, `cmd=get_history` with `apikey=` | streams, recent plays |
+| `seerr` | `GET /api/v1/request`, `/api/v1/request/count` with `X-Api-Key` | pending requests, last five |
 
 New types are one file each; Homepage's widget list is a good backlog
-(Sonarr, Radarr, qBittorrent, Proxmox, Home Assistant).
+(qBittorrent, Proxmox, Home Assistant). Sonarr, Radarr, Tautulli and Seerr are
+described in [companions.md](companions.md#sonarr-radarr-tautulli-and-seerr).
 
 ## UpstreamManager (the Upkeep tab)
 

@@ -16,7 +16,7 @@ try {
     `On the host, make the folder you mounted there writable for that user, e.g.:\n  mkdir -p data && sudo chown ${uid}:${uid} data`);
   process.exit(1);
 }
-const { app, auth, records, upstream, cfg, sync, outbox, writeDigest, daily, market, journal, reviews, scripts } = await buildApp({
+const { app, auth, records, upstream, cfg, sync, outbox, notifier, writeDigest, daily, market, journal, reviews, scripts } = await buildApp({
   dataFile: resolve(dataDir, "orb.db"),
   webDir: process.env.ORB_WEB || resolve(here, "../../web/dist"),
   logger: true,
@@ -40,6 +40,8 @@ setTimeout(pullTasks, 3000).unref();
 
 // Retry writes that failed to reach CalDAV or the wiki.
 setInterval(() => { outbox.flush().then(r => { if (r.done || r.failed) app.log.info(r, "outbox"); }).catch(() => {}); }, 60000).unref();
+// ntfy: a message when an Uptime Kuma monitor goes down or comes back (only when ntfy is set up).
+setInterval(() => { notifier.uptimeTick().catch(e => app.log.warn({ err: e.message }, "uptime alert check failed")); }, 2 * 60000).unref();
 // Yesterday's digest in the wiki log, when turned on (checked hourly, written once a day).
 setInterval(() => { writeDigest().catch(e => app.log.warn({ err: e.message }, "digest failed")); }, 3600000).unref();
 setTimeout(() => { writeDigest().catch(() => {}); }, 20000).unref();

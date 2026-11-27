@@ -37,7 +37,7 @@ export const dailySettings = (records: Records): DailySettings => {
 const dayStart = (iso: string) => new Date(`${iso}T00:00:00`);
 const addDays = (iso: string, n: number) => localDay(dayStart(iso).getTime() + n * 864e5 + 3 * 3600e3); // +3h keeps DST changes on the right day
 
-export function dailyApi(app: FastifyInstance, deps: { records: Records; dav: CalDav; cfg: () => OrbConfig; guard: any; who: (req: any) => string; glance?: AllGlance }) {
+export function dailyApi(app: FastifyInstance, deps: { records: Records; dav: CalDav; cfg: () => OrbConfig; guard: any; who: (req: any) => string; glance?: AllGlance; onBrief?: (day: string) => void }) {
   const { records, dav, cfg, guard } = deps;
 
   /** CalDAV events (every calendar) plus Orb's own events, from a day for n days. */
@@ -178,7 +178,7 @@ export function dailyApi(app: FastifyInstance, deps: { records: Records; dav: Ca
   async function morningTick() {
     const s = dailySettings(records), day = today();
     if (!s.briefOn || running || records.get("daily", day) || new Date().getHours() < s.briefHour) return;
-    running = true; try { await writeBrief(day); } finally { running = false; }
+    running = true; try { await writeBrief(day); deps.onBrief?.(day); } finally { running = false; }
   }
   return { gather, writeBrief, morningTick, events };
 }

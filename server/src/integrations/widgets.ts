@@ -6,9 +6,10 @@ import { omiDays, omiConversations } from "./companions.js";
 import { ffOverview } from "./firefly.js";
 import { cpSummary } from "./coinpile.js";
 import { immichWidget } from "./immich.js";
+import { arrWidget, tautulliWidget, seerrWidget } from "./media.js";
 
 /** Live app panels. Each app in the apps YAML may have
- *    widget: { type: plex | sabnzbd | immich | ..., url: http://..., key_env: NAME }
+ *    widget: { type: plex | sabnzbd | immich | sonarr | radarr | tautulli | seerr | ..., url: http://..., key_env: NAME }
  *  The server calls the app with the key from the named environment variable
  *  and hands the browser a small JSON shape; the key never reaches the page. */
 export type WidgetCfg = { type: string; url: string; keyEnv?: string; link?: string };
@@ -24,7 +25,9 @@ export function widgetsFrom(yaml: string): Record<string, WidgetCfg> {
 
 const cache = new Map<string, { at: number; data: unknown }>();
 export async function widgetData(name: string, w: WidgetCfg) {
-  const hit = cache.get(name); if (hit && Date.now() - hit.at < 10000) return hit.data;
+  // Keyed by the address too, so pointing a widget somewhere else shows the change at once.
+  const ck = `${name}|${w.type}|${w.url}`;
+  const hit = cache.get(ck); if (hit && Date.now() - hit.at < 10000) return hit.data;
   const base = trimSlash(w.url); if (!base) throw new HttpError(400, `${name}'s widget has no url.`);
   const key = secret(w.keyEnv);
   let data: unknown;
@@ -54,6 +57,12 @@ export async function widgetData(name: string, w: WidgetCfg) {
     data = { type: "omi", day: days[0] || null, conversations: convs };
   } else if (w.type === "immich") {
     data = await immichWidget(w);
+  } else if (w.type === "sonarr" || w.type === "radarr") {
+    data = await arrWidget(w.type, w);
+  } else if (w.type === "tautulli") {
+    data = await tautulliWidget(w);
+  } else if (w.type === "seerr" || w.type === "jellyseerr" || w.type === "overseerr") {
+    data = await seerrWidget(w);
   } else throw new HttpError(400, `No live view for widget type ${w.type}.`);
-  cache.set(name, { at: Date.now(), data }); return data;
+  cache.set(ck, { at: Date.now(), data }); return data;
 }

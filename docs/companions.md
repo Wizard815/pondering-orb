@@ -1,4 +1,4 @@
-# Firefly III, Coinpile, Omi and Immich
+# Firefly III, Coinpile, Omi, Immich and the media apps
 
 Your own apps, read only. Add them as apps with a widget in Settings → Apps
 (the apps YAML):
@@ -174,6 +174,52 @@ What goes wrong:
 - "No memories for today": Immich makes memories overnight. Check
   Administration → Jobs, and that the photos have dates.
 - No library size: the key isn't an admin's, or lacks `server.statistics`.
+
+## Sonarr, Radarr, Tautulli and Seerr
+
+Read-only panels for the media stack. Orb's server makes every call (always
+GET) with the key from `key_env`; the browser never sees a key.
+
+```yaml
+  - name: Media
+    apps:
+      - name: Sonarr
+        url: http://192.168.20.5:8200          # where your browser opens it
+        widget: { type: sonarr, url: http://192.168.20.5:8200, key_env: SONARR_API_KEY }
+      - name: Radarr
+        url: http://192.168.20.5:8201
+        widget: { type: radarr, url: http://192.168.20.5:8201, key_env: RADARR_API_KEY }
+      - name: Tautulli
+        url: http://192.168.20.5:8210
+        widget: { type: tautulli, url: http://192.168.20.5:8210, key_env: TAUTULLI_API_KEY }
+      - name: Seerr
+        url: http://192.168.20.5:5055
+        widget: { type: seerr, url: http://192.168.20.5:5055, key_env: SEERR_API_KEY }
+```
+
+| App | Calls | Shows |
+| --- | --- | --- |
+| Sonarr | `/api/v3/calendar` (today + 7 days, with series), `/api/v3/queue`, header `X-Api-Key` | episodes airing, queue with progress, status, time left |
+| Radarr | `/api/v3/calendar`, `/api/v3/queue`, header `X-Api-Key` | movies released (cinema, digital or physical), queue |
+| Tautulli | `/api/v2?cmd=get_activity`, `cmd=get_history&length=5`, `apikey=` | streams, who watches what, transcode or direct, the last five plays |
+| Seerr | `/api/v1/request?take=5&sort=added`, `/api/v1/request/count`, header `X-Api-Key` | requests waiting for approval, the last five with status |
+
+- Keys: Sonarr, Radarr and Seerr → Settings → General → API Key. Tautulli →
+  Settings → Web Interface → API Key. Put each in Orb's `.env` and name the
+  variable in `key_env`.
+- `type: jellyseerr` and `type: overseerr` work the same as `seerr`.
+- Tautulli and Seerr show people's names (who is watching, who asked). Orb is
+  your own dashboard, so that's fine; don't share the page.
+- If Sonarr or Radarr has a URL base (`/sonarr`), put it in the widget's `url`.
+
+What goes wrong:
+- "refused the API key": the key in that variable is wrong or was
+  regenerated. Copy it again.
+- "Couldn't reach …": the app is down, or the address is wrong from inside
+  Orb's container (use the box IP and port, or the container name on a shared
+  network).
+- "has no calendar at that address (404)": the url is missing a URL base.
+- "answered with a web page": the url points at a login page or a proxy.
 
 ## Panel, or a full page
 

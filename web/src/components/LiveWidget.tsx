@@ -60,13 +60,54 @@ function Immich({ name, data }: { name: string; data: any }) {
   </>;
 }
 
-/** Live data for an app with `widget:` in the apps YAML (Plex, SABnzbd),
+const bar = (pct: number) => <div className="bar"><span style={{ width: Math.min(100, pct) + "%" }} /></div>;
+const when = (iso: string) => { const d = new Date(iso); if (isNaN(+d)) return ""; return d.toLocaleString([], { weekday: "short", ...(iso.length > 10 ? { hour: "2-digit", minute: "2-digit" } : {}) }); };
+const clip = { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } as const;
+
+/** Sonarr / Radarr: what airs or is released in the next 7 days, and the download queue. */
+function Arr({ data }: { data: any }) {
+  return <>
+    <h4 className="group-name">Next 7 days</h4>
+    {data.upcoming.length ? <ul className="list small">{data.upcoming.slice(0, 6).map((u: any, i: number) => <li key={i}>
+      <div className="grow" style={clip}><b>{u.title}</b>{u.detail ? <span className="hint"> {u.detail}</span> : null}</div>
+      <span className="hint">{when(u.at)}{u.hasFile ? " · downloaded" : ""}</span></li>)}</ul>
+      : <div className="empty small">Nothing {data.type === "sonarr" ? "airing" : "released"} this week.</div>}
+    <h4 className="group-name">Queue{data.queueTotal > data.queue.length ? <span className="hint"> ({data.queueTotal})</span> : null}</h4>
+    {data.queue.length ? data.queue.map((q: any, i: number) => <div key={i} className="lv">
+      <div className="row" style={{ justifyContent: "space-between" }}><span className="grow" style={clip}>{q.title}</span>
+        <span className="mono small">{q.warning ? "needs a look · " : ""}{q.status ? q.status + " · " : ""}{q.pct}%{q.timeleft ? ` · ${q.timeleft} left` : ""}</span></div>{bar(q.pct)}</div>)
+      : <div className="empty small">Queue empty.</div>}
+  </>;
+}
+/** Tautulli: who is watching what (direct play or transcoding), and recent plays. */
+function Tautulli({ data }: { data: any }) {
+  const how = (s: any) => s.transcode ? "transcoding" : s.decision === "copy" ? "direct stream" : s.decision ? "direct play" : "";
+  return <>
+    <div className="small">{data.streams ? <b>{data.streams} {data.streams === 1 ? "stream" : "streams"}</b> : "Nothing playing"}{data.transcodes ? <span className="muted"> · {data.transcodes} transcoding</span> : null}</div>
+    {data.sessions.map((s: any, i: number) => <div key={i} className="lv">
+      <div className="row" style={{ justifyContent: "space-between" }}><b className="grow" style={{ overflowWrap: "anywhere" }}>{s.title}</b>
+        <span className="hint">{s.user}{s.player ? " · " + s.player : ""}{s.state === "paused" ? " · paused" : ""}{how(s) ? " · " + how(s) : ""}</span></div>{bar(s.progress)}</div>)}
+    {data.plays.recent.length > 0 && <><h4 className="group-name">Recent plays <span className="hint">({data.plays.total.toLocaleString()} in all)</span></h4>
+      <ul className="list small">{data.plays.recent.map((p: any, i: number) => <li key={i}><span className="grow" style={clip}>{p.title}</span><span className="hint">{p.user}{p.at ? " · " + ago(p.at) : ""}</span></li>)}</ul></>}
+  </>;
+}
+/** Seerr: requests waiting for approval, and the last five requests. */
+function Seerr({ data }: { data: any }) {
+  return <>
+    <div className="small">{data.pending ? <span className="pill warn"><i />{data.pending} waiting for approval</span> : <span className="muted">No requests waiting.</span>}{data.processing ? <span className="muted"> · {data.processing} processing</span> : null}</div>
+    {data.requests.length ? <ul className="list small">{data.requests.map((r: any) => <li key={r.id}>
+      <div className="grow" style={clip}><b>{r.title}</b> <span className="hint">{r.kind === "tv" ? "TV" : "movie"}{r.user ? " · " + r.user : ""}</span></div>
+      <span className="hint">{r.status}{r.media && r.status !== "pending" && r.status !== "declined" ? " · " + r.media : ""}{r.at ? " · " + ago(r.at) : ""}</span></li>)}</ul>
+      : <div className="empty small">No requests yet.</div>}
+  </>;
+}
+
+/** Live data for an app with `widget:` in the apps YAML (Plex, SABnzbd, Sonarr, ...),
  *  fetched through the server so the app's key never reaches the browser. */
 export function LiveWidget({ name }: { name: string }) {
   const { data, error } = useFetch<any>(`/api/widgets/${encodeURIComponent(name)}`, 15000);
   if (error) return <div className="err-inline small">{error}</div>;
   if (!data) return <div className="hint">Loading…</div>;
-  const bar = (pct: number) => <div className="bar"><span style={{ width: Math.min(100, pct) + "%" }} /></div>;
   if (data.type === "plex") return data.sessions.length ? <div>{data.sessions.map((s: any, i: number) => <div key={i} className="lv">
       <div className="row" style={{ justifyContent: "space-between" }}><b className="grow" style={{ overflowWrap: "anywhere" }}>{s.title}</b><span className="hint">{s.user}{s.player ? " · " + s.player : ""}{s.state === "paused" ? " · paused" : ""}{s.transcode ? " · transcoding" : ""}</span></div>{bar(s.progress)}</div>)}</div>
     : <div className="empty small">Nothing playing.</div>;
@@ -78,5 +119,8 @@ export function LiveWidget({ name }: { name: string }) {
   if (data.type === "firefly") return <Firefly data={data} />;
   if (data.type === "coinpile") return <Coinpile data={data} />;
   if (data.type === "immich") return <Immich name={name} data={data} />;
+  if (data.type === "sonarr" || data.type === "radarr") return <Arr data={data} />;
+  if (data.type === "tautulli") return <Tautulli data={data} />;
+  if (data.type === "seerr") return <Seerr data={data} />;
   return null;
 }

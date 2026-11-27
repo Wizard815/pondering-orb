@@ -22,6 +22,9 @@ export interface OrbConfig {
   npm: { baseUrl: string; emailEnv: string; passwordEnv: string };
   nginx: { confDir: string; domain: string };
   technitium: { baseUrl: string; tokenEnv: string };
+  /** ntfy push notifications: the server's address, one protected topic, and the variable holding an access token
+   *  with write access to it. events: which alerts to send (uptime, outbox, brief; empty = all). */
+  ntfy: { url: string; topic: string; tokenEnv: string; events: string };
   pollMinutes: number;
 }
 
@@ -41,6 +44,7 @@ const DEFAULTS: OrbConfig = {
   npm: { baseUrl: "", emailEnv: "NPM_EMAIL", passwordEnv: "NPM_PASSWORD" },
   nginx: { confDir: "", domain: "" },
   technitium: { baseUrl: "", tokenEnv: "TECHNITIUM_TOKEN" },
+  ntfy: { url: "", topic: "", tokenEnv: "NTFY_TOKEN", events: "" },
   pollMinutes: 15,
 };
 
@@ -79,6 +83,7 @@ export function loadConfig(path = process.env.ORB_CONFIG || "/config/orb.yaml", 
     npm: { ...DEFAULTS.npm, ...(raw.npm ?? {}) },
     nginx: { ...DEFAULTS.nginx, ...(raw.nginx ?? {}) },
     technitium: { ...DEFAULTS.technitium, ...(raw.technitium ?? {}) },
+    ntfy: { ...DEFAULTS.ntfy, ...(raw.ntfy ?? {}) },
   };
   // Addresses can also come from the environment (docker-compose.example.yml).
   // orb.yaml wins when it sets the same thing, so editing the YAML always works.
@@ -95,6 +100,8 @@ export function loadConfig(path = process.env.ORB_CONFIG || "/config/orb.yaml", 
   if (env.NPM_URL && !has("npm", "baseUrl")) c.npm.baseUrl = env.NPM_URL;
   if (env.NGINX_CONF_DIR && !has("nginx", "confDir")) c.nginx.confDir = env.NGINX_CONF_DIR;
   if (env.NGINX_DOMAIN && !has("nginx", "domain")) c.nginx.domain = env.NGINX_DOMAIN;
+  if (env.NTFY_URL && !has("ntfy", "url")) c.ntfy.url = env.NTFY_URL;
+  if (env.NTFY_TOPIC && !has("ntfy", "topic")) c.ntfy.topic = env.NTFY_TOPIC;
   if (env.TECHNITIUM_URL && !has("technitium", "baseUrl")) c.technitium.baseUrl = env.TECHNITIUM_URL;
   if (env.MILACLONE_URL && !has("milaclone", "url")) c.milaclone.url = env.MILACLONE_URL;
   if (env.MILACLONE_API_URL && !has("milaclone", "apiUrl")) c.milaclone.apiUrl = env.MILACLONE_API_URL;
