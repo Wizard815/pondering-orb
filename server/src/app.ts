@@ -16,6 +16,7 @@ import { Scripts, type ScriptSetting } from "./scripts.js";
 import { hostStats, containers } from "./integrations/system.js";
 import { chat, chatStream, Msg, Tool } from "./integrations/llm.js";
 import { widgetsFrom, widgetData } from "./integrations/widgets.js";
+import { immichThumb } from "./integrations/immich.js";
 import { companion, companionByName, omiDays, omiConversations, omiSearchMemories, isOmiTask } from "./integrations/companions.js";
 import { ffAccounts, ffOverview, ffRecent, ffSearch } from "./integrations/firefly.js";
 import { cpSummary, cpMcpTools } from "./integrations/coinpile.js";
@@ -646,6 +647,13 @@ export async function buildApp(o: AppOptions = {}) {
     const w = widgetsFrom(String((store.get("settings", "apps") as any)?.yaml || ""))[req.params.name];
     if (!w) throw new HttpError(404, `${req.params.name} has no widget in the apps YAML.`);
     return widgetData(req.params.name, w);
+  });
+  // Immich "on this day" pictures, fetched with the widget's key so it never reaches the page.
+  app.get("/api/widgets/:name/photo/:id", { preHandler: guard }, async (req: any, reply) => {
+    const w = widgetsFrom(String((store.get("settings", "apps") as any)?.yaml || ""))[req.params.name];
+    if (!w || w.type !== "immich") throw new HttpError(404, `${req.params.name} has no Immich widget in the apps YAML.`);
+    const t = await immichThumb(w, String(req.params.id));
+    reply.header("Content-Type", t.mime).header("Cache-Control", "private, max-age=3600").send(t.bytes);
   });
 
   // ---- wiki related links (add only) ----

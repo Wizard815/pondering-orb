@@ -23,7 +23,7 @@ groups:
         rune: Up
         url: http://upstream-manager:5000
         description: Upstreams, branches, approval requests
-  # Live panels: give an app a widget (plex, sabnzbd, firefly, coinpile or omi) and the name of the
+  # Live panels: give an app a widget (plex, sabnzbd, firefly, coinpile, omi or immich) and the name of the
   # environment variable that holds its key on the Orb server.
   # - name: Media
   #   apps:
@@ -33,6 +33,13 @@ groups:
   #     - name: SABnzbd
   #       url: http://sabnzbd:8085
   #       widget: { type: sabnzbd, url: http://sabnzbd:8085, key_env: SABNZBD_API_KEY }
+  # Photos: "on this day" from Immich, with your own Immich API key (memory.read, asset.view;
+  # server.statistics too if you're Immich's admin, for the library size):
+  # - name: Photos
+  #   apps:
+  #     - name: Immich
+  #       url: http://192.168.20.5:8407
+  #       widget: { type: immich, url: http://immich:2283, key_env: IMMICH_API_KEY }
   # Your own apps, read only (add page: true for a full tab):
   # - name: Household
   #   apps:

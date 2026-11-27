@@ -75,6 +75,33 @@ test("TestWidgets_PlexAndSabnzbd", async () => {
   } finally { app3.server.close(); }
 });
 
+test("TestWidgets_ImmichOnThisDay", async () => {
+  const pic = "11111111-2222-3333-4444-555555555555";
+  const im = await serve((req, body, res) => {
+    if (req.headers["x-api-key"] !== "ik") return J(res, { message: "Invalid API key" }, 401);
+    if (req.url.startsWith("/api/memories?for=")) return J(res, [
+      { id: "m1", data: { year: 2023 }, assets: [{ id: pic, type: "IMAGE" }] },
+      { id: "m2", data: { year: 2025 }, assets: [] },
+    ]);
+    if (req.url === "/api/server/statistics") return J(res, { message: "admin only" }, 403);
+    if (req.url.startsWith(`/api/assets/${pic}/thumbnail`)) { res.writeHead(200, { "Content-Type": "image/webp" }); return res.end("PIC"); }
+    J(res, {}, 404);
+  });
+  process.env.TEST_IMMICH = "ik";
+  try {
+    const { app } = await buildApp({ config: cfg() });
+    await app.inject({ method: "PUT", url: "/api/c/settings/apps", payload: { yaml: `groups:\n  - name: Photos\n    apps:\n      - name: Immich\n        url: http://photos.lan\n        widget: { type: immich, url: ${im.url}, key_env: TEST_IMMICH }\n` } });
+    const w = (await app.inject({ url: "/api/widgets/Immich" })).json();
+    assert.equal(w.memories.length, 1, "a memory with no photos is left out");
+    assert.deepEqual([w.memories[0].year, w.memories[0].count, w.memories[0].photos[0].id, w.link, w.library], [2023, 1, pic, "http://photos.lan", null]);
+    assert.ok(!JSON.stringify(w).includes("ik"), "the key never reaches the page");
+    const p = await app.inject({ url: `/api/widgets/Immich/photo/${pic}` });
+    assert.deepEqual([p.statusCode, p.headers["content-type"], p.body], [200, "image/webp", "PIC"]);
+    assert.equal((await app.inject({ url: "/api/widgets/Immich/photo/../../etc" })).statusCode, 404);
+    assert.equal((await app.inject({ url: "/api/widgets/Immich/photo/not-an-id" })).statusCode, 400);
+  } finally { im.server.close(); }
+});
+
 test("TestChores_UpstreamDailyActionAndDigest", async () => {
   const seen: string[] = [];
   const um = await serve((req, body, res) => { seen.push(`${req.method} ${req.url}`); J(res, { ok: true, results: [] }); });

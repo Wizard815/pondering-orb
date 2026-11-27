@@ -46,6 +46,20 @@ function Omi({ data }: { data: any }) {
   </>;
 }
 
+/** Immich: "on this day" photos from earlier years, and the library's size. */
+function Immich({ name, data }: { name: string; data: any }) {
+  const gb = (b: number) => `${(b / 1e9).toFixed(b >= 1e11 ? 0 : 1)} GB`;
+  return <>
+    {data.memories?.length ? data.memories.slice(0, 3).map((m: any) => <div key={m.id} style={{ marginBottom: 6 }}>
+      <div className="small"><b>{m.yearsAgo === 1 ? "1 year ago" : m.yearsAgo ? `${m.yearsAgo} years ago` : "On this day"}</b> <span className="hint">{m.year || ""} · {m.count} {m.count === 1 ? "photo" : "photos"}</span></div>
+      <div className="row" style={{ gap: 4, flexWrap: "wrap" }}>{m.photos.map((p: any) =>
+        <a key={p.id} href={`${data.link}/photos/${p.id}`} target="_blank" rel="noreferrer" aria-label={`Open ${p.video ? "video" : "photo"} from ${m.year || "this day"} in Immich`}>
+          <img src={`/api/widgets/${encodeURIComponent(name)}/photo/${p.id}`} alt={`${p.video ? "Video" : "Photo"} from ${m.year || "this day"}`} loading="lazy" style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 6 }} /></a>)}</div>
+    </div>) : <div className="empty small">No memories for today.</div>}
+    {data.library && <div className="hint">{data.library.photos.toLocaleString()} photos · {data.library.videos.toLocaleString()} videos · {gb(data.library.bytes)}</div>}
+  </>;
+}
+
 /** Live data for an app with `widget:` in the apps YAML (Plex, SABnzbd),
  *  fetched through the server so the app's key never reaches the browser. */
 export function LiveWidget({ name }: { name: string }) {
@@ -63,5 +77,6 @@ export function LiveWidget({ name }: { name: string }) {
   if (data.type === "omi") return <Omi data={data} />;
   if (data.type === "firefly") return <Firefly data={data} />;
   if (data.type === "coinpile") return <Coinpile data={data} />;
+  if (data.type === "immich") return <Immich name={name} data={data} />;
   return null;
 }

@@ -1,4 +1,4 @@
-# Firefly III, Coinpile and Omi
+# Firefly III, Coinpile, Omi and Immich
 
 Your own apps, read only. Add them as apps with a widget in Settings → Apps
 (the apps YAML):
@@ -146,6 +146,34 @@ Orb never gets the other person's numbers:
   else they share with you. Golem asks you for their figure when it needs
   one. To use those numbers, ask Coinpile's own agent with a model that runs
   on your machine.
+
+## Immich (photos: on this day)
+
+The Immich panel shows Immich's own "on this day" memories (photos from this
+date in earlier years) and, if you are Immich's admin, the library's size.
+
+```yaml
+      - name: Immich
+        url: http://192.168.20.5:8407        # where you open Immich: photos link here
+        widget: { type: immich, url: http://immich:2283, key_env: IMMICH_API_KEY }
+```
+
+- Make the key while signed in as **yourself**: Immich → Account settings →
+  API keys. Give it `memory.read` and `asset.view` (add `server.statistics`
+  for the library size, admin only). Orb is your own dashboard, so it shows
+  what your Immich account sees: your photos, a partner's, albums shared
+  with you. Don't use a family member's key.
+- `url` in `widget` is how Orb's server reaches Immich (the container name
+  on a shared network, or the box IP and port). The app's own `url` is where
+  your browser opens a photo.
+- Pictures come through Orb's server (`/api/widgets/Immich/photo/<id>`), so
+  the key never reaches the browser.
+
+What goes wrong:
+- "Immich refused the key": it was deleted or mistyped. Make a new one.
+- "No memories for today": Immich makes memories overnight. Check
+  Administration → Jobs, and that the photos have dates.
+- No library size: the key isn't an admin's, or lacks `server.statistics`.
 
 ## Panel, or a full page
 

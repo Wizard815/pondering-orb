@@ -5,18 +5,19 @@ import { HttpError } from "../records.js";
 import { omiDays, omiConversations } from "./companions.js";
 import { ffOverview } from "./firefly.js";
 import { cpSummary } from "./coinpile.js";
+import { immichWidget } from "./immich.js";
 
 /** Live app panels. Each app in the apps YAML may have
- *    widget: { type: plex | sabnzbd, url: http://..., key_env: NAME }
+ *    widget: { type: plex | sabnzbd | immich | ..., url: http://..., key_env: NAME }
  *  The server calls the app with the key from the named environment variable
  *  and hands the browser a small JSON shape; the key never reaches the page. */
-export type WidgetCfg = { type: string; url: string; keyEnv?: string };
+export type WidgetCfg = { type: string; url: string; keyEnv?: string; link?: string };
 export function widgetsFrom(yaml: string): Record<string, WidgetCfg> {
   const out: Record<string, WidgetCfg> = {};
   let c: any = {}; try { c = parse(yaml || "") || {}; } catch { return out; }
   for (const g of Array.isArray(c.groups) ? c.groups : []) for (const a of Array.isArray(g?.apps) ? g.apps : []) {
     const w = a?.widget; if (!a?.name || !w || typeof w !== "object" || !w.type) continue;
-    out[String(a.name)] = { type: String(w.type), url: String(w.url || a.url || ""), keyEnv: w.key_env || w.keyEnv };
+    out[String(a.name)] = { type: String(w.type), url: String(w.url || a.url || ""), keyEnv: w.key_env || w.keyEnv, ...(a.url ? { link: String(a.url) } : {}) };
   }
   return out;
 }
@@ -51,6 +52,8 @@ export async function widgetData(name: string, w: WidgetCfg) {
     const c = { name, url: w.url, keyEnv: w.keyEnv };
     const [days, convs] = await Promise.all([omiDays(c, 2), omiConversations(c, 5)]);
     data = { type: "omi", day: days[0] || null, conversations: convs };
+  } else if (w.type === "immich") {
+    data = await immichWidget(w);
   } else throw new HttpError(400, `No live view for widget type ${w.type}.`);
   cache.set(name, { at: Date.now(), data }); return data;
 }
