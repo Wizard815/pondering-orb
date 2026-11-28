@@ -285,6 +285,10 @@ already alerts on:
 | `uptime` | an Uptime Kuma monitor goes down or comes back (checked every 2 minutes; ignored monitors never), or Kuma can't be read |
 | `outbox` | a write to CalDAV or the wiki fails its third retry |
 | `brief` | the automatic morning brief is written (no content, just "ready") |
+| `media` | Seerr has new requests waiting, a Sonarr or Radarr download finishes, or one gets stuck with a warning (checked every 2 minutes, from the widgets in the apps YAML) |
+
+Orb's desktop and Android apps get the same alerts without ntfy
+([apps.md](apps.md)).
 
 ```yaml
 ntfy:

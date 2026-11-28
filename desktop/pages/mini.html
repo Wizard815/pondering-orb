@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; font-src 'self'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orb at a glance</title>
+<link rel="stylesheet" href="./style.css">
+<link rel="stylesheet" href="./mini.css">
+</head>
+<body>
+<main class="mini">
+  <header><img src="./icon.svg" alt=""><h1>At a glance</h1><span class="hint" id="when" role="status" aria-live="polite"></span>
+    <button id="refresh" aria-label="Check now" title="Check now">↻</button><button id="open" aria-label="Open Orb" title="Open Orb">⤢</button></header>
+  <div id="err" class="err" role="status" aria-live="polite"></div>
+  <div id="glance"></div>
+</main>
+<script src="./mini.js"></script>
+</body>
+</html>

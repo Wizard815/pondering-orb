@@ -1,0 +1,18 @@
+<resources>
+    <string name="app_name">Pondering Orb</string>
+    <string name="settings_title">Orb app settings</string>
+    <string name="share_title">Add to Orb</string>
+    <string name="tile">Orb</string>
+    <string name="w_status">Orb: services</string>
+    <string name="w_today">Orb: today</string>
+    <string name="w_tasks">Orb: tasks</string>
+    <string name="w_media">Orb: media</string>
+    <string name="w_status_d">Up or down, from Uptime Kuma</string>
+    <string name="w_today_d">The brief, today\'s events and chores</string>
+    <string name="w_tasks_d">Open tasks; tick one off</string>
+    <string name="w_media_d">Plex, downloads and requests</string>
+    <string name="sc_add">Add a task</string>
+    <string name="sc_todo">To-do</string>
+    <string name="sc_daily">Daily</string>
+    <string name="sc_uptime">Uptime</string>
+</resources>

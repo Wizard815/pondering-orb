@@ -1,0 +1,12 @@
+<resources>
+    <style name="Theme.Orb" parent="android:Theme.Material.Light.DarkActionBar">
+        <item name="android:colorPrimary">@color/bg</item>
+        <item name="android:colorPrimaryDark">@color/bg</item>
+        <item name="android:colorAccent">@color/violet</item>
+        <item name="android:statusBarColor">@color/bg</item>
+        <item name="android:windowBackground">@color/page</item>
+    </style>
+    <style name="Theme.Orb.Dialog" parent="android:Theme.Material.Light.Dialog">
+        <item name="android:colorAccent">@color/violet</item>
+    </style>
+</resources>

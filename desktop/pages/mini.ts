@@ -1,0 +1,10 @@
+import { ago, drawGlance, type Glance } from "./glance";
+declare const orb: any;
+const root = document.getElementById("glance")!, when = document.getElementById("when")!, err = document.getElementById("err")!;
+const draw = (g: Glance) => { drawGlance(root, g, async (id, title) => { try { await orb.done(id, title); } catch (e: any) { err.textContent = String(e.message || e); } }); when.textContent = g ? ago(g.at) : ""; };
+orb.onGlance((g: Glance) => { err.textContent = ""; draw(g); });
+orb.onStatus((m: string) => { err.textContent = m; });
+document.getElementById("refresh")!.addEventListener("click", async () => { when.textContent = "checking…"; draw(await orb.refresh()); });
+document.getElementById("open")!.addEventListener("click", () => orb.openOrb());
+orb.glance().then(draw);
+setInterval(async () => { const g = await orb.glance(); if (g) when.textContent = ago(g.at); }, 30000);

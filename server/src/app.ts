@@ -40,6 +40,7 @@ import { journalApi } from "./journal.js";
 import { stocksApi } from "./stocks.js";
 import { reviewsApi } from "./reviews.js";
 import { handwritingApi } from "./handwriting.js";
+import { appsApi } from "./apps.js";
 import { serverApps, linkFor, suggestions, unraidSystem, unraidContainers, agentNetworkIps } from "./integrations/unraid.js";
 import { npmRoutes, nginxRoutes, technitiumNames, serverAddress, type Route, type DnsName } from "./integrations/proxies.js";
 import { today, localDay, isDay, timeZone } from "./dates.js";
@@ -84,9 +85,9 @@ export async function buildApp(o: AppOptions = {}) {
   };
   const records = new Records(store, cfg);
   const outbox = new Outbox(store, () => records.emit("outbox")); // browsers refresh the "waiting to sync" pill
-  const notifier = new Notifier(cfg, store, (msg, extra) => app.log.warn(extra, msg));
-  outbox.onStuck = it => { notifier.send("outbox", { title: "A write isn't getting through", message: `${it.label}: still failing after ${it.tries} tries (${it.lastError}). Orb keeps retrying; see Settings → Logs.`, tags: ["warning"] }); };
   const auth = new Auth(store, o.password ?? process.env.ORB_PASSWORD ?? "", o.tokens ?? process.env.ORB_API_TOKENS ?? "");
+  const notifier = new Notifier(cfg, store, (msg, extra) => app.log.warn(extra, msg), () => auth.devices.count);
+  outbox.onStuck = it => { notifier.send("outbox", { title: "A write isn't getting through", message: `${it.label}: still failing after ${it.tries} tries (${it.lastError}). Orb keeps retrying; see Settings → Logs.`, tags: ["warning"] }); };
   const upstream = new Upstream(() => cfg().upstream.baseUrl, () => cfg().upstream.headerEnv);
   const dav = new CalDav(() => cfg().caldav.url, () => ({ user: secret(cfg().caldav.userEnv), pass: secret(cfg().caldav.passwordEnv) }));
   const sync = new TaskSync(records, dav, cfg, outbox);
@@ -243,6 +244,7 @@ export async function buildApp(o: AppOptions = {}) {
   const who = (req: any) => req.who as string;
 
   // ---- health and sign-in ----
+  const sessionCookie = (reply: any, req: any, token: string) => reply.setCookie("orb_session", token, { httpOnly: true, sameSite: "strict", path: "/", maxAge: 60 * 60 * 24 * 30, secure: req.protocol === "https" });
   app.get("/api/health", async () => ({ ok: true, version: VERSION, signIn: auth.open ? "open" : "password", timeZone: timeZone() }));
   app.post("/api/login", async (req, reply) => {
     const { password } = (req.body as any) || {};
@@ -250,7 +252,7 @@ export async function buildApp(o: AppOptions = {}) {
     if (wait) return reply.code(429).send({ error: `Too many wrong passwords. Try again in ${wait} min.` });
     if (!auth.checkPassword(String(password || ""))) { auth.noteFail(req.ip); return reply.code(401).send({ error: "That password isn't right." }); }
     auth.clearFails(req.ip);
-    reply.setCookie("orb_session", auth.newSession(), { httpOnly: true, sameSite: "strict", path: "/", maxAge: 60 * 60 * 24 * 30, secure: req.protocol === "https" });
+    sessionCookie(reply, req, auth.newSession());
     return { ok: true };
   });
   app.post("/api/logout", async (req, reply) => { const c = (req as any).cookies?.orb_session; if (c) auth.endSession(c); reply.clearCookie("orb_session", { path: "/" }); return { ok: true }; });
@@ -329,6 +331,7 @@ export async function buildApp(o: AppOptions = {}) {
   const dataDir = o.dataFile && o.dataFile !== ":memory:" ? dirname(o.dataFile) : tempData();
   const journal = journalApi(app, { records, cfg, guard, who, upstream, hermes, outbox, appsYaml, events: daily.events, wiki });
   handwritingApi(app, { records, cfg, guard, who, dir: pjoin(dataDir, "handwriting") });
+  const apps = appsApi(app, { auth, records, notifier, cfg, guard, who, appsYaml, events: daily.events, sessionCookie });
 
   // ---- live updates (Server-Sent Events) ----
   app.get("/api/stream", { preHandler: guard }, (req, reply) => {
@@ -711,5 +714,5 @@ export async function buildApp(o: AppOptions = {}) {
     app.setNotFoundHandler((req, reply) => req.url.startsWith("/api/") || req.url.startsWith("/mcp") ? reply.code(404).send({ error: "Not found." }) : reply.sendFile("index.html"));
   }
 
-  return { app, records, store, auth, upstream, cfg, sync, outbox, notifier, writeDigest, daily, market, journal, reviews, scripts };
+  return { app, records, store, auth, upstream, cfg, sync, outbox, notifier, writeDigest, daily, market, journal, reviews, scripts, apps };
 }

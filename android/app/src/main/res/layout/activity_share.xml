@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp" android:minWidth="300dp">
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:labelFor="@id/text" android:text="Add to Orb" android:textSize="20sp" android:fontFamily="serif" android:textStyle="bold" />
+    <EditText android:id="@+id/text" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:inputType="textMultiLine|textCapSentences" android:maxLength="500" android:hint="What to add" android:importantForAutofill="no" />
+    <TextView android:id="@+id/error" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/bad" android:accessibilityLiveRegion="polite" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="end" android:layout_marginTop="8dp">
+        <Button android:id="@+id/cancel" style="?android:attr/borderlessButtonStyle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:minHeight="48dp" android:text="Cancel" />
+        <Button android:id="@+id/as_log" style="?android:attr/borderlessButtonStyle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:minHeight="48dp" android:text="Log it" />
+        <Button android:id="@+id/as_task" style="?android:attr/buttonBarPositiveButtonStyle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:minHeight="48dp" android:text="Add task" />
+    </LinearLayout>
+</LinearLayout>

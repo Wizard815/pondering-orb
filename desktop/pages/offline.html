@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; font-src 'self'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pondering Orb (offline)</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<main>
+  <div class="brand"><img src="./icon.svg" alt=""><div><h1>Orb is out of reach</h1><div class="hint" id="why"></div></div></div>
+  <div class="row"><button class="primary" id="retry">Try again</button><button id="settings">Settings</button></div>
+  <p class="hint">Orb checks again every minute and comes back by itself. Until then, this is what it last showed<span id="when"></span>.</p>
+  <div id="glance"></div>
+</main>
+<script src="./offline.js"></script>
+</body>
+</html>

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; font-src 'self'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pondering Orb</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<main>
+  <div class="brand"><img src="./icon.svg" alt=""><div><h1>Pondering Orb</h1><div class="hint">Your homelab dashboard, on this computer.</div></div></div>
+
+  <div id="status" class="err" role="status" aria-live="polite"></div>
+  <div id="saved" class="ok" role="status" aria-live="polite"></div>
+
+  <form id="signin" class="card" hidden>
+    <h2>Sign in</h2>
+    <label for="url">Orb's address</label>
+    <input id="url" type="url" name="url" required placeholder="https://orb.thefellashub.com" autocomplete="url">
+    <div class="hint">Your Cloudflare tunnel's address for Orb, or its LAN address (http://192.168.20.5:8095).</div>
+    <label for="password">Orb's password</label>
+    <input id="password" type="password" name="password" autocomplete="current-password">
+    <div class="hint">Used once. This computer gets its own key, which you can remove in Orb's Settings → Devices.</div>
+    <label for="name">Name for this computer</label>
+    <input id="name" type="text" name="name" maxlength="60">
+    <details>
+      <summary>Cloudflare Access</summary>
+      <div class="hint">If Orb is behind Cloudflare Access, either sign in to Access in Orb's window when it asks, or add a service token here so notifications and the tray keep working in the background (Zero Trust → Access → Service Auth, and allow it in Orb's Access policy).</div>
+      <label for="cfid">Service token Client ID</label>
+      <input id="cfid" type="text" name="cfClientId" autocomplete="off">
+      <label for="cfsecret">Service token Client Secret</label>
+      <input id="cfsecret" type="password" name="cfSecret" autocomplete="off">
+    </details>
+    <div class="row"><button class="primary" type="submit" id="go">Sign in</button></div>
+  </form>
+
+  <section id="signedin" hidden>
+    <div class="card">
+      <h2>Connected</h2>
+      <div>Orb at <b id="where"></b>, as <b id="device"></b>.</div>
+      <div class="row"><button class="primary" type="button" id="open">Open Orb</button><button type="button" id="mini">Orb at a glance</button><button type="button" id="signout" class="danger">Sign out of this computer</button></div>
+    </div>
+    <form id="prefs" class="card">
+      <h2>This computer</h2>
+      <label class="check"><input type="checkbox" name="notifications"> Notifications (a service down, the morning brief, new requests, finished downloads)</label>
+      <label class="check"><input type="checkbox" name="startAtLogin"> Start in the tray when I sign in to this computer</label>
+      <label for="shortcut">Shortcut to show or hide Orb</label>
+      <input id="shortcut" type="text" name="shortcut" placeholder="CommandOrControl+Alt+O">
+      <label for="minikey">Shortcut for Orb at a glance (a small window that stays on top)</label>
+      <input id="minikey" type="text" name="miniShortcut" placeholder="CommandOrControl+Alt+M">
+      <div class="hint">Like <kbd>CommandOrControl+Alt+O</kbd>. Leave empty to turn a shortcut off.</div>
+      <details>
+        <summary>Cloudflare Access service token</summary>
+        <label for="cfid2">Client ID</label>
+        <input id="cfid2" type="text" name="cfClientId" autocomplete="off">
+        <label for="cfsecret2">Client Secret</label>
+        <input id="cfsecret2" type="password" name="cfSecret" autocomplete="off" placeholder="unchanged">
+        <div class="hint">Clear the Client ID to stop using a service token.</div>
+      </details>
+      <div class="row"><button type="submit" class="primary">Save</button></div>
+    </form>
+  </section>
+  <p class="hint" id="keyring"></p>
+</main>
+<script src="./settings.js"></script>
+</body>
+</html>

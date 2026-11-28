@@ -1,0 +1,13 @@
+<resources>
+    <color name="bg">#0F1119</color>
+    <color name="panel">#E6161A28</color>
+    <color name="line">#2D3352</color>
+    <color name="text">#E9E4D6</color>
+    <color name="dim">#A39D8C</color>
+    <color name="gold">#E2B553</color>
+    <color name="violet">#5A3FC0</color>
+    <color name="violet_hi">#9D86FF</color>
+    <color name="bad">#E8796C</color>
+    <color name="page">#EBE2CD</color>
+    <color name="page_text">#2A2418</color>
+</resources>

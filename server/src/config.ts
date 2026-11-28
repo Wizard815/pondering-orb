@@ -23,7 +23,7 @@ export interface OrbConfig {
   nginx: { confDir: string; domain: string };
   technitium: { baseUrl: string; tokenEnv: string };
   /** ntfy push notifications: the server's address, one protected topic, and the variable holding an access token
-   *  with write access to it. events: which alerts to send (uptime, outbox, brief; empty = all). */
+   *  with write access to it. events: which alerts to send (uptime, outbox, brief, media; empty = all). */
   ntfy: { url: string; topic: string; tokenEnv: string; events: string };
   pollMinutes: number;
 }

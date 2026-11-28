@@ -4,13 +4,14 @@ import { HttpError } from "../records.js";
 
 /** ntfy (https://ntfy.sh, self-hosted): push notifications to a phone.
  *  Orb sends only what it already alerts on (a service down in Uptime Kuma, a
- *  write stuck in the outbox, the morning brief being ready), to one topic.
+ *  write stuck in the outbox, the morning brief being ready, new media
+ *  requests and finished downloads), to one topic.
  *  Protect the topic in ntfy (one per person) and give Orb an access token
  *  with write access to it, in the variable named by tokenEnv.
  *  Bodies are short and scrubbed: never a key, a password or a money amount. */
 export type NtfyCfg = { url: string; topic: string; tokenEnv: string; events?: string };
-export type NtfyEvent = "uptime" | "outbox" | "brief" | "test";
-export const NTFY_EVENTS: NtfyEvent[] = ["uptime", "outbox", "brief"];
+export type NtfyEvent = "uptime" | "outbox" | "brief" | "media" | "test";
+export const NTFY_EVENTS: NtfyEvent[] = ["uptime", "outbox", "brief", "media"];
 const TOPIC = /^[-_A-Za-z0-9]{1,64}$/;
 
 /** Which kinds of notification are on (all of them when the list is empty). */

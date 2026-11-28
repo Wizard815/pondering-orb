@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="add_task" android:enabled="true" android:icon="@drawable/ic_stat_orb" android:shortcutShortLabel="@string/sc_add">
+        <intent android:action="com.ponderingorb.app.ADD_TASK" android:targetPackage="com.ponderingorb.app" android:targetClass="com.ponderingorb.app.ShareActivity" />
+    </shortcut>
+    <shortcut android:shortcutId="todo" android:enabled="true" android:icon="@drawable/ic_stat_orb" android:shortcutShortLabel="@string/sc_todo">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="com.ponderingorb.app" android:targetClass="com.ponderingorb.app.MainActivity">
+            <extra android:name="hash" android:value="todo" />
+        </intent>
+    </shortcut>
+    <shortcut android:shortcutId="daily" android:enabled="true" android:icon="@drawable/ic_stat_orb" android:shortcutShortLabel="@string/sc_daily">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="com.ponderingorb.app" android:targetClass="com.ponderingorb.app.MainActivity">
+            <extra android:name="hash" android:value="daily" />
+        </intent>
+    </shortcut>
+    <shortcut android:shortcutId="uptime" android:enabled="true" android:icon="@drawable/ic_stat_orb" android:shortcutShortLabel="@string/sc_uptime">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="com.ponderingorb.app" android:targetClass="com.ponderingorb.app.MainActivity">
+            <extra android:name="hash" android:value="uptime" />
+        </intent>
+    </shortcut>
+</shortcuts>

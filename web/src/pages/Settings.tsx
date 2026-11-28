@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { PageDef } from "./types";
 import { put, saveSettings, useColl, useSettings } from "../lib/store";
 import { useUi } from "../lib/ui";
-import { get, post } from "../lib/api";
+import { api, get, post } from "../lib/api";
 import { PRESETS, EDITABLE } from "../lib/theme";
 import { parseApps, DEFAULT_APPS } from "../lib/apps";
 import { getZone, listOf } from "../lib/util";
@@ -21,8 +21,8 @@ const CONNS: { id: string; name: string; fields: [string, string][]; note?: stri
   { id: "technitium", name: "Technitium DNS", fields: [["baseUrl", "Address (e.g. http://192.168.20.5:5380)"], ["tokenEnv", "API token variable"]], note: "Read only: a record named after an app (plex.home.lan) that points at the server becomes that app's link." },
   { id: "milaclone", name: "Milaclone (Ideas)", fields: [["url", "Address in your browser (e.g. http://tower:4321)"]], note: "The Ideas tab shows Milaclone: boards, mind maps and drawings." },
   { id: "unraid", name: "Unraid Management Agent", fields: [["baseUrl", "Agent address (e.g. http://192.168.20.5:8043)"], ["tokenEnv", "Token variable (the agent's API token)"], ["linkHost", "Server's LAN address for app links (empty: found from the agent, e.g. 192.168.20.5)"]], note: "Lists every container with its ports for the Links page. Unraid's WebUI and icon for each container come from Docker labels, through the socket proxy." },
-  { id: "ntfy", name: "ntfy notifications", fields: [["url", "ntfy address (e.g. http://192.168.20.5:8091)"], ["topic", "Topic (yours alone, e.g. orb-wizard)"], ["tokenEnv", "Access token variable (Bearer tk_...)"], ["events", "Send (empty: all): uptime, outbox, brief"]],
-    note: "Test sends a test notification. Orb sends a monitor going down or back up, a write stuck in the outbox, and the morning brief being ready; never keys or money amounts. Protect the topic in ntfy (one per person) and give Orb a token that may write to it." },
+  { id: "ntfy", name: "ntfy notifications", fields: [["url", "ntfy address (e.g. http://192.168.20.5:8091)"], ["topic", "Topic (yours alone, e.g. orb-wizard)"], ["tokenEnv", "Access token variable (Bearer tk_...)"], ["events", "Send (empty: all): uptime, outbox, brief, media"]],
+    note: "Test sends a test notification. Orb sends a monitor going down or back up, a write stuck in the outbox, the morning brief being ready, new Seerr requests and finished or stuck downloads; never keys or money amounts. Orb's desktop and Android apps get the same alerts without ntfy. Protect the topic in ntfy (one per person) and give Orb a token that may write to it." },
   { id: "hermes", name: "Hermes Studio", fields: [["baseUrl", "Base URL"], ["userEnv", "User variable"], ["passwordEnv", "Password variable"]] },
 ];
 
@@ -43,7 +43,7 @@ function Connections() {
 
 type ScriptRow = { id: string; name: string; description: string; options: { key: string; label: string; placeholder?: string }[]; on: boolean; cron: string; defaultCron: string; values: Record<string, string>;
   cronOk: boolean; next: string | null; running: boolean; runs: { at: string; ok: boolean; by: string; summary: string; details: string[]; ms: number }[] };
-const when = (iso: string) => new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+const when = (iso: string | number) => new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
 /** Built-in jobs: run now, or turn on and give a cron schedule. */
 function ScriptsSettings() {
@@ -67,6 +67,19 @@ function ScriptsSettings() {
         <div className="grow"><span className="hint">{when(r.at)} · {r.by === "cron" ? "on schedule" : "by you"}</span> {r.summary}
           {r.details.length > 0 && <details><summary className="hint">{r.details.length} changes</summary><ul className="mono small">{r.details.map((d, j) => <li key={j}>{d}</li>)}</ul></details>}</div></li>)}</ul>}
     </form>)}</>;
+}
+
+type DeviceRow = { id: string; name: string; platform: string; createdAt: number; lastSeen: number };
+const PLATFORM_NAME: Record<string, string> = { windows: "Windows", linux: "Linux", mac: "Mac", android: "Android", other: "Other" };
+/** Orb's desktop and Android apps signed in with your password (docs/apps.md). */
+function DevicesPanel() {
+  const ui = useUi(), { data, error, reload } = useFetch<DeviceRow[]>("/api/devices", 60000);
+  if (error) return <div className="err-inline small">{error}</div>;
+  if (!data) return <div className="hint">Loading devices…</div>;
+  return <><p className="hint" style={{ margin: 0 }}>Orb's desktop and Android apps each sign in once with your password and keep their own key. Sign one out here if it's lost or you stop using it; it has to sign in again. Get the apps from the repository's Releases page.</p>
+    {!data.length ? <div className="hint">No apps signed in yet.</div> : <ul className="list small">{data.map(d => <li key={d.id}>
+      <div className="grow"><b>{d.name}</b> <span className="tag">{PLATFORM_NAME[d.platform] || d.platform}</span><div className="hint">signed in {when(d.createdAt)} · last seen {when(d.lastSeen)}</div></div>
+      <button className="btn sm" aria-label={"Sign out " + d.name} onClick={async () => { try { await api("DELETE", `/api/devices/${encodeURIComponent(d.id)}`); ui.status(`${d.name} is signed out.`); reload(); } catch (x) { ui.error(x); } }}>Sign out</button></li>)}</ul>}</>;
 }
 
 /** Containers on the server that look like apps Orb connects to, for connections that are still empty. */
@@ -182,6 +195,7 @@ export const SettingsPage: PageDef = {
           <div className="row"><input type="url" id="btopurl" name="btop" defaultValue={s.btopUrl || ""} key={s.btopUrl} placeholder="http://your-server:7681" /><button className="btn" type="submit">Save</button></div></form>, w: 6, h: 4 },
       { key: "lists", title: "Task lists on Main", node: <MainLists />, w: 6, h: 5 },
       { key: "outbox", title: "Waiting to sync", node: <OutboxPanel />, w: 6, h: 6 },
+      { key: "devices", title: "Devices", node: <DevicesPanel />, w: 6, h: 7 },
       { key: "apps", title: "Apps", node: <AppsYaml />, w: 12, h: 11 },
     ] };
   },

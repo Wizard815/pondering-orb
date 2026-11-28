@@ -68,6 +68,15 @@ Each one is optional; leave its address empty and its panels say so.
 Every key stays on the server. Settings and the apps YAML only name the
 environment variable that holds it.
 
+## Apps for Windows, Linux and Android
+
+Orb in its own window or on your phone, at your tunnel's address
+(`https://orb.thefellashub.com`) or the LAN: notifications without ntfy, a tray
+icon, `Ctrl+Alt+O` from anywhere, a small always-on-top glance, home-screen
+widgets (services, today, tasks with a tick, media), a Quick Settings tile and
+Share → Orb. Download them from Releases (**apps-latest**); see
+[docs/apps.md](docs/apps.md).
+
 ## Run it with Docker
 
 ```bash
@@ -162,6 +171,8 @@ and `.env`. Stopping the container cleanly is enough for a consistent copy.
 
 - Sign in with `ORB_PASSWORD`. Agents use tokens from `ORB_API_TOKENS`, and
   they can't change settings, decide stock picks or place orders.
+- Orb's apps sign in once with the password and keep their own key; remove a
+  lost device in Settings → Devices.
 - Ten wrong passwords from one address lock that address out for ten minutes.
   Behind a reverse proxy every browser shares the proxy's address, so the wait
   is shared too.
@@ -189,6 +200,8 @@ npm run build   # server/dist and web/dist
   keeps Orb's records, talks to the other apps, runs the Golem, schedules the
   brief, research and syncs, and serves the API, `/mcp` and the web app.
 - `web/`: React + Vite + TypeScript.
+- `desktop/`: the Windows and Linux app (Electron), its own npm package.
+- `android/`: the Android app (Kotlin, widgets, tile).
 - `docker/btop/`: the optional btop terminal.
 - `demo/index.html`: the original single-page demo, kept for history.
 
@@ -206,6 +219,8 @@ npm run build   # server/dist and web/dist
 - [docs/picks.md](docs/picks.md): the Daily page, stock picks, the decision
   model and Robinhood
 - [docs/miladash.md](docs/miladash.md): the ideas board and Miladash
+- [docs/apps.md](docs/apps.md): the Windows, Linux and Android apps,
+  Cloudflare Access, notifications and widgets
 
 Not in Orb, by choice: several users in one Orb (run one per person), and
 mail (an early version is kept on the `mail` branch).

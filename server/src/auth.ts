@@ -1,6 +1,7 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { Store } from "./db.js";
+import { Devices } from "./devices.js";
 
 /** Two ways in:
  *  - People sign in with ORB_PASSWORD and get an HttpOnly session cookie.
@@ -10,7 +11,9 @@ import type { Store } from "./db.js";
  *  server warns about it on start. */
 export class Auth {
   tokens = new Map<string, string>();
+  devices: Devices;
   constructor(private store: Store, private password = process.env.ORB_PASSWORD || "", tokens = process.env.ORB_API_TOKENS || "") {
+    this.devices = new Devices(store);
     for (const pair of tokens.split(",").map(s => s.trim()).filter(Boolean)) {
       const i = pair.indexOf(":");
       const name = pair.slice(0, i).trim(), token = pair.slice(i + 1).trim();
@@ -54,7 +57,7 @@ export class Auth {
    *  agent, or null when not allowed. */
   who(req: FastifyRequest): string | null {
     const h = req.headers.authorization || "";
-    if (h.startsWith("Bearer ")) { const t = h.slice(7).trim(); return t ? this.tokens.get(hash(t)) ?? null : null; }
+    if (h.startsWith("Bearer ")) { const t = h.slice(7).trim(); if (!t) return null; return this.tokens.get(hash(t)) ?? (this.devices.check(t) ? "you" : null); }
     const c = (req as any).cookies?.orb_session as string | undefined;
     if (c && this.store.db.prepare("SELECT 1 FROM sessions WHERE token = ? AND created_at >= ?").get(c, Date.now() - Auth.MAX_AGE)) return "you";
     return this.open ? "you" : null;

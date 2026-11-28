@@ -1,5 +1,15 @@
 import { Component, StrictMode, useEffect, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
+// Fonts are bundled, so the page (and Orb's apps, offline) never reach Google.
+import "@fontsource/cinzel/500.css";
+import "@fontsource/cinzel/600.css";
+import "@fontsource/cinzel/700.css";
+import "@fontsource/alegreya-sans/400.css";
+import "@fontsource/alegreya-sans/400-italic.css";
+import "@fontsource/alegreya-sans/500.css";
+import "@fontsource/alegreya-sans/700.css";
+import "@fontsource/jetbrains-mono/400.css";
+import "@fontsource/jetbrains-mono/500.css";
 import "./demo.css";
 import "./app.css";
 import { App } from "./App";

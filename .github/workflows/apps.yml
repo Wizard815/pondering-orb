@@ -1,0 +1,117 @@
+# Orb's apps (docs/apps.md): the Windows and Linux desktop app and the Android APK.
+#   main: builds them and puts them on the "apps-latest" pre-release (always the newest).
+#   a v* tag: the same files on that version's release.
+#   Run it by hand from the Actions tab too.
+name: apps
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+    paths: ["desktop/**", "android/**", "server/src/apps.ts", "server/src/devices.ts", ".github/workflows/apps.yml"]
+  pull_request:
+    paths: ["desktop/**", "android/**", ".github/workflows/apps.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: --linux AppImage deb
+          - os: windows-latest
+            target: --win nsis
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+      - run: npm run build
+      - name: Version from the tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: npm version --no-git-tag-version --allow-same-version "${GITHUB_REF_NAME#v}"
+      - run: npx electron-builder ${{ matrix.target }} --publish never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ runner.os }}
+          path: |
+            desktop/release/*.AppImage
+            desktop/release/*.deb
+            desktop/release/*.exe
+          if-no-files-found: error
+
+  android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+      - name: Signing key (repository secret ORB_KEYSTORE_B64, optional)
+        env:
+          KS: ${{ secrets.ORB_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KS" ]; then echo "$KS" | base64 -d > "$RUNNER_TEMP/orb.jks"; echo "ORB_KEYSTORE=$RUNNER_TEMP/orb.jks" >> "$GITHUB_ENV"; fi
+      - name: Build and test
+        env:
+          ORB_KEYSTORE_PASSWORD: ${{ secrets.ORB_KEYSTORE_PASSWORD }}
+          ORB_KEY_ALIAS: ${{ secrets.ORB_KEY_ALIAS }}
+          ORB_KEY_PASSWORD: ${{ secrets.ORB_KEY_PASSWORD }}
+          ORB_VERSION_CODE: ${{ github.run_number }}
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then export ORB_VERSION_NAME="${GITHUB_REF_NAME#v}"; fi
+          ./gradlew --no-daemon testDebugUnitTest assembleRelease
+          mv app/build/outputs/apk/release/app-release.apk "app/build/outputs/apk/release/Pondering-Orb-android.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: android/app/build/outputs/apk/release/Pondering-Orb-android.apk
+          if-no-files-found: error
+
+  release:
+    needs: [desktop, android]
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ls -la out
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes "Pondering Orb $GITHUB_REF_NAME"
+            gh release upload "$GITHUB_REF_NAME" out/* --clobber
+          else
+            # One rolling pre-release, moved to this commit each time.
+            gh release delete apps-latest --yes --cleanup-tag >/dev/null 2>&1 || true
+            gh release create apps-latest out/* --prerelease --target "$GITHUB_SHA" --title "Orb apps (latest from main)" \
+              --notes "Windows: the .exe installer. Linux: the .AppImage (chmod +x, run) or the .deb. Android: the .apk (allow installs from your browser or file manager). Built from ${GITHUB_SHA::7}. See docs/apps.md."
+          fi

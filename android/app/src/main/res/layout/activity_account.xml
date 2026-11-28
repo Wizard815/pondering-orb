@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+        <ImageView android:layout_width="56dp" android:layout_height="56dp" android:src="@mipmap/ic_launcher" android:importantForAccessibility="no" />
+        <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="vertical" android:paddingStart="12dp">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Pondering Orb" android:textSize="24sp" android:fontFamily="serif" android:textStyle="bold" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Your homelab dashboard, on this phone." android:alpha="0.7" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <TextView android:id="@+id/error" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14dp" android:padding="12dp" android:background="#33E8796C" android:textColor="@color/bad" android:visibility="gone" android:accessibilityLiveRegion="polite" />
+    <TextView android:id="@+id/saved" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14dp" android:textColor="#2E7A4C" android:visibility="gone" android:accessibilityLiveRegion="polite" />
+
+    <LinearLayout android:id="@+id/signin_box" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+        <TextView style="@style/Label" android:labelFor="@id/url" android:text="Orb's address" />
+        <EditText android:id="@+id/url" style="@style/Field" android:inputType="textUri" android:hint="https://orb.thefellashub.com" android:importantForAutofill="no" />
+        <TextView style="@style/Hint" android:text="Your Cloudflare tunnel's address for Orb, or its LAN address (http://192.168.20.5:8095)." />
+        <TextView style="@style/Label" android:labelFor="@id/password" android:text="Orb's password" />
+        <EditText android:id="@+id/password" style="@style/Field" android:inputType="textPassword" android:autofillHints="password" />
+        <TextView style="@style/Hint" android:text="Used once. This phone gets its own key, which you can remove in Orb's Settings → Devices." />
+        <TextView style="@style/Label" android:labelFor="@id/name" android:text="Name for this phone" />
+        <EditText android:id="@+id/name" style="@style/Field" android:inputType="textCapWords" android:maxLength="60" android:importantForAutofill="no" />
+        <TextView style="@style/Label" android:text="Cloudflare Access (optional)" />
+        <TextView style="@style/Hint" android:text="Behind Cloudflare Access? Sign in to Access in Orb when it asks, or add a service token so widgets and notifications get through in the background." />
+        <EditText android:id="@+id/cf_id" style="@style/Field" android:inputType="text" android:hint="Service token Client ID" android:importantForAutofill="no" />
+        <EditText android:id="@+id/cf_secret" style="@style/Field" android:inputType="textPassword" android:hint="Service token Client Secret" android:importantForAutofill="no" />
+        <Button android:id="@+id/sign_in" style="@style/Primary" android:text="Sign in" />
+    </LinearLayout>
+
+    <LinearLayout android:id="@+id/signed_box" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone">
+        <TextView android:id="@+id/where" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:textSize="16sp" />
+        <Button android:id="@+id/open" style="@style/Primary" android:text="Open Orb" />
+        <Switch android:id="@+id/notifications" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:layout_marginTop="16dp" android:text="Notifications: a service down, the morning brief, new requests, finished downloads" />
+        <TextView style="@style/Hint" android:text="Orb is checked every 15 minutes, with no Google push. Add widgets from the home screen, and the Orb tile from Quick Settings." />
+        <TextView style="@style/Label" android:text="Cloudflare Access service token" />
+        <EditText android:id="@+id/cf_id2" style="@style/Field" android:inputType="text" android:hint="Client ID (empty: none)" android:importantForAutofill="no" />
+        <EditText android:id="@+id/cf_secret2" style="@style/Field" android:inputType="textPassword" android:hint="Client Secret (unchanged)" android:importantForAutofill="no" />
+        <Button android:id="@+id/save" style="@style/Primary" android:text="Save" />
+        <Button android:id="@+id/sign_out" android:layout_width="wrap_content" android:layout_height="wrap_content" android:minHeight="48dp" android:layout_marginTop="24dp" android:text="Sign out of this phone" android:textColor="@color/bad" style="?android:attr/borderlessButtonStyle" />
+    </LinearLayout>
+</LinearLayout>
+</ScrollView>
