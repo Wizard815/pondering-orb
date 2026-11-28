@@ -8,7 +8,8 @@ import { buildApp } from "../../server/src/app.js";
 import { loadConfig } from "../../server/src/config.js";
 
 // The real app (Electron) against a real Orb server with the built web page.
-// Needs a display: on Linux run it under xvfb-run. Build the web page first (npm run build at the root).
+// Needs a display: on Linux run it under xvfb-run. Install and build the root first (npm ci && npm run build there):
+// it uses the real server. Not part of the build's type check, so the desktop builds on its own.
 const require = createRequire(import.meta.url);
 const { _electron } = require("playwright");
 const SHOTS = process.env.ORB_DESKTOP_SHOTS;

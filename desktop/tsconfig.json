@@ -11,5 +11,5 @@
     "isolatedModules": true,
     "types": ["node"]
   },
-  "include": ["src", "pages", "test", "e2e"]
+  "include": ["src", "pages", "test"]
 }
