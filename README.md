@@ -1,5 +1,7 @@
 # Pondering Orb
 
+[![License: PolyForm Shield 1.0.0](https://img.shields.io/badge/license-PolyForm%20Shield%201.0.0-blue)](LICENSE)
+
 A self-hosted homelab command center, styled as a wizard's tower. One page to
 see what you're working on, what's due, how the lab is doing and what the day
 holds, with the Golem, an assistant that can read all of it.
@@ -227,4 +229,9 @@ mail (an early version is kept on the `mail` branch).
 
 ## License
 
-MIT, see [LICENSE](LICENSE).
+Pondering Orb is source-available under the
+[PolyForm Shield License 1.0.0](LICENSE). You can read, run, change and share
+it for free, including at work. You can't sell it or offer it as a competing
+product or hosted service without permission: open an issue titled
+"License request" to ask. [docs/LICENSING.md](docs/LICENSING.md) explains it
+in plain English. Versions published before the switch stay under MIT.
